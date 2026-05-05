@@ -94,8 +94,18 @@ export class LotteMall implements Mall {
       args,
     });
     // 컨텍스트 레벨 dialog 핸들러: 항상 accept (lotte는 confirm 자주 발동)
-    this.context.on('page', (p) => {
+    // + 광고 popup (IBK 안내 / contactus 등) 자동 close
+    this.context.on('page', async (p) => {
       p.on('dialog', (d) => d.accept().catch(() => {}));
+      try {
+        await p.waitForLoadState('domcontentloaded', { timeout: 3000 });
+        const url = p.url();
+        if (/contactus|forward\.pop_|\/popup\b|pop_ibk|pop_event/i.test(url)) {
+          await p.close().catch(() => {});
+        }
+      } catch {
+        /* ignore */
+      }
     });
     const pages = this.context.pages();
     this.page = pages[0] ?? (await this.context.newPage());
@@ -559,7 +569,8 @@ export class LotteMall implements Mall {
       }
     }
 
-    // 3) 매칭된 항목 각각: 클릭 → 팝업의 최상위 적립금 추출 → 닫기
+    // 3) 매칭된 항목 각각: 클릭 → 팝업/페이지의 최상위 적립금 추출 → product 페이지 복귀
+    const productUrl = page.url();
     for (const m of matchedLocs) {
       let topTier: number | null = null;
       try {
@@ -570,6 +581,12 @@ export class LotteMall implements Mall {
         /* click/extract 실패 — topTier null 유지 */
       } finally {
         await this.closeRewardPopup(page);
+        // 클릭이 navigation을 일으켰으면 product 페이지로 복귀 (이벤트 페이지로 떠나는 경우 흔함)
+        if (page.url() !== productUrl) {
+          await page.goto(productUrl, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+          await sleep(rand(800, 1200));
+          await this.dismissOverlays(page);
+        }
       }
       this.rewardEvents.push({ name: m.name, topTier });
     }
