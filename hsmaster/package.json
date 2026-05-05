@@ -1,0 +1,28 @@
+{
+  "name": "hsmaster",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PRIVATE — 홈쇼핑 차익거래 자동화 CLI (외부 공개 금지)",
+  "type": "module",
+  "bin": {
+    "hsm": "./bin/hsm"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "hsm": "tsx src/cli/index.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "commander": "^12.1.0",
+    "playwright": "^1.48.0",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

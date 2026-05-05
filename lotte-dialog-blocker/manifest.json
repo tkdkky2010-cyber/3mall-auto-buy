@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Lotte Dialog Auto-Accept",
+  "version": "1.0",
+  "description": "lotteimall.com에서 confirm/alert 팝업을 자동으로 OK 처리합니다",
+  "content_scripts": [
+    {
+      "matches": ["*://*.lotteimall.com/*"],
+      "js": ["inject.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ]
+}

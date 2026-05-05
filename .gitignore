@@ -1,0 +1,22 @@
+# PRIVATE — 계정/세션 정보 절대 git 노출 금지
+hmall_config.json
+lotte.json
+galleria.json
+
+# 동적 상품 ID (월 갱신, 민감)
+hsmaster/config/sulwhasoo-ids.json
+
+# 빌드/런타임 산출물
+hsmaster/node_modules/
+hsmaster/dist/
+hsmaster/data/
+
+# codegen·probe artifacts (평문 비밀번호 흔적 가능)
+hsmaster/scripts/
+
+# 로그·OS 노이즈
+*.log
+.DS_Store
+
+# Chrome 확장 인증키 (배포용 아님)
+lotte-dialog-blocker.pem
