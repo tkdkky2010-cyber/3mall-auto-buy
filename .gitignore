@@ -13,6 +13,11 @@ hsmaster/data/
 
 # codegen·probe artifacts (평문 비밀번호 흔적 가능)
 hsmaster/scripts/
+# 단 launch script는 commit (사용자 setup용)
+!hsmaster/scripts/launch-chrome-cdp.sh
+
+# 계정별 persistent browser profiles (cookies, session)
+profiles/
 
 # 로그·OS 노이즈
 *.log
