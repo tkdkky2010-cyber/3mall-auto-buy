@@ -19,7 +19,18 @@ import sys
 import time
 from pathlib import Path
 from dotenv import load_dotenv
-from patchright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError
+
+# patchright (stealth) 먼저 시도, 실패 시 plain playwright fallback
+# 최신 Chrome (147+) 에서 patchright connect_over_cdp 가 'Browser context management not supported' 에러 가능
+PW_BACKEND = None
+try:
+    from patchright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError
+    PW_BACKEND = "patchright"
+except ImportError:
+    pass
+if PW_BACKEND is None:
+    from playwright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError  # type: ignore
+    PW_BACKEND = "playwright"
 
 ROOT = Path(__file__).parent
 PROJECT_ROOT = ROOT.parent
@@ -402,6 +413,12 @@ def do_checkout(page: Page) -> dict:
         pay_btn.click()
         page.wait_for_timeout(3500)
 
+        # 4.5) brand-specific 결제수단 popup → app pay 버튼 클릭 (예: 삼성→monimo pay 결제)
+        if not click_payment_app_option(page, card_brand):
+            print(f"    [WARN] 결제수단 popup에서 app pay 버튼 미발견 — 7자리 코드 직접 추출 시도")
+
+        page.wait_for_timeout(2000)
+
         # 5) monimo 7자리 코드 추출
         code = extract_monimo_code(page)
         if not code:
@@ -416,52 +433,77 @@ def do_checkout(page: Page) -> dict:
 
 
 def select_best_card(page: Page) -> str | None:
-    """카드할인 섹션 parse → 추천 카드 클릭. brand 코드 반환."""
+    """카드할인 섹션의 leftmost 카드 option 클릭. brand는 클릭 후 동적으로 읽음."""
     section_loc = page.locator("h2:has-text('카드할인')").first
     if section_loc.count() == 0:
         print("    [WARN] '카드할인' h2 미발견")
         return None
 
-    try:
-        section_text = section_loc.locator("xpath=ancestor::div[1]").inner_text(timeout=3000)
-    except Exception:
-        section_text = ""
-    print(f"    [DEBUG] 카드할인 섹션 첫 200자: {section_text[:200].replace(chr(10), ' | ')}")
-
-    recommended_brand: str | None = None
-    matched_keyword: str | None = None
-    for keyword, brand in CARD_BRAND_MAP.items():
-        if keyword in section_text:
-            recommended_brand = brand
-            matched_keyword = keyword
-            print(f"    [INFO] 카드 brand 감지: '{keyword}' → {brand}")
-            break
-
-    if not recommended_brand or not matched_keyword:
-        print("    [WARN] 카드 brand 텍스트 매칭 실패 — 셀렉터 검토 필요")
-        return None
-
-    keywords_list = list(CARD_BRAND_MAP.keys())
+    # 카드 option = div[data-slot="hstack.root"] 중 <strong>에 "%" 포함된 것 (구조적 식별, brand 무관)
+    # 가장 왼쪽 = 최고 할인율 (사용자 가이드)
     js = """
-        (kwList) => {
+        () => {
             const h2 = Array.from(document.querySelectorAll('h2'))
                 .find(h => h.textContent.trim() === '카드할인');
-            if (!h2) return false;
-            const section = h2.closest('div');
-            if (!section) return false;
-            const els = Array.from(section.querySelectorAll('button, a, li, label'));
-            for (const kw of kwList) {
-                const target = els.find(el => el.textContent.includes(kw) && el.offsetParent !== null);
-                if (target) { target.click(); return true; }
+            if (!h2) return { ok: false, reason: 'h2 없음' };
+            // ancestor walk — % 포함된 카드 option div 들어있는 section 찾기
+            let section = h2.closest('div');
+            let opts = [];
+            for (let lvl = 0; lvl < 5 && section; lvl++) {
+                const candidates = Array.from(section.querySelectorAll('div[data-slot="hstack.root"]'))
+                    .filter(d => {
+                        if (d.offsetParent === null) return false;
+                        // 구조적 detection: <strong>에 "%" 있고 <p> 두 개 있는 카드 option
+                        const strong = d.querySelector('strong');
+                        if (!strong || !/\\d+\\s*%/.test(strong.textContent || '')) return false;
+                        return d.querySelectorAll('p').length >= 2;
+                    });
+                if (candidates.length > 0) { opts = candidates; break; }
+                section = section.parentElement;
             }
-            return false;
+            if (opts.length === 0) return { ok: false, reason: 'card option 없음 (구조 미발견)' };
+            // leftmost = 최고 할인율
+            opts.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+            const target = opts[0];
+            // 클릭된 카드의 brand/percent 동적 추출
+            const ps = Array.from(target.querySelectorAll('p'));
+            const brandText = (ps[0]?.textContent || '').trim();
+            const percentText = (target.querySelector('strong')?.textContent || '').trim();
+            const fullText = (target.textContent || '').replace(/\\s+/g, ' ').trim();
+            // 다른 옵션들의 brand/percent도 디버그용
+            const all = opts.map(o => ({
+                brand: (o.querySelector('p')?.textContent || '').trim(),
+                percent: (o.querySelector('strong')?.textContent || '').trim(),
+                left: Math.round(o.getBoundingClientRect().left),
+            }));
+            target.click();
+            return { ok: true, brand: brandText, percent: percentText, fullText, total: opts.length, all };
         }
     """
-    clicked = page.evaluate(js, keywords_list)
-    if not clicked:
-        print(f"    [WARN] 카드 클릭 실패")
-    page.wait_for_timeout(1200)
+    click_result = page.evaluate(js)
+    if not click_result or not click_result.get("ok"):
+        print(f"    [WARN] 카드 클릭 실패: {click_result}")
+        return None
 
+    print(f"    [INFO] 카드할인 옵션 {click_result.get('total')}개:")
+    for opt in click_result.get("all", []):
+        print(f"           left={opt['left']:>4} brand='{opt['brand']}' percent='{opt['percent']}'")
+    print(f"    [OK] 가장 왼쪽 클릭: '{click_result.get('brand')}' {click_result.get('percent')}")
+
+    # 클릭된 brand text → 내부 코드 매핑 (X BOOST 같은 default 카드 변형 처리용)
+    recommended_brand: str | None = None
+    clicked_text = click_result.get("brand", "")
+    for keyword, brand_code in CARD_BRAND_MAP.items():
+        if keyword in clicked_text:
+            recommended_brand = brand_code
+            break
+    if not recommended_brand:
+        print(f"    [INFO] 알 수 없는 brand '{clicked_text}' — default 결제 그대로 진행")
+        recommended_brand = "UNKNOWN"
+
+    page.wait_for_timeout(1500)
+
+    # 다중 카드 (현대 X BOOST 등) 처리
     if recommended_brand in DEFAULT_CARD_NAME and DEFAULT_CARD_NAME[recommended_brand]:
         select_specific_card_variant(page, recommended_brand, DEFAULT_CARD_NAME[recommended_brand])
 
@@ -481,29 +523,90 @@ def select_specific_card_variant(page: Page, brand: str, card_name: str) -> None
         print(f"    [WARN] '{card_name}' 미발견 — default 카드 그대로")
 
 
-def extract_monimo_code(page: Page) -> str | None:
-    """결제하기 후 monimo popup의 7자리 (4-3 형식) 추출."""
-    print("    [INFO] monimo popup 대기 (10초)...")
-    deadline = time.time() + 10
+def click_payment_app_option(page: Page, card_brand: str) -> bool:
+    """결제하기 후 carrier-card popup(주로 iframe)에서 app pay 버튼 클릭.
+    삼성 → monimo pay 결제. iframe 모든 frame 순회.
+    """
+    page.wait_for_timeout(3000)  # iframe 로드 충분히 대기
+
+    brand_app_keywords: dict[str, list[str]] = {
+        "SAMSUNG": ["monimo pay", "모니모"],
+    }
+    keywords = brand_app_keywords.get(card_brand, [])
+    if not keywords:
+        keywords = ["PC결제", "PC 결제", "monimo pay", "앱으로 결제"]
+
+    js = """
+        (kwList) => {
+            for (const kw of kwList) {
+                const els = Array.from(document.querySelectorAll('*'))
+                    .filter(el => el.offsetParent !== null && el.textContent && el.textContent.includes(kw));
+                if (els.length === 0) continue;
+                els.sort((a, b) => a.textContent.length - b.textContent.length);
+                for (const el of els) {
+                    let target = el;
+                    for (let depth = 0; depth < 6 && target; depth++) {
+                        const tag = target.tagName;
+                        const role = target.getAttribute && target.getAttribute('role');
+                        if (tag === 'BUTTON' || tag === 'A' || role === 'button' || target.onclick) {
+                            target.click();
+                            return { ok: true, kw, depth, tag };
+                        }
+                        target = target.parentElement;
+                    }
+                }
+                els[0].click();
+                return { ok: true, kw, depth: -1, tag: els[0].tagName };
+            }
+            return { ok: false };
+        }
+    """
+    # 모든 page (새 창 popup 포함) + 각 page의 모든 frame 순회
+    # 삼성카드 결제 popup은 별도 브라우저 창으로 열림 (window.open)
+    context = page.context
+    deadline = time.time() + 8  # 새 창 8초까지 기다림
     while time.time() < deadline:
-        for frame in [page] + list(page.frames):
-            try:
-                txt = frame.evaluate("() => document.body ? document.body.innerText : ''") or ""
-            except Exception:
-                continue
-            # 4-3 패턴 + popup 컨텍스트 검증 (남은 시간 / monimo / PC결제 키워드 중 하나)
-            if not txt:
-                continue
-            ctx_ok = ("남은 시간" in txt) or ("monimo" in txt.lower()) or ("PC결제" in txt) or ("PC 결제" in txt)
-            if not ctx_ok:
-                continue
-            m = re.search(r"\b(\d{4})\s*(\d{3})\b", txt)
-            if m:
-                code = m.group(1) + m.group(2)
-                print(f"    [OK] monimo 코드: {code}")
-                return code
+        all_pages = context.pages
+        for pi, p in enumerate(all_pages):
+            for fi, frame in enumerate(p.frames):
+                try:
+                    result = frame.evaluate(js, keywords)
+                    if result and result.get("ok"):
+                        page_label = f"page[{pi}]({p.url[:50]})"
+                        frame_label = "main" if fi == 0 else f"iframe[{fi}]"
+                        print(f"    [OK] 결제수단 click on {page_label} {frame_label}: '{result.get('kw')}'")
+                        return True
+                except Exception:
+                    continue
+        page.wait_for_timeout(800)
+    print(f"    [WARN] {len(context.pages)}개 page 전부 검색했지만 keyword {keywords} 미발견")
+    return False
+
+
+def extract_monimo_code(page: Page) -> str | None:
+    """결제하기 후 monimo popup의 7자리 (4-3 형식) 추출. 모든 page+frame 순회."""
+    print("    [INFO] monimo popup 대기 (15초)...")
+    context = page.context
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        for p in context.pages:
+            for frame in p.frames:
+                try:
+                    txt = frame.evaluate("() => document.body ? document.body.innerText : ''") or ""
+                except Exception:
+                    continue
+                if not txt:
+                    continue
+                ctx_ok = ("남은 시간" in txt) or ("monimo" in txt.lower()) or ("PC결제" in txt) or ("PC 결제" in txt)
+                if not ctx_ok:
+                    continue
+                m = re.search(r"\b(\d{4})\s*(\d{3})\b", txt)
+                if m:
+                    code = m.group(1) + m.group(2)
+                    print(f"    [OK] monimo 코드: {code} (page={p.url[:50]})")
+                    return code
         page.wait_for_timeout(500)
-    print("    [WARN] 10초 안에 monimo 코드 미발견")
+    print("    [WARN] 15초 안에 monimo 코드 미발견")
     return None
 
 
@@ -591,26 +694,53 @@ def main() -> int:
     print(f"[INFO] CDP endpoint={CDP_ENDPOINT}")
 
     summary = []
+    print(f"[INFO] PW backend: {PW_BACKEND}")
     with sync_playwright() as p:
         try:
             browser = p.chromium.connect_over_cdp(CDP_ENDPOINT, slow_mo=500)
         except Exception as e:
-            print(f"[FATAL] CDP 연결 실패: {e}")
-            print(f"        Chrome을 --remote-debugging-port={CDP_PORT} 옵션으로 띄웠는지 확인")
-            print(f"        (예: hsmaster/scripts/launch-chrome-cdp.sh)")
+            err_msg = str(e)
+            print(f"[WARN] {PW_BACKEND} CDP 연결 실패: {err_msg[:200]}")
+            # Chrome 147+에서 patchright가 'Browser context management not supported' 던지면 playwright로 fallback
+            if PW_BACKEND == "patchright" and "Browser context management" in err_msg:
+                print("[INFO] plain playwright로 재시도...")
+                try:
+                    from playwright.sync_api import sync_playwright as sync_pw_plain
+                except ImportError:
+                    print("[FATAL] playwright 미설치 — pip install playwright")
+                    return 1
+                # 새 sync 컨텍스트 필요 — outer with 닫고 다시 시작
+                pass  # fall through; handle below
+            else:
+                print(f"        Chrome을 --remote-debugging-port={CDP_PORT} 옵션으로 띄웠는지 확인")
+                return 1
+        else:
+            return _run_with_browser(browser, accounts, target_indices, account_plan, summary)
+    # patchright 실패 시 plain playwright로 재실행
+    from playwright.sync_api import sync_playwright as sync_pw_plain
+    print(f"[INFO] PW backend (fallback): playwright")
+    with sync_pw_plain() as p:
+        try:
+            browser = p.chromium.connect_over_cdp(CDP_ENDPOINT, slow_mo=500)
+        except Exception as e:
+            print(f"[FATAL] playwright CDP 연결도 실패: {e}")
             return 1
+        return _run_with_browser(browser, accounts, target_indices, account_plan, summary)
 
-        context = browser.contexts[0] if browser.contexts else browser.new_context()
-        for idx in target_indices:
-            account = accounts[idx - 1]
-            items = account_plan.get(idx, [])
-            try:
-                ok, total, cleared, ckt = process_account(context, idx, account, items, cdp_mode=True)
-                summary.append((idx, account["id"], ok, total, cleared, ckt))
-            except Exception as e:
-                print(f"  [FATAL] #{idx} {account['id']}: {e}")
-                summary.append((idx, account["id"], 0, len(items), False, None))
-            time.sleep(ACCOUNT_DELAY_SEC)
+
+def _run_with_browser(browser, accounts, target_indices, account_plan, summary) -> int:
+
+    context = browser.contexts[0] if browser.contexts else browser.new_context()
+    for idx in target_indices:
+        account = accounts[idx - 1]
+        items = account_plan.get(idx, [])
+        try:
+            ok, total, cleared, ckt = process_account(context, idx, account, items, cdp_mode=True)
+            summary.append((idx, account["id"], ok, total, cleared, ckt))
+        except Exception as e:
+            print(f"  [FATAL] #{idx} {account['id']}: {e}")
+            summary.append((idx, account["id"], 0, len(items), False, None))
+        time.sleep(ACCOUNT_DELAY_SEC)
 
     print("\n========= SUMMARY =========")
     for idx, aid, ok, total, cleared, ckt in summary:
