@@ -11,10 +11,10 @@ hsmaster/node_modules/
 hsmaster/dist/
 hsmaster/data/
 
-# codegen·probe artifacts (평문 비밀번호 흔적 가능)
-hsmaster/scripts/
-# 단 launch script는 commit (사용자 setup용)
-!hsmaster/scripts/launch-chrome-cdp.sh
+# codegen·probe artifacts (평문 비밀번호 흔적 가능) — .sh 파일은 commit 허용
+hsmaster/scripts/*.js
+hsmaster/scripts/*.mjs
+hsmaster/scripts/*.ts
 
 # 계정별 persistent browser profiles (cookies, session)
 profiles/
