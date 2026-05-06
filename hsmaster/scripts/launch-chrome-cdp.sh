@@ -21,16 +21,28 @@ fi
 
 echo "▶ Chrome 디버그 모드 launch (port $PORT, profile=$USER_DATA_DIR)"
 
-open -na "Google Chrome" --args \
+# 직접 binary 경로 + 시작 URL 명시 (창이 안 뜨는 케이스 방지)
+CHROME_BIN='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+"$CHROME_BIN" \
   --remote-debugging-port="$PORT" \
   '--remote-allow-origins=*' \
-  --user-data-dir="$USER_DATA_DIR"
+  --user-data-dir="$USER_DATA_DIR" \
+  --no-first-run \
+  --no-default-browser-check \
+  https://www.hmall.com/ \
+  > /dev/null 2>&1 &
 
 # 5초 대기 후 포트 확인
 sleep 5
 if curl -s "http://127.0.0.1:$PORT/json/version" > /dev/null 2>&1; then
+  # 창이 0개면 강제로 새 탭 열기
+  WINDOW_COUNT=$(osascript -e 'tell application "Google Chrome" to count of windows' 2>/dev/null || echo 0)
+  if [ "$WINDOW_COUNT" = "0" ]; then
+    curl -sX PUT "http://127.0.0.1:$PORT/json/new?https://www.hmall.com/" > /dev/null
+    sleep 1
+  fi
+  osascript -e 'tell application "Google Chrome" to activate' 2>/dev/null
   echo "✓ CDP 포트 활성화됨"
-  echo "  버전: $(curl -s http://127.0.0.1:$PORT/json/version | head -c 100)"
   echo ""
   echo "다음 단계:"
   echo "  1. 띄워진 Chrome에서 hmall 수동 로그인 (계정별 첫 1회만)"
