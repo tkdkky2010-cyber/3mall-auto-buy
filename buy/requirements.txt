@@ -1,0 +1,5 @@
+patchright>=1.55.0
+python-dotenv>=1.0.0
+# Phase 3-B 폰 자동화 도착 시 추가:
+# Pillow>=10.0
+# easyocr>=1.7

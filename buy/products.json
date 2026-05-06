@@ -1,0 +1,136 @@
+{
+  "_comment": "상품 # -> URL/옵션 정보. option_index는 구매하기 클릭 후 팝업에서 클릭할 [선택 N] 번호. 단일옵션 상품도 팝업에서 [선택 1] 클릭이 정책.",
+  "_fields": {
+    "name": "표시용 이름",
+    "slitmCd": "Hmall 상품 코드",
+    "url_extra": "URL 뒤에 붙는 추가 쿼리 (sectId 등)",
+    "option_index": "옵션 팝업에서 클릭할 [선택 N] 번호 (단일옵션도 1)",
+    "auto_coupon": "쿠폰받기 버튼이 있으면 자동 클릭할지. 하루견과는 사용자가 직접 받으므로 false (가이드 부록 §4)"
+  },
+  "1": {
+    "name": "이너플로라 (유한건강생활 3박스)",
+    "slitmCd": "2154750833",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "2": {
+    "name": "하루견과 초록색 100봉",
+    "slitmCd": "2151046312",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "3": {
+    "name": "하루견과 갈색 100봉",
+    "slitmCd": "2225431602",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "4": {
+    "name": "곡물도감 곡물서리태",
+    "slitmCd": "2227834416",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "5": {
+    "name": "말차 (4와 동일 URL, [선택 2])",
+    "slitmCd": "2227834416",
+    "url_extra": "&sectId=3059445",
+    "option_index": 2,
+    "auto_coupon": true
+  },
+  "10": {
+    "name": "이경제 더힘찬녹용 30포",
+    "slitmCd": "2240802022",
+    "url_extra": "&ordpreview=true",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "12": {
+    "name": "갱년기 다이어트 리얼퀸 3병",
+    "slitmCd": "2202276847",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "15": {
+    "name": "셀게이트 글루타치온 30p",
+    "slitmCd": "2244515588",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "17": {
+    "name": "데이즈온 원데이 알파 8개",
+    "slitmCd": "2247036059",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "20": {
+    "name": "바디랩 유기농 레몬즙 1박",
+    "slitmCd": "2244671296",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "21": {
+    "name": "뉴트리원 브레인알파PS 8박",
+    "slitmCd": "2148410018",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "22": {
+    "name": "올바른건강식품 와이 9박",
+    "slitmCd": "2244934734",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "24": {
+    "name": "알파CD 옐로우컷 20박",
+    "slitmCd": "2245143490",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "25": {
+    "name": "유기농 석류젤리 9박(90개)",
+    "slitmCd": "2243971283",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "26": {
+    "name": "오라틱스 구강유산균 10박",
+    "slitmCd": "2244032427",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "27": {
+    "name": "에이투젠 혈당유산균 3개 1박스",
+    "slitmCd": "2150414954",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "28": {
+    "name": "스키니랩 시서스 다이어트 11박",
+    "slitmCd": "2202464603",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "29": {
+    "name": "뉴트리원 루테인 AX GR 100정",
+    "slitmCd": "2237504874",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  }
+}
