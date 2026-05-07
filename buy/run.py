@@ -53,25 +53,33 @@ CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
 # Phase 3-A 안전장치: 결제하기 클릭 후 7자리 코드만 추출하고 폰 결제는 수동 (또는 Phase 3-B)
 DRY_PAYMENT = os.environ.get("DRY_PAYMENT", "true").lower() == "true"
 
-# 카드 brand 매핑 (텍스트 키워드 → 내부 코드)
-CARD_BRAND_MAP = {
-    "현대": "HYUNDAI",
-    "삼성": "SAMSUNG",
-    "롯데": "LOTTE",
-    "KB": "KB",
-    "국민": "KB",
-    "하나": "HANA",
-    "농협": "NH",
-    "NH": "NH",
-    "BC": "BC",
-    "비씨": "BC",
+# 캐러셀 <img alt="cardCdXX"> → 내부 brand 코드
+CARD_CD_TO_BRAND = {
+    "cardCd01": "BC",
+    "cardCd02": "SAMSUNG",
+    "cardCd03": "KB",
+    "cardCd04": "HYUNDAI",
+    "cardCd07": "SHINHAN",
+    "cardCd08": "LOTTE",
+    "cardCd10": "HANA",
+    "cardCd40": "NH",
 }
 
-# 다중 카드 중 default 선택 — .env에서 로드
-DEFAULT_CARD_NAME: dict[str, str] = {
-    "HYUNDAI": os.environ.get("HYUNDAI_CARD_NAME", "").strip(),
-    "KB": os.environ.get("KB_CARD_NAME", "").strip(),
+# cardCd → 결제수단변경 모달의 <li value="..."> 텍스트 (override 흐름용)
+CARD_CD_TO_NAME = {
+    "cardCd01": "비씨카드(페이북)",
+    "cardCd02": "삼성카드",
+    "cardCd03": "KB국민카드",
+    "cardCd04": "현대카드",
+    "cardCd07": "신한카드",
+    "cardCd08": "롯데카드",
+    "cardCd10": "하나카드",
+    "cardCd40": "NH농협카드",
 }
+
+# 오늘의 결제수단 강제 지정 — 비우면 캐러셀 자동 판독
+# 값 예: "삼성카드" / "현대카드" / "카카오페이" / "토스페이"
+TODAY_BRAND_OVERRIDE = os.environ.get("TODAY_BRAND", "").strip()
 
 
 def load_json(path: Path) -> dict:
@@ -363,7 +371,8 @@ def do_checkout(page: Page) -> dict:
     """cart→구매하기→카드선택→결제하기→7자리 추출.
     Returns dict: {success, code, card_brand, error}
     """
-    out = {"success": False, "code": None, "card_brand": None, "error": None}
+    out = {"success": False, "code": None, "card_brand": None,
+           "is_pay": False, "qr_pay": None, "error": None}
     try:
         # 1) cart 페이지로 이동 + 일반상품 체크
         page.goto(CART_URL, wait_until="domcontentloaded")
@@ -394,18 +403,46 @@ def do_checkout(page: Page) -> dict:
         page.wait_for_load_state("domcontentloaded", timeout=15000)
         page.wait_for_timeout(2500)
 
-        # 3) 카드할인 섹션 → 추천 카드 선택
-        card_brand = select_best_card(page)
-        if not card_brand:
-            out["error"] = "카드할인 섹션 또는 추천 카드 없음 (셀렉터 검토 필요)"
+        # 3) 캐러셀 판독 + 슬라이드 선택 (TODAY_BRAND 있으면 그 카드 강제, 없으면 최고%)
+        slides = detect_carousel_slides(page)
+        if not slides:
+            out["error"] = "캐러셀 슬라이드 미발견 (h2:카드할인 섹션 X)"
             return out
-        out["card_brand"] = card_brand
+        all_summary = [f"{s['brand']}({s['percent']}%)" + ("" if s["isCard"] else "[PAY]") for s in slides]
+        print(f"    [INFO] 캐러셀 슬라이드 {len(slides)}개: {all_summary}")
+
+        pick = pick_carousel_slide(slides, override=TODAY_BRAND_OVERRIDE)
+        if not pick:
+            if TODAY_BRAND_OVERRIDE:
+                out["error"] = f"TODAY_BRAND='{TODAY_BRAND_OVERRIDE}' 캐러셀 슬라이드 매칭 실패 (결제수단변경 모달 fallback 미구현)"
+            else:
+                out["error"] = "슬라이드 선택 실패"
+            return out
+
+        cardcd = pick.get("cardCd", "")
+        is_pay = not pick.get("isCard", True)
+        tag = "카드" if pick.get("isCard") else "페이"
+        mode = "override" if TODAY_BRAND_OVERRIDE else "auto"
+        print(f"    [OK] {tag} {mode} 선택: '{pick.get('brand')}' {pick.get('percent')}% ({cardcd})")
+
+        if pick.get("isCard"):
+            internal_brand = CARD_CD_TO_BRAND.get(cardcd, "UNKNOWN")
+            out["card_brand"] = CARD_CD_TO_NAME.get(cardcd, pick.get("brand", ""))
+        else:
+            internal_brand = "PAY"
+            short = pick.get("brand", "")
+            out["card_brand"] = "카카오페이" if "카카오" in short else ("토스페이" if "토스" in short else short)
+        out["is_pay"] = is_pay
+
+        # 캐러셀 슬라이드 클릭 (Playwright real-click으로 React 핸들러 트리거)
+        if not click_carousel_slide(page, cardcd):
+            out["error"] = "캐러셀 슬라이드 클릭 실패"
+            return out
 
         # 4) 결제하기 클릭
         page.wait_for_timeout(800)
         pay_btn = page.locator("button").filter(has_text=re.compile(r"^\s*결제하기\s*$")).first
         if pay_btn.count() == 0:
-            # 좀 더 너그럽게
             pay_btn = page.locator("button").filter(has_text="결제하기").first
         if pay_btn.count() == 0:
             out["error"] = "결제하기 버튼 없음"
@@ -413,13 +450,17 @@ def do_checkout(page: Page) -> dict:
         pay_btn.click()
         page.wait_for_timeout(3500)
 
-        # 4.5) brand-specific 결제수단 popup → app pay 버튼 클릭 (예: 삼성→monimo pay 결제)
-        if not click_payment_app_option(page, card_brand):
+        # 5) 카드 path → 7자리 / 페이 path → QR 화면 도달 확인
+        if out["is_pay"]:
+            qr_pay = detect_qr_screen(page)
+            out["qr_pay"] = qr_pay or "UNKNOWN"
+            print(f"    [INFO] 페이 path: {out['qr_pay']} QR 화면 도달 — Phase 3-B 폰 자동화 대기")
+            out["success"] = True
+            return out
+
+        if not click_payment_app_option(page, internal_brand):
             print(f"    [WARN] 결제수단 popup에서 app pay 버튼 미발견 — 7자리 코드 직접 추출 시도")
-
         page.wait_for_timeout(2000)
-
-        # 5) monimo 7자리 코드 추출
         code = extract_monimo_code(page)
         if not code:
             out["error"] = "monimo 7자리 코드 미추출 (popup 셀렉터 검토 필요)"
@@ -432,95 +473,181 @@ def do_checkout(page: Page) -> dict:
         return out
 
 
-def select_best_card(page: Page) -> str | None:
-    """카드할인 섹션의 leftmost 카드 option 클릭. brand는 클릭 후 동적으로 읽음."""
-    section_loc = page.locator("h2:has-text('카드할인')").first
-    if section_loc.count() == 0:
-        print("    [WARN] '카드할인' h2 미발견")
-        return None
-
-    # 카드 option = div[data-slot="hstack.root"] 중 <strong>에 "%" 포함된 것 (구조적 식별, brand 무관)
-    # 가장 왼쪽 = 최고 할인율 (사용자 가이드)
+def detect_carousel_slides(page: Page) -> list[dict]:
+    """카드할인 캐러셀 모든 슬라이드의 메타데이터 list 반환 (클릭 X)."""
     js = """
         () => {
             const h2 = Array.from(document.querySelectorAll('h2'))
                 .find(h => h.textContent.trim() === '카드할인');
-            if (!h2) return { ok: false, reason: 'h2 없음' };
-            // ancestor walk — % 포함된 카드 option div 들어있는 section 찾기
+            if (!h2) return [];
             let section = h2.closest('div');
-            let opts = [];
             for (let lvl = 0; lvl < 5 && section; lvl++) {
-                const candidates = Array.from(section.querySelectorAll('div[data-slot="hstack.root"]'))
-                    .filter(d => {
-                        if (d.offsetParent === null) return false;
-                        // 구조적 detection: <strong>에 "%" 있고 <p> 두 개 있는 카드 option
-                        const strong = d.querySelector('strong');
-                        if (!strong || !/\\d+\\s*%/.test(strong.textContent || '')) return false;
-                        return d.querySelectorAll('p').length >= 2;
+                const slides = Array.from(section.querySelectorAll('.swiper-slide'))
+                    .filter(s => {
+                        if (s.offsetParent === null) return false;
+                        const img = s.querySelector('img[alt]');
+                        const strong = s.querySelector('strong');
+                        return img && strong && /\\d+\\s*%/.test(strong.textContent || '');
                     });
-                if (candidates.length > 0) { opts = candidates; break; }
+                if (slides.length > 0) {
+                    return slides.map(s => {
+                        const img = s.querySelector('img[alt]');
+                        const strong = s.querySelector('strong');
+                        const m = (strong.textContent || '').match(/(\\d+)\\s*%/);
+                        const ps = Array.from(s.querySelectorAll('p'));
+                        return {
+                            cardCd: img.alt,
+                            brand: (ps[0]?.textContent || '').trim(),
+                            percent: m ? parseInt(m[1]) : 0,
+                            isCard: img.alt.startsWith('cardCd'),
+                            left: Math.round(s.getBoundingClientRect().left),
+                        };
+                    });
+                }
                 section = section.parentElement;
             }
-            if (opts.length === 0) return { ok: false, reason: 'card option 없음 (구조 미발견)' };
-            // leftmost = 최고 할인율
-            opts.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
-            const target = opts[0];
-            // 클릭된 카드의 brand/percent 동적 추출
-            const ps = Array.from(target.querySelectorAll('p'));
-            const brandText = (ps[0]?.textContent || '').trim();
-            const percentText = (target.querySelector('strong')?.textContent || '').trim();
-            const fullText = (target.textContent || '').replace(/\\s+/g, ' ').trim();
-            // 다른 옵션들의 brand/percent도 디버그용
-            const all = opts.map(o => ({
-                brand: (o.querySelector('p')?.textContent || '').trim(),
-                percent: (o.querySelector('strong')?.textContent || '').trim(),
-                left: Math.round(o.getBoundingClientRect().left),
-            }));
-            target.click();
-            return { ok: true, brand: brandText, percent: percentText, fullText, total: opts.length, all };
+            return [];
         }
     """
-    click_result = page.evaluate(js)
-    if not click_result or not click_result.get("ok"):
-        print(f"    [WARN] 카드 클릭 실패: {click_result}")
+    return page.evaluate(js) or []
+
+
+def pick_carousel_slide(slides: list[dict], override: str = "") -> dict | None:
+    """슬라이드 list에서 하나 선택. override 있으면 매칭, 없으면 최고 % + leftmost."""
+    if not slides:
         return None
-
-    print(f"    [INFO] 카드할인 옵션 {click_result.get('total')}개:")
-    for opt in click_result.get("all", []):
-        print(f"           left={opt['left']:>4} brand='{opt['brand']}' percent='{opt['percent']}'")
-    print(f"    [OK] 가장 왼쪽 클릭: '{click_result.get('brand')}' {click_result.get('percent')}")
-
-    # 클릭된 brand text → 내부 코드 매핑 (X BOOST 같은 default 카드 변형 처리용)
-    recommended_brand: str | None = None
-    clicked_text = click_result.get("brand", "")
-    for keyword, brand_code in CARD_BRAND_MAP.items():
-        if keyword in clicked_text:
-            recommended_brand = brand_code
-            break
-    if not recommended_brand:
-        print(f"    [INFO] 알 수 없는 brand '{clicked_text}' — default 결제 그대로 진행")
-        recommended_brand = "UNKNOWN"
-
-    page.wait_for_timeout(1500)
-
-    # 다중 카드 (현대 X BOOST 등) 처리
-    if recommended_brand in DEFAULT_CARD_NAME and DEFAULT_CARD_NAME[recommended_brand]:
-        select_specific_card_variant(page, recommended_brand, DEFAULT_CARD_NAME[recommended_brand])
-
-    return recommended_brand
+    if override:
+        # cardCd → 카드명 역매핑으로 비교
+        for s in slides:
+            full_name = CARD_CD_TO_NAME.get(s.get("cardCd", ""), "")
+            if full_name == override or override in s.get("brand", "") or s.get("brand", "") in override:
+                return s
+        return None  # override 매칭 슬라이드 없음
+    cards = [s for s in slides if s.get("isCard")]
+    pool = cards if cards else slides
+    pool.sort(key=lambda s: (-s.get("percent", 0), s.get("left", 0)))
+    return pool[0]
 
 
-def select_specific_card_variant(page: Page, brand: str, card_name: str) -> None:
-    """현대 X BOOST / KB 아시아나 체크 RF 3300 같은 다중 카드 default."""
-    print(f"    [INFO] {brand} 다중 카드 — '{card_name}' 선택 시도")
-    page.wait_for_timeout(1500)
-    target = page.locator("button, a, label, li").filter(has_text=card_name).first
-    if target.count() > 0 and target.is_visible():
-        target.click()
-        page.wait_for_timeout(800)
-        print(f"    [OK] '{card_name}' 클릭")
-    else:
-        print(f"    [WARN] '{card_name}' 미발견 — default 카드 그대로")
+def click_carousel_slide(page: Page, cardCd: str) -> bool:
+    """카드할인 캐러셀의 슬라이드를 Playwright real-click으로 선택.
+    캐러셀 클릭이 정상 흐름 (99%). 결제수단변경 모달은 최후의 수단.
+    """
+    # img[alt=cardCd]을 가진 슬라이드 안의 hstack.root div가 실제 클릭 핸들러
+    slide = page.locator(f'.swiper-slide:has(img[alt="{cardCd}"]) div[data-slot="hstack.root"]').first
+    if slide.count() == 0:
+        # fallback: swiper-slide 외곽
+        slide = page.locator(f'.swiper-slide:has(img[alt="{cardCd}"])').first
+    if slide.count() == 0:
+        print(f"    [WARN] 슬라이드 cardCd={cardCd} 미발견")
+        return False
+    try:
+        slide.scroll_into_view_if_needed(timeout=5000)
+        slide.click()
+        page.wait_for_timeout(1500)
+        print(f"    [OK] 캐러셀 슬라이드 클릭 (cardCd={cardCd})")
+        return True
+    except Exception as e:
+        print(f"    [WARN] 슬라이드 클릭 실패: {e}")
+        return False
+
+
+def detect_qr_screen(page: Page) -> str | None:
+    """페이 path에서 결제하기 후 QR 화면 도달 확인. 'KAKAOPAY' / 'TOSSPAY' / None 반환."""
+    print("    [INFO] QR 화면 대기 (10초)...")
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        for p in page.context.pages:
+            for frame in p.frames:
+                try:
+                    txt = frame.evaluate("() => document.body ? document.body.innerText : ''") or ""
+                    title = frame.evaluate("() => document.title || ''") or ""
+                except Exception:
+                    continue
+                blob = (title + " " + txt).lower()
+                if "카카오페이" in (title + txt) and "qr" in blob:
+                    return "KAKAOPAY"
+                if "토스페이" in (title + txt) and "qr" in blob:
+                    return "TOSSPAY"
+        page.wait_for_timeout(500)
+    return None
+
+
+def dismiss_card_overlay_popups(all_pages) -> None:
+    """카드사별 안내/권한 overlay popup 자동 dismiss.
+    NH: vbv.nonghyup.com의 '크롬·엣지 141 업데이트 안내' (a#btnClose).
+    추가 카드사는 아래 dismiss_actions에 등록.
+    """
+    dismiss_actions = [
+        # (URL substring, JS selector to click)
+        ("nonghyup.com", "a#btnClose"),
+    ]
+    for p in all_pages:
+        url = p.url
+        for url_sub, sel in dismiss_actions:
+            if url_sub not in url:
+                continue
+            try:
+                # selector 존재하면 click
+                clicked = p.evaluate(f"""
+                    () => {{
+                        const el = document.querySelector("{sel}");
+                        if (el && el.offsetParent !== null) {{ el.click(); return true; }}
+                        return false;
+                    }}
+                """)
+                if clicked:
+                    print(f"    [INFO] overlay popup 닫기: {url[:60]} ({sel})")
+            except Exception:
+                pass
+
+
+def click_nh_pay_button(page: Page) -> bool:
+    """NH 카드 popup의 파란 '결제하기' 버튼 클릭.
+    NH popup frame 식별 → frame 안에서 '결제하기' click.
+    """
+    deadline = time.time() + 8
+    while time.time() < deadline:
+        for p in page.context.pages:
+            dismiss_card_overlay_popups([p])
+            for frame in p.frames:
+                try:
+                    text = frame.evaluate("() => document.body ? document.body.innerText : ''") or ""
+                except Exception:
+                    continue
+                # NH popup 식별 — "NH pay" + "다른 결제" 둘 다 있어야 NH 결제 frame
+                if "NH pay" not in text or "다른 결제" not in text:
+                    continue
+                # frame 안에서 결제하기 click (frame URL 기록)
+                try:
+                    clicked = frame.evaluate("""
+                        () => {
+                            const els = Array.from(document.querySelectorAll('*'))
+                                .filter(el => el.children.length === 0 && el.textContent.trim() === '결제하기' && el.offsetParent !== null);
+                            if (els.length === 0) return false;
+                            for (const el of els) {
+                                let target = el;
+                                for (let d = 0; d < 6 && target; d++) {
+                                    if (target.tagName === 'BUTTON' || target.tagName === 'A' || target.onclick) {
+                                        target.click();
+                                        return true;
+                                    }
+                                    target = target.parentElement;
+                                }
+                            }
+                            els[0].click();
+                            return true;
+                        }
+                    """)
+                    if clicked:
+                        print(f"    [OK] NH popup '결제하기' 클릭 (frame={(frame.url or '?')[:60]})")
+                        return True
+                except Exception as e:
+                    print(f"    [WARN] NH frame 클릭 시도 실패: {e}")
+                    continue
+        page.wait_for_timeout(500)
+    print(f"    [WARN] NH popup '결제하기' 버튼 미발견 (8s)")
+    return False
 
 
 def click_payment_app_option(page: Page, card_brand: str) -> bool:
@@ -529,12 +656,17 @@ def click_payment_app_option(page: Page, card_brand: str) -> bool:
     """
     page.wait_for_timeout(3000)  # iframe 로드 충분히 대기
 
+    # NH는 2단계 (popup 식별 + 결제하기) — 별도 함수
+    if card_brand == "NH":
+        return click_nh_pay_button(page)
+
     brand_app_keywords: dict[str, list[str]] = {
         "SAMSUNG": ["monimo pay", "모니모"],
     }
     keywords = brand_app_keywords.get(card_brand, [])
     if not keywords:
         keywords = ["PC결제", "PC 결제", "monimo pay", "앱으로 결제"]
+    excludes: list[str] = []
 
     js = """
         (kwList) => {
@@ -567,8 +699,13 @@ def click_payment_app_option(page: Page, card_brand: str) -> bool:
     deadline = time.time() + 8  # 새 창 8초까지 기다림
     while time.time() < deadline:
         all_pages = context.pages
+        # NH 등 카드사별 overlay 안내 popup 자동 dismiss
+        dismiss_card_overlay_popups(all_pages)
         for pi, p in enumerate(all_pages):
             for fi, frame in enumerate(p.frames):
+                # 카드별 exclude URL — 해당 substring 포함된 프레임은 skip
+                if excludes and any(e in (frame.url or "") for e in excludes):
+                    continue
                 try:
                     result = frame.evaluate(js, keywords)
                     if result and result.get("ok"):
@@ -584,10 +721,17 @@ def click_payment_app_option(page: Page, card_brand: str) -> bool:
 
 
 def extract_monimo_code(page: Page) -> str | None:
-    """결제하기 후 monimo popup의 7자리 (4-3 형식) 추출. 모든 page+frame 순회."""
-    print("    [INFO] monimo popup 대기 (15초)...")
+    """결제 popup의 7자리 코드 추출. monimo (4-3) / NH (2-2-3) / 단순 7자리 모두 지원."""
+    print("    [INFO] 결제 코드 popup 대기 (15초)...")
     context = page.context
     deadline = time.time() + 15
+    # 컨텍스트 키워드 — 결제 코드 화면임을 식별
+    ctx_keywords = ("남은 시간", "monimo", "PC결제", "PC 결제", "결제코드", "결제완료", "QR코드")
+    # 추출 패턴 — NH 2-2-3 우선, monimo 4-3 후순위
+    patterns = [
+        re.compile(r"\b(\d{2})[-\s](\d{2})[-\s](\d{3})\b"),  # NH: "26-35-585"
+        re.compile(r"\b(\d{4})[-\s]*(\d{3})\b"),               # monimo: "3358 599"
+    ]
     while time.time() < deadline:
         for p in context.pages:
             for frame in p.frames:
@@ -597,16 +741,17 @@ def extract_monimo_code(page: Page) -> str | None:
                     continue
                 if not txt:
                     continue
-                ctx_ok = ("남은 시간" in txt) or ("monimo" in txt.lower()) or ("PC결제" in txt) or ("PC 결제" in txt)
-                if not ctx_ok:
+                txt_lower = txt.lower()
+                if not any(k.lower() in txt_lower for k in ctx_keywords):
                     continue
-                m = re.search(r"\b(\d{4})\s*(\d{3})\b", txt)
-                if m:
-                    code = m.group(1) + m.group(2)
-                    print(f"    [OK] monimo 코드: {code} (page={p.url[:50]})")
-                    return code
+                for pat in patterns:
+                    m = pat.search(txt)
+                    if m:
+                        code = "".join(m.groups())
+                        print(f"    [OK] 결제 코드: {code} (page={p.url[:50]})")
+                        return code
         page.wait_for_timeout(500)
-    print("    [WARN] 15초 안에 monimo 코드 미발견")
+    print("    [WARN] 15초 안에 결제 코드 미발견")
     return None
 
 
@@ -645,7 +790,10 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
         print(f"  [CHECKOUT] #{idx} 시작...")
         checkout_result = do_checkout(page)
         if checkout_result["success"]:
-            print(f"  ✓ [PAYMENT CODE] #{idx} {checkout_result['card_brand']} → {checkout_result['code']}")
+            if checkout_result.get("is_pay"):
+                print(f"  ✓ [PAY QR] #{idx} {checkout_result['card_brand']} → {checkout_result.get('qr_pay')} QR (Phase 3-B 폰 처리)")
+            else:
+                print(f"  ✓ [PAYMENT CODE] #{idx} {checkout_result['card_brand']} → {checkout_result['code']}")
             if DRY_PAYMENT:
                 print(f"  ⚠️ DRY_PAYMENT=true — 폰에서 수동 결제 또는 Phase 3-B 자동화 대기")
         else:
@@ -752,7 +900,10 @@ def _run_with_browser(browser, accounts, target_indices, account_plan, summary) 
         ck = ""
         if ckt is not None:
             if ckt["success"]:
-                ck = f" 💳 {ckt['card_brand']}/{ckt['code']}"
+                if ckt.get("is_pay"):
+                    ck = f" 📱 {ckt['card_brand']}/{ckt.get('qr_pay', 'QR')}"
+                else:
+                    ck = f" 💳 {ckt['card_brand']}/{ckt['code']}"
             else:
                 ck = f" ✗ckt:{ckt['error'][:40] if ckt['error'] else '?'}"
         print(f"  {mark} {cart_mark} #{idx:2d} {aid:30s}  {ok}/{total}{ck}")
