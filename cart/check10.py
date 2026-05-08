@@ -115,7 +115,9 @@ def check_one_product(page: Page, prod: dict) -> dict:
         "url": url,
         "ten_percent": False,
         "phrase": None,
-        "type": None,           # "simple" / "tier" / "unknown"
+        "min_purchase": None,   # 최소 구매금액 (예: "30,000원 이상", "1원 이상")
+        "rate": None,           # 적립률 (예: "10%")
+        "max_reward": None,     # 최대 적립금 (예: "200,000P")
         "has_coupon": False,    # strong.rvej6q8 (쿠폰 적용가 라벨) 존재 여부
         "error": None,
     }
@@ -147,36 +149,49 @@ def check_one_product(page: Page, prod: dict) -> dict:
     if m:
         out["phrase"] = (m.group(1) + "10% 적립").strip()
 
-    # Step 2: H.Point 적립 상세 링크 click → 단순/구간별
-    # 가이드 기준: 상세 페이지 테이블 행 1개 = simple, 2+ = tier
+    # Step 2: H.Point 적립 상세 링크 click → 표에서 최소구매/적립률 + 본문에서 최대적립
     detail_link = page.locator('a[href*="evntHPointDtl"]').first
     if detail_link.count() > 0:
         try:
-            href = detail_link.get_attribute("href") or ""
-            # 같은 탭 navigate
             detail_link.click()
             page.wait_for_load_state("domcontentloaded", timeout=10000)
             page.wait_for_timeout(2000)
-            # "행사 상품 구매시" 하단 테이블 행 수
-            try:
-                rows = page.locator("table tbody tr").count()
-            except Exception:
-                rows = 0
-            if rows == 1:
-                out["type"] = "simple"
-            elif rows >= 2:
-                out["type"] = "tier"
-            else:
-                # 행 0 — 다른 구조일 수 있음. 문구로 fallback
-                out["type"] = "tier" if "최대" in (out["phrase"] or "") else "simple"
-            # 뒤로가기
+            extracted = page.evaluate("""
+                () => {
+                    const out = {};
+                    // 표 첫 데이터 행: 최소구매금액 | 적립률
+                    const tables = document.querySelectorAll('table');
+                    for (const tbl of tables) {
+                        const rows = tbl.querySelectorAll('tr');
+                        for (const r of rows) {
+                            const cells = r.querySelectorAll('td');
+                            if (cells.length >= 2) {
+                                const c0 = cells[0].textContent.trim();
+                                const c1 = cells[1].textContent.trim();
+                                if (/원\\s*이상|개\\s*이상/.test(c0) && /%/.test(c1)) {
+                                    out.min_purchase = c0;
+                                    out.rate = c1;
+                                    break;
+                                }
+                            }
+                        }
+                        if (out.min_purchase) break;
+                    }
+                    // 본문에서 "최대 N,NNN P 까지만" 추출
+                    const body = document.body ? document.body.innerText : '';
+                    const m = body.match(/최대\\s*([\\d,]+)\\s*P/);
+                    if (m) out.max_reward = m[1] + 'P';
+                    return out;
+                }
+            """)
+            if extracted:
+                out["min_purchase"] = extracted.get("min_purchase")
+                out["rate"] = extracted.get("rate")
+                out["max_reward"] = extracted.get("max_reward")
             page.go_back(wait_until="domcontentloaded", timeout=10000)
             page.wait_for_timeout(1200)
-        except Exception as e:
-            out["type"] = "unknown"
-    else:
-        # H.Point 링크 없으면 phrase 기준 fallback
-        out["type"] = "tier" if "최대" in (out["phrase"] or "") else "simple"
+        except Exception:
+            pass
 
     # Step 3: 쿠폰 보유 여부 — strong.rvej6q8 (쿠폰 적용가 라벨) 존재만 확인
     # 가격은 폰트 난독화로 부정확하니 추출 X. 다운로드는 buy 단계의 click_coupon_receive에서.
@@ -230,12 +245,40 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
             print(f"[WARN] 탭 생성 실패: {e}")
             return False
 
-    # 마지막 데이터 행 찾기
     try:
         all_vals = ws.get_all_values()
     except Exception as e:
         print(f"[WARN] 탭 읽기 실패: {e}")
         return False
+
+    # 기존 "현대Hmall 10% 적립 체크" 섹션이 있으면 그 행부터 다음 빈 행까지만 지움
+    # — 다른 섹션 (rate-check 결과 등)은 안 건드림
+    section_marker = "현대Hmall 10% 적립 체크"
+    hmall_start_idx = None  # 0-based
+    for i, row in enumerate(all_vals):
+        if row and row[0].strip().startswith(section_marker):
+            hmall_start_idx = i
+            break
+    if hmall_start_idx is not None:
+        # 섹션 끝 = 다음 완전 빈 행 (모든 셀 빈 칸)
+        hmall_end_idx = len(all_vals)
+        for j in range(hmall_start_idx + 1, len(all_vals)):
+            if not any(c.strip() for c in all_vals[j]):
+                hmall_end_idx = j
+                break
+        clear_range = f"A{hmall_start_idx + 1}:Z{hmall_end_idx}"
+        try:
+            ws.batch_clear([clear_range])
+            print(f"[INFO] 기존 Hmall 섹션 삭제: {clear_range}")
+        except Exception as e:
+            print(f"[WARN] 기존 섹션 삭제 실패: {e}")
+        # 다시 읽기 — 삭제 후 마지막 데이터 행 재계산
+        try:
+            all_vals = ws.get_all_values()
+        except Exception:
+            pass
+
+    # 마지막 데이터 행 찾기
     last_row = 0
     for i, row in enumerate(all_vals):
         if any(c.strip() for c in row):
@@ -244,26 +287,29 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
 
     # 데이터 준비
     section_title = [f"현대Hmall 10% 적립 체크 ({tab_candidates[0]}) — {len(results)}개 상품"]
-    headers = ["#", "제품명", "10%적립", "적립 문구", "단순/구간", "쿠폰", "URL"]
-    type_map = {"simple": "✅단순10%", "tier": "⚠️구간별", "unknown": "?", None: ""}
+    headers = ["#", "제품명", "10%적립", "적립 문구", "최소구매", "적립률", "최대적립", "쿠폰", "URL"]
     rows = []
     for r in results:
         if r.get("error"):
             ten = "ERR"
             phrase = r.get("error", "")
-            klass = ""
+            min_p = ""
+            rate = ""
+            max_r = ""
             coupon = ""
         else:
             ten = "✓" if r["ten_percent"] else "✗"
             phrase = r.get("phrase") or ""
-            klass = type_map.get(r.get("type"), "")
+            min_p = r.get("min_purchase") or ""
+            rate = r.get("rate") or ""
+            max_r = r.get("max_reward") or ""
             coupon = "🎟️ 보유" if r.get("has_coupon") else ""
-        rows.append([str(r["id"]), r["name"], ten, phrase, klass, coupon, r.get("url", "")])
+        rows.append([str(r["id"]), r["name"], ten, phrase, min_p, rate, max_r, coupon, r.get("url", "")])
 
     # 한 번에 입력 (gspread batch update — Chrome UI 조작 X)
     payload = [section_title] + [headers] + rows
     end_row = start_row + len(payload) - 1
-    range_str = f"A{start_row}:G{end_row}"
+    range_str = f"A{start_row}:I{end_row}"
     try:
         ws.update(values=payload, range_name=range_str, value_input_option="USER_ENTERED")
         print(f"[OK] 시트 입력 완료: {ws.title}!{range_str} ({len(rows)}개 상품)")
@@ -273,26 +319,31 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
         return False
 
 
+def _short_min(v: str | None) -> str:
+    """'30,000원 이상' → '30,000원↑', '1원 이상' → '1원↑'."""
+    if not v:
+        return "—"
+    return v.replace("이상", "").strip() + "↑" if "이상" in v else v
+
+
 def print_report(results: list[dict]) -> None:
     print("\n========= 10% 적립 체크 결과 =========")
-    print(f"{'#':>3} | {'제품명':40s} | {'10%':5s} | {'구분':10s} | 쿠폰")
-    print("-" * 90)
+    print(f"{'#':>3} | {'제품명':38s} | {'10%':4s} | {'최소구매':12s} | {'적립률':6s} | {'최대적립':10s} | 쿠폰")
+    print("-" * 110)
     for r in results:
         if r.get("error"):
             mark_10 = "ERR"
-            type_str = r["error"][:10]
+            min_p = r["error"][:10]
+            rate = "—"
+            max_r = "—"
         else:
             mark_10 = "✓" if r["ten_percent"] else "✗"
-            type_map = {"simple": "✅단순10%", "tier": "⚠️구간별", "unknown": "?", None: "—"}
-            type_str = type_map.get(r["type"], "—")
-        coupon = "보유" if r.get("has_coupon") else "—"
-        name = (r["name"][:38] + "…") if len(r["name"]) > 39 else r["name"]
-        print(f"{r['id']:>3} | {name:40s} | {mark_10:5s} | {type_str:10s} | {coupon}")
-
-    good = [r for r in results if r["ten_percent"] and r["type"] == "simple"]
-    print(f"\n>>> 단순 10% 적립 (구매 후보): {len(good)}개")
-    for r in good:
-        print(f"     #{r['id']:>3} {r['name']}")
+            min_p = _short_min(r.get("min_purchase"))
+            rate = r.get("rate") or "—"
+            max_r = r.get("max_reward") or "—"
+        coupon = "🎟️" if r.get("has_coupon") else "—"
+        name = (r["name"][:36] + "…") if len(r["name"]) > 37 else r["name"]
+        print(f"{r['id']:>3} | {name:38s} | {mark_10:4s} | {min_p:12s} | {rate:6s} | {max_r:10s} | {coupon}")
 
 
 def main() -> int:
@@ -364,7 +415,7 @@ def _run(browser, acc) -> int:
         "date": date_str,
         "account_used": acc["id"],
         "products": results,
-        "good_ids": [r["id"] for r in results if r["ten_percent"] and r["type"] == "simple"],
+        "ten_percent_ids": [r["id"] for r in results if r["ten_percent"] and not r.get("error")],
     }
     TODAY_OUT.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\n[OK] 결과 저장: {TODAY_OUT}")
