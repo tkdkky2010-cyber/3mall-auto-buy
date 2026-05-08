@@ -39,9 +39,13 @@ CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
 LOGIN_URL = "https://www.hmall.com/mo/cob/loginForm"
 ITEM_URL_FMT = "https://www.hmall.com/md/pda/itemPtc?slitmCd={slitmCd}{extra}"
 
+# Google Sheets — Step 1과 동일 시트의 "{M.DD}" 탭에 추가 입력
+SHEET_KEY = "1fxB0UvLRy2iQfonCWn5U5mWnXbzSdn6l4e2XuQluhwo"
+GSPREAD_KEY = next(iter(PROJECT_ROOT.glob("gen-lang-*.json")), None)
+
 # 가이드 cart/Hmall 10% Check Guide.md 의 상품 목록 (Phase 2)
 PRODUCTS = [
-    {"id": 1,  "name": "이너플로라",                          "slitmCd": "2152461561", "url_extra": "&ordpreview=true"},
+    {"id": 1,  "name": "이너플로라",                          "slitmCd": "2154750833", "url_extra": ""},
     {"id": 2,  "name": "하루견과 초록색 100봉",                "slitmCd": "2151046312", "url_extra": "&sectId=3059445"},
     {"id": 3,  "name": "하루견과 갈색 100봉",                 "slitmCd": "2225431602", "url_extra": "&sectId=3059445"},
     {"id": 4,  "name": "곡물도감 곡물서리태",                  "slitmCd": "2227834416", "url_extra": "&sectId=3059445"},
@@ -184,6 +188,91 @@ def check_one_product(page: Page, prod: dict) -> dict:
     return out
 
 
+def write_to_sheet(results: list[dict], date_str: str) -> bool:
+    """Step 1과 동일 시트의 "{M.DD}" 탭에 Hmall 10% 결과 추가 입력.
+    기존 데이터 마지막 행에서 2행 띄운 후 헤더+상품 행들 입력.
+    """
+    if not GSPREAD_KEY or not GSPREAD_KEY.exists():
+        print("[WARN] gspread 서비스 계정 키 없음 (gen-lang-*.json) — 시트 입력 skip")
+        return False
+    try:
+        import gspread
+    except ImportError:
+        print("[WARN] gspread 미설치 (pip install gspread google-auth) — 시트 입력 skip")
+        return False
+
+    # 탭명 = "M.DD" (zero-padded DD): 2026-05-08 → "5.08"
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    tab_candidates = [f"{dt.month}.{dt.day:02d}", f"{dt.month}.{dt.day}"]
+
+    try:
+        gc = gspread.service_account(filename=str(GSPREAD_KEY))
+        sh = gc.open_by_key(SHEET_KEY)
+    except Exception as e:
+        print(f"[WARN] 시트 연결 실패: {e}")
+        return False
+
+    ws = None
+    for tab in tab_candidates:
+        try:
+            ws = sh.worksheet(tab)
+            print(f"[INFO] 탭 '{tab}' 사용")
+            break
+        except Exception:
+            continue
+    if ws is None:
+        # 없으면 첫 후보로 생성
+        new_tab = tab_candidates[0]
+        try:
+            ws = sh.add_worksheet(title=new_tab, rows=200, cols=10, index=0)
+            print(f"[INFO] 탭 '{new_tab}' 신규 생성")
+        except Exception as e:
+            print(f"[WARN] 탭 생성 실패: {e}")
+            return False
+
+    # 마지막 데이터 행 찾기
+    try:
+        all_vals = ws.get_all_values()
+    except Exception as e:
+        print(f"[WARN] 탭 읽기 실패: {e}")
+        return False
+    last_row = 0
+    for i, row in enumerate(all_vals):
+        if any(c.strip() for c in row):
+            last_row = i + 1
+    start_row = last_row + 3 if last_row > 0 else 1   # 2행 띄움 (rate-check 데이터와 시각적 분리)
+
+    # 데이터 준비
+    section_title = [f"현대Hmall 10% 적립 체크 ({tab_candidates[0]}) — {len(results)}개 상품"]
+    headers = ["#", "제품명", "10%적립", "적립 문구", "단순/구간", "쿠폰", "URL"]
+    type_map = {"simple": "✅단순10%", "tier": "⚠️구간별", "unknown": "?", None: ""}
+    rows = []
+    for r in results:
+        if r.get("error"):
+            ten = "ERR"
+            phrase = r.get("error", "")
+            klass = ""
+            coupon = ""
+        else:
+            ten = "✓" if r["ten_percent"] else "✗"
+            phrase = r.get("phrase") or ""
+            klass = type_map.get(r.get("type"), "")
+            coupon = "🎟️ 보유" if r.get("has_coupon") else ""
+        rows.append([str(r["id"]), r["name"], ten, phrase, klass, coupon, r.get("url", "")])
+
+    # 한 번에 입력 (gspread batch update — Chrome UI 조작 X)
+    payload = [section_title] + [headers] + rows
+    end_row = start_row + len(payload) - 1
+    range_str = f"A{start_row}:G{end_row}"
+    try:
+        ws.update(values=payload, range_name=range_str, value_input_option="USER_ENTERED")
+        print(f"[OK] 시트 입력 완료: {ws.title}!{range_str} ({len(rows)}개 상품)")
+        return True
+    except Exception as e:
+        print(f"[WARN] 시트 입력 실패: {e}")
+        return False
+
+
 def print_report(results: list[dict]) -> None:
     print("\n========= 10% 적립 체크 결과 =========")
     print(f"{'#':>3} | {'제품명':40s} | {'10%':5s} | {'구분':10s} | 쿠폰")
@@ -270,14 +359,19 @@ def _run(browser, acc) -> int:
     print_report(results)
 
     # JSON 출력
+    date_str = datetime.now().strftime("%Y-%m-%d")
     payload = {
-        "date": datetime.now().strftime("%Y-%m-%d"),
+        "date": date_str,
         "account_used": acc["id"],
         "products": results,
         "good_ids": [r["id"] for r in results if r["ten_percent"] and r["type"] == "simple"],
     }
     TODAY_OUT.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\n[OK] 결과 저장: {TODAY_OUT}")
+
+    # Google Sheets 입력 (Step 1과 동일 시트의 "{M.DD}" 탭에 추가)
+    write_to_sheet(results, date_str)
+
     page.close()
     return 0
 

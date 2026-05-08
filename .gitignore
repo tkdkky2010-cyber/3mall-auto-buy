@@ -2,6 +2,7 @@
 hmall_config.json
 lotte.json
 galleria.json
+gen-lang-*.json
 
 # 동적 상품 ID (월 갱신, 민감)
 hsmaster/config/sulwhasoo-ids.json
