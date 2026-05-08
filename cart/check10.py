@@ -112,7 +112,7 @@ def check_one_product(page: Page, prod: dict) -> dict:
         "ten_percent": False,
         "phrase": None,
         "type": None,           # "simple" / "tier" / "unknown"
-        "coupon_price_dom": None,  # DOM 텍스트 (폰트 난독화 — 부정확)
+        "has_coupon": False,    # strong.rvej6q8 (쿠폰 적용가 라벨) 존재 여부
         "error": None,
     }
     try:
@@ -174,14 +174,10 @@ def check_one_product(page: Page, prod: dict) -> dict:
         # H.Point 링크 없으면 phrase 기준 fallback
         out["type"] = "tier" if "최대" in (out["phrase"] or "") else "simple"
 
-    # Step 3: 쿠폰 적용가 (strong.rvej6q8 라벨 + strong.rvej6qa 금액)
-    # 폰트 난독화로 DOM 텍스트는 부정확 — 그대로 dump (참고용)
+    # Step 3: 쿠폰 보유 여부 — strong.rvej6q8 (쿠폰 적용가 라벨) 존재만 확인
+    # 가격은 폰트 난독화로 부정확하니 추출 X. 다운로드는 buy 단계의 click_coupon_receive에서.
     try:
-        coupon_label = page.locator("strong.rvej6q8").first
-        if coupon_label.count() > 0:
-            price = page.locator("div.rvej6q9 strong.rvej6qa").first
-            if price.count() > 0:
-                out["coupon_price_dom"] = price.inner_text().strip()
+        out["has_coupon"] = page.locator("strong.rvej6q8").count() > 0
     except Exception:
         pass
 
@@ -190,8 +186,8 @@ def check_one_product(page: Page, prod: dict) -> dict:
 
 def print_report(results: list[dict]) -> None:
     print("\n========= 10% 적립 체크 결과 =========")
-    print(f"{'#':>3} | {'제품명':40s} | {'10%':5s} | {'구분':10s} | 쿠폰가(DOM)")
-    print("-" * 100)
+    print(f"{'#':>3} | {'제품명':40s} | {'10%':5s} | {'구분':10s} | 쿠폰")
+    print("-" * 90)
     for r in results:
         if r.get("error"):
             mark_10 = "ERR"
@@ -200,7 +196,7 @@ def print_report(results: list[dict]) -> None:
             mark_10 = "✓" if r["ten_percent"] else "✗"
             type_map = {"simple": "✅단순10%", "tier": "⚠️구간별", "unknown": "?", None: "—"}
             type_str = type_map.get(r["type"], "—")
-        coupon = r.get("coupon_price_dom") or "—"
+        coupon = "보유" if r.get("has_coupon") else "—"
         name = (r["name"][:38] + "…") if len(r["name"]) > 39 else r["name"]
         print(f"{r['id']:>3} | {name:40s} | {mark_10:5s} | {type_str:10s} | {coupon}")
 
