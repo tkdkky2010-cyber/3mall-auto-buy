@@ -662,6 +662,7 @@ def click_payment_app_option(page: Page, card_brand: str) -> bool:
 
     brand_app_keywords: dict[str, list[str]] = {
         "SAMSUNG": ["monimo pay", "모니모"],
+        "HYUNDAI": ["앱카드 결제"],   # 현대카드 popup의 "앱카드 결제" → 7자리(4-3) 화면
     }
     keywords = brand_app_keywords.get(card_brand, [])
     if not keywords:
@@ -726,11 +727,16 @@ def extract_monimo_code(page: Page) -> str | None:
     context = page.context
     deadline = time.time() + 15
     # 컨텍스트 키워드 — 결제 코드 화면임을 식별
-    ctx_keywords = ("남은 시간", "monimo", "PC결제", "PC 결제", "결제코드", "결제완료", "QR코드")
-    # 추출 패턴 — NH 2-2-3 우선, monimo 4-3 후순위
+    ctx_keywords = (
+        "남은 시간", "monimo", "PC결제", "PC 결제",
+        "결제코드", "결제완료", "결제 완료",
+        "QR코드", "QR 촬영", "숫자코드", "앱카드",
+    )
+    # 추출 패턴 (priority order)
     patterns = [
         re.compile(r"\b(\d{2})[-\s](\d{2})[-\s](\d{3})\b"),  # NH: "26-35-585"
         re.compile(r"\b(\d{4})[-\s]*(\d{3})\b"),               # monimo: "3358 599"
+        re.compile(r"\b(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\b"),  # 현대카드: 각 자리 줄바꿈 분리
     ]
     while time.time() < deadline:
         for p in context.pages:
