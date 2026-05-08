@@ -133,7 +133,6 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 | 24 | 알파CD 옐로우컷 20박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2245143490&sectId=3059445 |
 | 25 | 유기농 석류젤리 9박(90개) | https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445 |
 | 26 | 오라틱스 구강유산균 10박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244032427&sectId=3059445 |
-| 27 | 에이투젠 혈당유산균 3개 1박스 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2150414954&sectId=3059445 |
 | 28 | 스키니랩 시서스 다이어트 11박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2202464603&sectId=3059445 |
 | 29 | 뉴트리원 루테인 AX GR 100정 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2237504874&sectId=3059445 |
 

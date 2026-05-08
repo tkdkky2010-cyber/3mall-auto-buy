@@ -138,9 +138,16 @@ def check_one_product(page: Page, prod: dict) -> dict:
         out["error"] = "판매중단"
         return out
 
+    # Step 3 (쿠폰 검출) — ten_percent 여부와 무관하게 항상 실행
+    # "쿠폰 받기" 버튼 존재 여부 (buy/run.py의 click_coupon_receive와 동일 로직)
+    try:
+        out["has_coupon"] = page.locator("button").filter(has_text="쿠폰 받기").count() > 0
+    except Exception:
+        pass
+
     # Step 1: "10% 적립" 검출
     if "10% 적립" not in body_text:
-        return out  # ten_percent=False
+        return out  # ten_percent=False (쿠폰 정보는 위에서 이미 채움)
 
     out["ten_percent"] = True
 
@@ -192,13 +199,6 @@ def check_one_product(page: Page, prod: dict) -> dict:
             page.wait_for_timeout(1200)
         except Exception:
             pass
-
-    # Step 3: 쿠폰 보유 여부 — strong.rvej6q8 (쿠폰 적용가 라벨) 존재만 확인
-    # 가격은 폰트 난독화로 부정확하니 추출 X. 다운로드는 buy 단계의 click_coupon_receive에서.
-    try:
-        out["has_coupon"] = page.locator("strong.rvej6q8").count() > 0
-    except Exception:
-        pass
 
     return out
 
