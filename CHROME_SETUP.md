@@ -1,101 +1,127 @@
-# Chrome 자동화 setup — 결정 사항 + 이유
+# Chrome 자동화 setup — Chrome for Testing + Profile 6
 
-매일 자동화 시 Chrome을 어떻게 띄워야 메인 Chrome 영향 없이 + Hmall 봇 차단 우회까지 되는지 정리.
+매일 자동화 시 메인 Chrome 안 닫히고 + Hmall 봇 차단 회피되는 격리된 Chrome 환경.
 
-## 핵심 요건 3개
+## 핵심 결정
 
-1. **메인 Chrome 안 닫힘** — 평소 쓰는 Chrome 인스턴스 그대로 유지
-2. **Hmall 봇 차단 우회** — Chrome user-agent + 누적 브라우징 이력으로 정상 사용자처럼 보여야 함
-3. **로그인 영속성** — 한 번 로그인하면 cookies/세션 디스크 저장, 재시작 후 유지
-
-## 결정
-
-| 항목 | 채택 | 채택 안 한 이유 |
+| 항목 | 선택 | 이유 |
 |---|---|---|
-| **실제 Google Chrome binary 사용** | ✅ `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` | Chrome for Testing은 user-agent가 "Chrome for Testing" → Hmall 봇 의심 가능 |
-| **별도 user-data-dir** | ✅ `~/HmallChrome/Default` (메인 Chrome 데이터와 분리) | 같은 데이터 디렉토리 쓰면 SingletonLock 충돌 |
-| **Profile 6 데이터 카피본** | ✅ `~/HmallChrome/Default` 안에 메인 Chrome의 Profile 6 데이터 (Google 로그인 + 브라우징 이력) 복사 | 빈 프로필 시 Hmall 봇 차단 ("다른 로그인 수단" 문구) |
-| **직접 binary 실행 + `disown`** | ✅ `bash` 백그라운드로 띄움 | `open -na "Google Chrome"`은 macOS LaunchServices가 메인 Chrome 강제 종료시킴 |
-| **CDP `--remote-debugging-port=9222`** | ✅ Playwright `connect_over_cdp` 으로 attach | Playwright 자체가 Chrome 띄우면 별도 인스턴스 누적, 봇 탐지 더 잘됨 |
+| Browser binary | **Chrome for Testing** (~/ChromeForTesting) | 메인 "Google Chrome.app"과 완전 별개 .app → 충돌 X |
+| 데이터 디렉토리 | **`~/HmallChrome`** | 메인 Chrome `~/Library/.../Chrome` 과 분리 |
+| 프로필 | **`Profile 6`** | JASON MORY Google 계정 binding (gaia_id: 108971081211332048810) |
+| Launch script | git tracked: **`hsmaster/scripts/launch-hmall-chrome.sh`** | git pull로 양쪽 컴터 sync |
+| 호출 경로 | `~/bin/launch-hmall-chrome.sh` (symlink → 위 파일) | 어디서든 호출 가능 |
+| CDP port | **9222** | Playwright `connect_over_cdp` |
+
+## 첫 setup (컴터당 1회)
+
+### 1. Chrome for Testing 설치 (Homebrew node 필요)
+
+```bash
+export PATH="/opt/homebrew/bin:$PATH"  # apple silicon 의 경우
+mkdir -p $HOME/ChromeForTesting
+npx -y @puppeteer/browsers install chrome@stable --path "$HOME/ChromeForTesting"
+```
+
+→ `~/ChromeForTesting/chrome/mac_arm-NNN.NNN.NNN.NN/chrome-mac-arm64/Google Chrome for Testing.app` 설치됨.
+
+### 2. Profile 6 데이터 준비
+
+**A. 다른 컴터에서 옮긴다면:**
+```bash
+# 다른 컴터에서 zip
+cd ~/HmallChrome
+zip -r ~/Desktop/Profile6.zip "Profile 6" "Local State"
+
+# 새 컴터로 옮긴 후
+cd ~/HmallChrome
+unzip ~/Desktop/Profile6.zip
+```
+
+**B. 새로 만든다면 (Profile 6 데이터 0 상태):**
+- launch script 처음 실행 시 빈 Profile 6 자동 생성됨
+- Chrome for Testing 창 우측 상단 "Sign in to Chromium" → JASON MORY (또는 원하는 Google 계정)으로 로그인 1회
+- Hmall 메인 페이지 잠시 둘러보기 (이력 누적)
+- → 누적 이력 부족 시 초반 봇 차단 risk 있을 수 있음. 시간 지나면 해결
+
+### 3. ~/bin symlink 생성 (이 프로젝트 git clone 후 1회)
+
+```bash
+mkdir -p ~/bin
+ln -s "$HOME/Desktop/Vibe Coding/3mall auto buy/hsmaster/scripts/launch-hmall-chrome.sh" \
+      "$HOME/bin/launch-hmall-chrome.sh"
+```
+
+→ 이후 어디서든 `~/bin/launch-hmall-chrome.sh` 호출하면 git tracked script 실행.
+
+## 매일 사용
+
+```bash
+~/bin/launch-hmall-chrome.sh    # CFT 띄움 (이미 떠있으면 그냥 종료)
+```
+
+CDP 9222 활성화되면 자동화 스크립트 (`buy/run.py`, `cart/check10.py`)가 `connect_over_cdp` 으로 attach.
+
+## 환경 변수 (기본값 변경 시)
+
+| ENV | 기본값 | 용도 |
+|---|---|---|
+| `PORT` | 9222 | CDP 디버깅 포트 (스크립트 내 hardcoded) |
+| (수정 시 스크립트 직접 편집) | | |
+
+스크립트 내부:
+- `PORT=9222`
+- `USER_DATA_DIR="$HOME/HmallChrome"`
+- `PROFILE_DIR="Profile 6"`
 
 ## 동작 흐름
 
 ```
-[USER 메인 Chrome]                  [자동화 Chrome]
-  /Library/.../Chrome data            ~/HmallChrome/Default (Profile 6 카피)
-  ↓                                   ↓
-  Google Chrome.app 실행 중           Google Chrome.app 다른 process로 실행 중
-  (port: 일반)                        (port: 9222 CDP)
-  ↓                                   ↓
-  영향 없음                           Playwright connect_over_cdp("http://127.0.0.1:9222")
-                                      → 봇 차단 회피 + 영구 로그인 사용
+[메인 Chrome]                          [자동화 CFT]
+- ~/Library/.../Chrome                 - ~/HmallChrome/Profile 6/
+- 평소 브라우징 (YouTube, Gmail 등)    - JASON MORY Google 로그인
+- CDP 없음                             - port 9222 CDP
+- "Google Chrome.app"                  - "Google Chrome for Testing.app"
+   ↓ 독립적                                ↓ 독립적
+사용자 작업 그대로                     Playwright connect_over_cdp("http://127.0.0.1:9222")
+                                       → Hmall 19계정 자동 로그인 + 카트/체크아웃
 ```
+
+→ 두 .app은 macOS LaunchServices 관점에서 다른 앱. 같은 Mac에서 동시 동작 OK.
 
 ## 잘못된 옵션들 (해본 결과)
 
 | 시도 | 결과 |
 |---|---|
-| `open -na "Google Chrome" --args ...` | 메인 Chrome 강제 종료 (LaunchServices 충돌) |
-| Chrome for Testing (Playwright bundled) | Hmall 봇 차단됨 (user-agent로 탐지) |
-| `~/HmallChrome` 빈 프로필로 시작 | Hmall 로그인 시 "다른 로그인 수단" 차단 |
-| 메인 Chrome의 user-data-dir 직접 사용 (`--user-data-dir=~/Library/Application Support/Google/Chrome --profile-directory="Profile 6"`) | 메인 Chrome 닫고 자동화 Chrome 띄우는 사이클 — 매번 메인 Chrome 닫혀야 가능 |
-
-## 사용법
-
-### 자동화 Chrome 띄우기
-```bash
-cd "~/Desktop/Vibe Coding/3mall auto buy"
-bash hsmaster/scripts/launch-chrome-cdp.sh
-```
-
-→ `~/HmallChrome/Default` 데이터로 새 Chrome process 시작 + CDP 9222 활성화. 메인 Chrome 영향 X.
-
-### 첫 setup (한 번만)
-
-```bash
-# 1. 메인 Chrome 종료 (Profile 6 lock 풀기)
-osascript -e 'quit app "Google Chrome"'
-sleep 3
-
-# 2. Profile 6 데이터를 ~/HmallChrome/Default로 복사
-mkdir -p ~/HmallChrome
-cp -r "$HOME/Library/Application Support/Google/Chrome/Profile 6" ~/HmallChrome/Default
-
-# 3. 메인 Chrome 다시 띄워도 OK
-open -a "Google Chrome"
-
-# 4. 자동화 Chrome 띄우기
-bash hsmaster/scripts/launch-chrome-cdp.sh
-
-# 5. 자동화 Chrome 창에서 Hmall 로그인 1회 (cookies는 이미 있을 가능성 높음)
-```
-
-이후 매일 launch-chrome-cdp.sh만 실행하면 됨.
-
-## 환경 변수
-
-| ENV | 기본값 | 용도 |
-|---|---|---|
-| `CDP_PORT` | 9222 | CDP 디버깅 포트 |
-| `HMALL_USER_DATA_DIR` | `$HOME/HmallChrome` | 자동화 Chrome 데이터 디렉토리 |
-| `HMALL_CHROME_PROFILE` | Default | 프로필 폴더명 |
-| `CHROME_BIN` | `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` | Chrome binary 경로 |
+| `open -na "Google Chrome" --args ...` | 메인 Chrome 강제 종료 (LaunchServices가 같은 .app 처리) |
+| 메인 Chrome.app 직접 binary 실행 | 메인 Chrome 가끔 종료, 데이터 충돌 |
+| 빈 user-data-dir로 시작 | Hmall "다른 로그인 수단" 차단 (이력 부족) |
 
 ## 문제 해결
 
-### CDP 9222 접속 실패
+### Profile 6 Google 로그인이 안 된 경우 (sync 미동작)
 ```bash
-# 포트 확인
-curl http://127.0.0.1:9222/json/version
+~/bin/launch-hmall-chrome.sh
+```
+실행 후 띄워진 CFT 창 우측 상단 프로필 아이콘 → "Sign in to Chromium" 클릭 → Google 계정 입력. 이후 Local State에 자동 binding.
 
-# 안 뜨면 launch script 다시
-bash hsmaster/scripts/launch-chrome-cdp.sh
+### Local State 깨진 경우 (Profile 6 metadata 비어있음)
+~/HmallChrome/Local State JSON 직접 수정:
+```python
+import json
+ls = json.load(open('/Users/jasonkim/HmallChrome/Local State'))
+# 'Profile 6' 키가 빈 metadata면 다른 작동 프로필 (예: Default) 의 metadata 복사
+ic = ls['profile']['info_cache']
+ic['Profile 6'] = ic.pop('Default')  # 또는 적절히
+ls['profile']['profiles_order'] = [p for p in ls['profile']['profiles_order'] if p != 'Default']
+ls['profile']['last_used'] = 'Profile 6'
+json.dump(ls, open('/Users/jasonkim/HmallChrome/Local State', 'w'), indent=2, ensure_ascii=False)
 ```
 
-### Hmall 로그인 차단 ("다른 로그인 수단")
-- ~/HmallChrome/Default 에 Profile 6 데이터가 있는지 확인 (1GB 정도)
-- 비어있으면 위 "첫 setup" 절차 다시
-
-### 메인 Chrome이 닫힘
-- launch script가 직접 binary 실행 + `disown`인지 확인 (`open -na` 쓰면 안 됨)
-- 두 Chrome 인스턴스 모두 `--user-data-dir`이 다른지 확인 (같으면 SingletonLock 충돌)
+### CDP 9222 응답 X
+```bash
+pkill -f "user-data-dir=/Users/jasonkim/HmallChrome"
+sleep 3
+~/bin/launch-hmall-chrome.sh
+curl http://127.0.0.1:9222/json/version  # 정상 응답 확인
+```

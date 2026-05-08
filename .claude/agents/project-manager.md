@@ -19,7 +19,7 @@ tools: Bash, Read, Write
 
 | 검증 항목 | 검증 방법 | 미충족 시 안내 |
 |---|---|---|
-| Chrome CDP 9222 살아있음 | `curl -s http://127.0.0.1:9222/json/version` | "Chrome CDP 미실행 — `hsmaster/scripts/launch-chrome-cdp.sh` 실행 후 hmall 수동 로그인 1회 필요" |
+| Chrome CDP 9222 살아있음 | `curl -s http://127.0.0.1:9222/json/version` | "Chrome CDP 미실행 — `~/bin/launch-hmall-chrome.sh` (또는 `hsmaster/scripts/launch-hmall-chrome.sh`) 실행. 자세한 setup은 CHROME_SETUP.md" |
 | `hmall_config.json` 존재 | `ls hmall_config.json` | "hmall_config.json 누락 — 19계정 ID/PW 파일 배치 필요" |
 | `buy/.env` 존재 | `ls buy/.env` | "`cp buy/.env.example buy/.env` 후 PIN/카드명 채움 필요" |
 
