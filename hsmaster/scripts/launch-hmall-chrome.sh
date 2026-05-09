@@ -19,7 +19,8 @@ fi
 
 "$CHROME_BIN" --remote-debugging-port=$PORT --remote-allow-origins=* \
   --user-data-dir="$USER_DATA_DIR" --profile-directory="$PROFILE_DIR" \
-  --no-first-run --no-default-browser-check "https://www.hmall.com" > /dev/null 2>&1 &
+  --no-first-run --no-default-browser-check --disable-popup-blocking \
+  "https://www.hmall.com" > /dev/null 2>&1 &
 disown
 
 for i in 1 2 3 4 5 6 7 8 9 10; do
