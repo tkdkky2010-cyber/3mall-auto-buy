@@ -315,7 +315,67 @@ def galleria_add_combo(page: Page, combo_no: int) -> bool:
     return True
 
 
-def galleria_checkout(page: Page, ok_number: str) -> dict:
+def naver_pay_input_password(pay_page, password_6: str) -> bool:
+    """Naver Pay SecureKeyboard 자동 입력.
+    sprite PNG (3x4 grid) + background-position 매핑으로 grid 위치 찾아 클릭."""
+    import base64, io, re
+    from PIL import Image
+    import numpy as np
+
+    refs_dir = ROOT / "secure_keyboard_refs"
+    if not refs_dir.exists():
+        print(f"    [WARN] reference 없음: {refs_dir}")
+        return False
+
+    # sprite PNG 추출 (모든 키 동일)
+    style = pay_page.locator('.SecureKeyboard_number__0F2Ti').first.get_attribute('style')
+    m = re.search(r'data:image/png;base64,([^)]+)', style or '')
+    if not m:
+        print("    [WARN] sprite PNG 못 찾음")
+        return False
+    sprite_img = Image.open(io.BytesIO(base64.b64decode(m.group(1)))).convert('RGBA')
+
+    # PNG sprite: 120x200, 3 cols x 4 rows, cell 40x50
+    W, H = 40, 50
+    refs = {}
+    for d in range(10):
+        ref_img = Image.open(refs_dir / f"{d}.png").convert('RGBA')
+        refs[d] = np.array(ref_img)[:, :, 3]  # alpha only
+
+    # 각 cell → digit (closest reference)
+    cell_to_digit = {}
+    for r in range(4):
+        for c in range(3):
+            cell = sprite_img.crop((c * W, r * H, (c + 1) * W, (r + 1) * H))
+            cell_arr = np.array(cell)[:, :, 3]
+            best_d, best_dist = None, float('inf')
+            for d, ref in refs.items():
+                dist = float(((cell_arr.astype(int) - ref.astype(int)) ** 2).sum())
+                if dist < best_dist:
+                    best_dist, best_d = dist, d
+            # threshold — 빈 셀 (백스페이스/전체삭제 위치)는 거리 큼
+            if best_dist < 500_000:
+                cell_to_digit[(r, c)] = best_d
+
+    # digit → grid position (1-indexed for class)
+    digit_to_grid = {d: (r, c) for (r, c), d in cell_to_digit.items()}
+
+    # 비밀번호 자릿수마다 해당 grid의 button click
+    for ch in password_6:
+        d = int(ch)
+        if d not in digit_to_grid:
+            print(f"    [WARN] digit {d} grid에 없음")
+            return False
+        r, c = digit_to_grid[d]
+        # class: 'SecureKeyboard_key-{r+1}-{c+1}__HASH' — substring match
+        sel = f'.SecureKeyboard_key__jGpA_:has([class*="SecureKeyboard_key-{r+1}-{c+1}__"])'
+        btn = pay_page.locator(sel).first
+        btn.click(timeout=3000)
+        pay_page.wait_for_timeout(150)
+    return True
+
+
+def galleria_checkout(page: Page, ok_number: str, naver_id: str = "", naver_pw: str = "", naver_pay_pw: str = "") -> dict:
     """갤러리아 카트 → 주문하기 → OK 캐쉬백 조회/사용 → 번호 입력 → DRY 모드 종료."""
     out = {"success": False, "error": None}
     try:
@@ -397,7 +457,67 @@ def galleria_checkout(page: Page, ok_number: str) -> dict:
             pay_page.wait_for_load_state("domcontentloaded", timeout=10000)
             print(f"    [OK] 결제 popup 도달: {pay_page.url[:60]}")
             if DRY_PAYMENT:
-                print("    [DRY] 결제 popup 도달 — SK Payment 로그인 X (Phase 3-B 폰 자동화 대기)")
+                print("    [DRY] 결제 popup 도달 — Naver 로그인 X")
+            else:
+                # Naver 로그인 (1 계정으로 12 갤러리아 계정 모두 결제)
+                # nidlogin URL이면 로그인 폼 채움. 이미 pay.naver.com이면 cookies 살아있어 skip.
+                if "nidlogin" in pay_page.url and naver_id and naver_pw:
+                    try:
+                        pay_page.locator("#id").fill(naver_id)
+                        pay_page.locator("#pw").fill(naver_pw)
+                        pay_page.locator("#submit_btn").click()
+                        pay_page.wait_for_load_state("domcontentloaded", timeout=15000)
+                        pay_page.wait_for_timeout(2500)
+                        # deviceConfirm — Register (#new.save)
+                        if "deviceConfirm" in pay_page.url:
+                            pay_page.locator("#new\\.save").click(timeout=5000)
+                            pay_page.wait_for_load_state("domcontentloaded", timeout=15000)
+                            pay_page.wait_for_timeout(2000)
+                            print("    [OK] Naver 기기 등록 (Register)")
+                        print(f"    [OK] Naver 로그인 → {pay_page.url[:90]}")
+                    except Exception as e:
+                        print(f"    [WARN] Naver 로그인 단계 실패: {e}")
+                else:
+                    print(f"    [INFO] Naver 로그인 skip (URL={pay_page.url[:60]})")
+
+                # 카드 선택 — "롯데 2224" 가 선택될 때까지 "다음 결제수단" 클릭
+                TARGET_CARD = "롯데 2224"
+                pay_page.wait_for_selector(".CardPlate_name__2ukEK", timeout=10000)
+                pay_page.wait_for_timeout(1500)
+                matched = False
+                for i in range(15):
+                    try:
+                        cur = (pay_page.locator(".CardPlate_name__2ukEK").first.text_content() or "").strip()
+                    except Exception:
+                        cur = ""
+                    if TARGET_CARD in cur:
+                        matched = True
+                        print(f"    [OK] 카드 선택: {cur}")
+                        break
+                    try:
+                        pay_page.get_by_role("button", name="다음 결제수단").click(timeout=3000)
+                        pay_page.wait_for_timeout(600)
+                    except Exception:
+                        break
+                if not matched:
+                    print(f"    [WARN] 카드 '{TARGET_CARD}' 못 찾음 — 마지막 카드: {cur}")
+
+                # 동의하고 결제하기
+                try:
+                    pay_page.get_by_role("button", name="동의하고 결제하기").click(timeout=5000)
+                    pay_page.wait_for_timeout(3000)
+                    print(f"    [OK] 동의하고 결제하기 → {pay_page.url[:80]}")
+                except Exception as e:
+                    print(f"    [WARN] 결제하기 클릭 실패: {e}")
+
+                # 6자리 SecureKeyboard 자동 입력
+                if naver_pay_pw and "authentication/pw" in pay_page.url:
+                    pay_page.wait_for_selector('.SecureKeyboard_key__jGpA_', timeout=10000)
+                    pay_page.wait_for_timeout(1000)
+                    if naver_pay_input_password(pay_page, naver_pay_pw):
+                        print(f"    [OK] 6자리 비밀번호 자동 입력")
+                else:
+                    print("    [INFO] naver_id/pw 없음 — 수동 로그인 대기")
         except Exception as e:
             print(f"    [WARN] 결제하기 클릭 실패: {e}")
             if dialog_messages:
@@ -790,9 +910,12 @@ def main() -> int:
         return 1
     acc = accounts[idx - 1]
 
-    # OK 번호 로드
+    # OK 번호 + Naver 자격증명 로드
     ok_cfg = load_json(OKCASHBAG_FILE)
     ok_number = ok_cfg["ok_number"]
+    naver_id = ok_cfg.get("naver_id", "")
+    naver_pw = ok_cfg.get("naver_pw", "")
+    naver_pay_pw = ok_cfg.get("naver_pay_pw", "")
 
     print(f"[INFO] mall={mall}, account #{idx} {acc['id']}, DRY={DRY_PAYMENT}")
     print(f"[INFO] PW backend: {PW_BACKEND}")
@@ -834,7 +957,7 @@ def main() -> int:
             if not galleria_add_combo(mall_page, combo_no):
                 print("[FATAL] 조합 추가 실패")
                 return 1
-            result = galleria_checkout(mall_page, ok_number)
+            result = galleria_checkout(mall_page, ok_number, naver_id=naver_id, naver_pw=naver_pw, naver_pay_pw=naver_pay_pw)
         else:
             lotte_clear_cart(mall_page)
             print(f"[INFO] 조합 {combo_no} 추가: {COMBOS.get(combo_no)}")
