@@ -664,13 +664,54 @@ def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
         page.wait_for_timeout(500)
         print(f"    [OK] OK 번호 입력 완료: {ok_parts[0]}-...-{ok_parts[3]}")
 
+        # 7) OK캐시백 모두사용 (활성화돼있을 때만)
+        try:
+            page.get_by_role("link", name="모두사용").first.click(timeout=2000)
+            page.wait_for_timeout(500)
+            print("    [OK] OK캐시백 모두사용")
+        except Exception:
+            pass
+
+        # 8) L포인트 모두사용 (활성화돼있을 때만 — #modal_btn_lpoint_all_use 가 visible 인지 확인)
+        lpoint_used = False
+        try:
+            btn = page.locator("#modal_btn_lpoint_all_use")
+            if btn.count() > 0 and btn.is_visible():
+                btn.click()
+                page.wait_for_timeout(500)
+                lpoint_used = True
+                print("    [OK] L포인트 모두사용")
+        except Exception:
+            pass
+
+        # 9) 카드사 select — 오늘 청구할인 카드. 매일 업데이트 필요
+        # TODO: 매일 청구할인 안내 (#card_corp_dc_html) 파싱해서 자동 매핑
+        TODAY_CARD_CODE = "016"  # 국민카드 (2026-05-10)
+        try:
+            page.locator("#iscm_cd").select_option(TODAY_CARD_CODE)
+            page.wait_for_timeout(500)
+            print(f"    [OK] 카드사 선택: {TODAY_CARD_CODE}")
+        except Exception as e:
+            print(f"    [WARN] 카드사 선택 실패: {e}")
+
         if DRY_PAYMENT:
             print("    [DRY] 결제하기 버튼 클릭 X")
             out["success"] = True
+            out["lpoint_used"] = lpoint_used
             return out
 
+        # 10) 결제하기 1차 + 사업자등록번호 (L포인트 사용 시) + 결제하기 2차
+        page.once("dialog", lambda d: d.dismiss())
         page.get_by_role("link", name="결제하기").click()
+        page.wait_for_timeout(2000)
+        if lpoint_used:
+            page.get_by_role("radio", name="사업자등록번호").check()
+            page.get_by_role("textbox", name="현금영수증 발행 번호입력").fill("5071815504")
+            page.wait_for_timeout(500)
+            print("    [OK] 사업자등록번호 입력 (L포인트 사용)")
+            page.get_by_role("link", name="결제하기").click()
         out["success"] = True
+        out["lpoint_used"] = lpoint_used
         return out
     except Exception as e:
         out["error"] = f"checkout 예외: {e}"
