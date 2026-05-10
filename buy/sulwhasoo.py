@@ -622,7 +622,7 @@ def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
         page.wait_for_timeout(500)
         print("    [OK] 동의합니다 체크")
 
-        # 3) direct 쿠폰 — modal 열고 각 select 첫 옵션 (placeholder 다음)
+        # 3) direct 쿠폰 — modal 열고 각 select 첫 옵션 (placeholder 다음, disabled skip)
         ifr = page.frame_locator('iframe[name="modal_ifrmWrap"]')
         page.locator("#modal_btn_coupon").scroll_into_view_if_needed()
         page.locator("#modal_btn_coupon").click(force=True)
@@ -631,23 +631,38 @@ def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
             sel = ifr.locator(f"#direct_coupon_{i}")
             if sel.count() == 0:
                 break
-            sel.select_option(index=1)
-            page.wait_for_timeout(200)
+            try:
+                sel.select_option(index=1, timeout=3000)
+                page.wait_for_timeout(200)
+            except Exception:
+                pass
         ifr.get_by_role("link", name="확인").click()
-        page.wait_for_timeout(1000)
+        # modal 사라짐 대기
+        page.wait_for_function(
+            "() => { const f = document.querySelector('iframe[name=\"modal_ifrmWrap\"]'); return !f || f.offsetParent === null; }",
+            timeout=10000,
+        )
+        page.wait_for_timeout(500)
         print("    [OK] direct 쿠폰 적용")
 
-        # 4) plus 쿠폰 — 조회/적용 nth(1), 각 select 첫 옵션
+        # 4) plus 쿠폰 — 조회/적용 nth(1), 각 select 첫 옵션 (disabled 옵션은 skip)
         page.get_by_role("link", name="조회/적용").nth(1).click()
         page.wait_for_timeout(2000)
         for i in range(8):
             sel = ifr.locator(f"#plus_coupon_{i}")
             if sel.count() == 0:
                 break
-            sel.select_option(index=1)
-            page.wait_for_timeout(200)
+            try:
+                sel.select_option(index=1, timeout=3000)
+                page.wait_for_timeout(200)
+            except Exception:
+                pass
         ifr.get_by_role("link", name="적용").click()
-        page.wait_for_timeout(1000)
+        page.wait_for_function(
+            "() => { const f = document.querySelector('iframe[name=\"modal_ifrmWrap\"]'); return !f || f.offsetParent === null; }",
+            timeout=10000,
+        )
+        page.wait_for_timeout(500)
         print("    [OK] plus 쿠폰 적용")
 
         # 5) "동의함" 이미지
@@ -701,15 +716,29 @@ def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
             return out
 
         # 10) 결제하기 1차 + 사업자등록번호 (L포인트 사용 시) + 결제하기 2차
-        page.once("dialog", lambda d: d.dismiss())
+        # 첫 결제하기 click → "현금영수증 신청하시겠습니까?" confirm dialog → accept(예) 해야 사업자번호 페이지로 진입
+        def _handle_dialog(d):
+            print(f"    [dialog] type={d.type} msg={d.message[:80]}")
+            if "현금영수증" in d.message:
+                d.accept()
+            else:
+                d.dismiss()
+        page.on("dialog", _handle_dialog)
         page.get_by_role("link", name="결제하기").click()
-        page.wait_for_timeout(2000)
-        if lpoint_used:
-            page.get_by_role("radio", name="사업자등록번호").check()
-            page.get_by_role("textbox", name="현금영수증 발행 번호입력").fill("5071815504")
-            page.wait_for_timeout(500)
-            print("    [OK] 사업자등록번호 입력 (L포인트 사용)")
-            page.get_by_role("link", name="결제하기").click()
+        page.wait_for_timeout(2500)
+        # 사업자번호 라디오 보이면 L 포인트 흐름 — check + 입력 + 2차 결제하기
+        try:
+            radio = page.get_by_role("radio", name="사업자등록번호")
+            if radio.count() > 0 and radio.first.is_visible():
+                radio.first.check()
+                page.get_by_role("textbox", name="현금영수증 발행 번호입력").fill("5071815504")
+                page.wait_for_timeout(500)
+                print("    [OK] 사업자등록번호 입력")
+                page.get_by_role("link", name="결제하기").click()
+            else:
+                print("    [INFO] 사업자번호 라디오 visible 아님 — 단일 결제하기로 진행")
+        except Exception as e:
+            print(f"    [WARN] 사업자번호 단계 실패: {e}")
         out["success"] = True
         out["lpoint_used"] = lpoint_used
         return out
