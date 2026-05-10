@@ -739,6 +739,21 @@ def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
                 print("    [INFO] 사업자번호 라디오 visible 아님 — 단일 결제하기로 진행")
         except Exception as e:
             print(f"    [WARN] 사업자번호 단계 실패: {e}")
+
+        # 11) KCP modal → KB Pay 버튼 클릭 (이중 iframe: MPI_cert > kbframe)
+        try:
+            page.wait_for_selector('iframe[name^="MPI_cert"]', timeout=15000)
+            page.wait_for_timeout(2000)
+            kb_btn = (
+                page.frame_locator('iframe[name^="MPI_cert"]')
+                .frame_locator('iframe[name="kbframe"]')
+                .get_by_role("button", name="KB Pay KB Pay")
+            )
+            kb_btn.click(timeout=10000)
+            print("    [OK] KB Pay 버튼 클릭 → 7자리 코드 화면")
+        except Exception as e:
+            print(f"    [WARN] KB Pay 버튼 클릭 실패: {e}")
+
         out["success"] = True
         out["lpoint_used"] = lpoint_used
         return out
