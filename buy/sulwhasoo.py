@@ -22,13 +22,10 @@ import time
 from pathlib import Path
 from dotenv import load_dotenv
 
-PW_BACKEND = None
-try:
-    from patchright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError
-    PW_BACKEND = "patchright"
-except ImportError:
-    from playwright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError  # type: ignore
-    PW_BACKEND = "playwright"
+# sulwhasoo는 OKCashbag/galleria/lotte 모두 정상 user session (cookies 영구) 사용 →
+# stealth (patchright) 불필요. 단순한 playwright 사용으로 Chrome 148 호환성 확보.
+from playwright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError
+PW_BACKEND = "playwright"
 
 ROOT = Path(__file__).parent
 PROJECT_ROOT = ROOT.parent
@@ -46,7 +43,7 @@ OKCASHBAG_URL = "https://www.okcashbag.com/"
 GALLERIA_HOME = "https://www.galleria.co.kr/main/initMain.action"
 LOTTE_HOME = "https://www.lotteimall.com/"
 
-# 갤러리아 상품 정보 (가이드 Sulwhasoo_Supply_Rate.md 섹션 3)
+# 갤러리아 상품 정보 (hsmaster/config/sulwhasoo-ids.json 기준)
 GALLERIA_PRODUCTS = {
     "b": {"name": "윤조3종",            "goods_no": "2502913432"},
     "c": {"name": "자음2종",            "goods_no": "2502913250"},
@@ -55,6 +52,17 @@ GALLERIA_PRODUCTS = {
     "f": {"name": "윤조에센스90",        "goods_no": "2204658942"},
     "g": {"name": "자음생2종",          "goods_no": "2408977039"},
     "h": {"name": "자음생크림리치세트", "goods_no": "2408977059"},
+}
+
+# 롯데 상품 정보 (hsmaster/config/sulwhasoo-ids.json 기준, 월 1회 갱신)
+LOTTE_PRODUCTS = {
+    "b": {"name": "윤조3종",            "goods_no": "2923416935"},
+    "c": {"name": "자음2종",            "goods_no": "2923389602"},
+    "d": {"name": "본윤2종",            "goods_no": "2008758498"},
+    "e": {"name": "탄력3종",            "goods_no": "2923406968"},
+    "f": {"name": "윤조에센스90",        "goods_no": "2091578259"},
+    "g": {"name": "자음생2종",          "goods_no": "2719761525"},
+    "h": {"name": "자음생크림리치세트", "goods_no": "2719761746"},
 }
 
 # 11개 고정 조합 (가이드 섹션 7)
@@ -169,8 +177,12 @@ def enter_via_okcashbag(page: Page, mall: str) -> Page:
     with page.expect_popup() as popup_info:
         page.get_by_role("button", name="쇼핑몰로 이동하기").click()
     mall_page = popup_info.value
-    mall_page.wait_for_load_state("domcontentloaded", timeout=15000)
-    mall_page.wait_for_timeout(2000)
+    # 최소 대기 — 일부 mall popup은 inactive 시 auto-close
+    try:
+        mall_page.wait_for_load_state("domcontentloaded", timeout=10000)
+    except Exception:
+        pass
+    mall_page.wait_for_timeout(1500)
     print(f"[OK] OKCashbag → {mall} popup: {mall_page.url[:80]}")
     return mall_page
 
@@ -402,33 +414,68 @@ def galleria_checkout(page: Page, ok_number: str) -> dict:
 
 
 def lotte_login(page: Page, account_id: str, account_pw: str) -> bool:
-    """롯데 로그인. 로그인 link 클릭 시 popup으로 로그인 form 열림."""
+    """롯데 로그인. codegen 흐름 그대로:
+    page1(mall popup) → 로그인 클릭 → page2(login popup) → fill → Enter →
+    page3(guide popup) → page2.close() → page3 처리 후 close.
+    page1(mall popup)은 절대 close 안 함.
+    """
+    context = page.context
     try:
-        with page.expect_popup() as login_popup_info:
-            page.get_by_role("link", name="로그인 로그인").click(timeout=5000)
-        login_page = login_popup_info.value
-        login_page.wait_for_load_state("domcontentloaded", timeout=10000)
-        login_page.wait_for_timeout(1500)
-        login_page.get_by_role("textbox", name="아이디 또는 이메일").fill(account_id)
-        login_page.get_by_role("textbox", name="비밀번호(영문+숫자+특수 8~15자)").fill(account_pw)
-        # 로그인 → 또 popup (안내 popup) 또는 직접 navigate
+        # 클릭 전 page focus (anti-bot detection 우회 도움)
         try:
-            with login_page.expect_popup(timeout=5000) as guide_popup_info:
+            page.bring_to_front()
+        except Exception:
+            pass
+
+        # context.expect_page (more stable than page.expect_popup)
+        with context.expect_page() as new_page_info:
+            page.get_by_role("link", name="로그인 로그인").click()
+        login_page = new_page_info.value
+
+        login_page.wait_for_load_state("domcontentloaded", timeout=15000)
+        login_page.get_by_role("textbox", name="아이디 또는 이메일").click()
+        login_page.get_by_role("textbox", name="아이디 또는 이메일").fill(account_id)
+        login_page.get_by_role("textbox", name="아이디 또는 이메일").press("Tab")
+        login_page.get_by_role("textbox", name="비밀번호(영문+숫자+특수 8~15자)").fill(account_pw)
+
+        # Enter → guide popup (없으면 timeout)
+        guide_page = None
+        try:
+            with context.expect_page(timeout=8000) as guide_info:
                 login_page.get_by_role("textbox", name="비밀번호(영문+숫자+특수 8~15자)").press("Enter")
-            guide_page = guide_popup_info.value
-            try:
-                guide_page.get_by_role("link", name="일간 보이지 않기").click(timeout=2000)
-            except Exception:
-                pass
-            guide_page.close()
+            guide_page = guide_info.value
         except PlaywrightTimeoutError:
             pass
+
+        # login popup close
         try:
             login_page.close()
         except Exception:
             pass
-        page.wait_for_timeout(2000)
-        return "로그아웃" in page.inner_text("body")
+
+        # guide popup 처리 + close
+        if guide_page is not None:
+            try:
+                guide_page.get_by_role("link", name="일간 보이지 않기").click(timeout=3000)
+            except Exception:
+                pass
+            try:
+                guide_page.close()
+            except Exception:
+                pass
+
+        # mall popup이 살아있으면 거기서 로그아웃 텍스트 검증, 아니면 fresh page 찾기
+        try:
+            if page.is_closed():
+                lps = [p for p in context.pages if 'lotteimall' in p.url and not p.is_closed()]
+                if not lps:
+                    return False
+                page = lps[-1]
+            page.wait_for_timeout(2500)
+            body = page.inner_text("body")
+            return "로그아웃" in body
+        except Exception:
+            return False
     except Exception as e:
         print(f"  [LOGIN ERR] {account_id}: {e}")
         return False
@@ -460,26 +507,25 @@ def lotte_clear_cart(page: Page) -> None:
         print(f"    [cart] 비우기 실패: {e}")
 
 
-def lotte_add_product(page: Page, search_query: str = "설화수") -> bool:
-    """롯데 상품 검색 + 첫 결과 + 쿠폰 다운로드 + 옵션 + 장바구니."""
+def lotte_add_product_by_url(page: Page, goods_no: str, qty: int) -> bool:
+    """롯데 상품 URL 직접 진입 → 쿠폰 다운로드 → 옵션 → 수량 +N → 장바구니."""
+    url = f"https://www.lotteimall.com/goods/viewGoodsDetail.lotte?goods_no={goods_no}"
     try:
-        page.get_by_role("textbox", name="검색어 입력").fill(search_query)
-        page.get_by_role("textbox", name="검색어 입력").press("Enter")
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        page.goto(url, wait_until="domcontentloaded", timeout=15000)
         page.wait_for_timeout(2000)
-        # 첫 설화수 상품 클릭
-        page.get_by_role("link", name=re.compile(r"\[설화수\]")).first.click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
-        page.wait_for_timeout(2000)
-        # 쿠폰 다운로드
+        dismiss_popup(page)
+
+        # 쿠폰받기 → 쿠폰 전체 다운로드 → 닫기
         try:
             page.get_by_role("button", name="쿠폰받기").click(timeout=3000)
             page.wait_for_timeout(800)
             page.get_by_role("button", name="쿠폰 전체 다운로드").click(timeout=2000)
             page.wait_for_timeout(800)
             page.get_by_role("button", name="닫기", exact=True).click(timeout=2000)
+            page.wait_for_timeout(500)
         except Exception:
             pass
+
         # 옵션 (타입 선택 → 세트)
         try:
             page.get_by_role("link", name="타입 선택").click(timeout=3000)
@@ -488,41 +534,127 @@ def lotte_add_product(page: Page, search_query: str = "설화수") -> bool:
             page.wait_for_timeout(500)
         except Exception:
             pass
-        # 수량 +2
-        for _ in range(2):
+
+        # 수량 (qty - 1) 번 + 클릭
+        for _ in range(qty - 1):
             try:
                 page.get_by_role("button", name="+").first.click(timeout=2000)
                 page.wait_for_timeout(300)
             except Exception:
                 break
+
         # 장바구니 담기
-        page.locator("#saveCart-btn").click()
+        page.locator("#saveCart-btn").click(timeout=5000)
         page.wait_for_timeout(1500)
         return True
     except Exception as e:
-        print(f"    [ERR] 롯데 상품 추가 실패: {e}")
+        print(f"    [ERR] 롯데 {goods_no} qty={qty} 추가 실패: {e}")
         return False
 
 
-def lotte_checkout(page: Page, ok_number: str) -> dict:
-    """롯데 카트 → 주문 → OK 번호 입력 (DRY)."""
+def lotte_add_combo(page: Page, combo_no: int) -> bool:
+    """롯데 조합 N (1~11) 자동 카트 추가."""
+    combo = COMBOS.get(combo_no)
+    if not combo:
+        print(f"    [ERR] 조합 {combo_no} 정의 없음")
+        return False
+    for sku, qty in combo:
+        prod = LOTTE_PRODUCTS.get(sku)
+        if not prod:
+            print(f"    [ERR] sku '{sku}' 상품 없음")
+            return False
+        print(f"    [INFO] {sku} ({prod['name']}) × {qty}")
+        if not lotte_add_product_by_url(page, prod["goods_no"], qty):
+            return False
+    return True
+
+
+def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
+    """롯데 카트 → 주문 → 주소 선택 → OK 번호 입력 (DRY)."""
     out = {"success": False, "error": None}
     try:
         page.get_by_role("link", name="장바구니 장바구니").click()
         page.wait_for_timeout(2000)
-        page.get_by_text("일반 (0/3)").click(timeout=3000)
-        page.wait_for_timeout(500)
+        # "일반 (X/Y)" 토글 — 클릭하면 전체선택/해제 토글. 전체선택 상태 보장 위해
+        # 텍스트 매칭 후 click. 만약 이미 전체선택 (X==Y)이면 click하면 해제 → 다시 click.
+        try:
+            general_label = page.get_by_text(re.compile(r"일반\s*\(\d+/\d+\)")).first
+            label_text = general_label.text_content() or ""
+            general_label.click(timeout=5000)
+            page.wait_for_timeout(800)
+            # 클릭 후 (X/Y) 다시 확인 — X != Y이면 한번 더 토글
+            m = re.match(r"일반\s*\((\d+)/(\d+)\)", label_text)
+            if m and m.group(1) == m.group(2):
+                # 이미 전체 선택이었음 → click으로 해제됨 → 다시 토글
+                general_label.click(timeout=3000)
+                page.wait_for_timeout(800)
+        except Exception as e:
+            print(f"    [WARN] 일반 (N/N) 토글 실패: {e}")
         page.get_by_role("link", name=re.compile(r"주문하기")).click()
         page.wait_for_load_state("domcontentloaded", timeout=15000)
         page.wait_for_timeout(2500)
 
-        # 동의
-        try:
-            page.get_by_text("동의합니다.", exact=True).click(timeout=3000)
-        except Exception:
-            pass
+        # 0) 주소 선택 — lotte_address_map.json에서 account별 dlvp_sn 매핑
+        if account_id:
+            try:
+                addr_map_path = Path(__file__).resolve().parent.parent / "lotte_address_map.json"
+                addr_map = json.loads(addr_map_path.read_text())
+                dlvp_sn = addr_map.get(account_id, {}).get("matched")
+                if dlvp_sn:
+                    page.locator("#base_rmit_nm").select_option(value=str(dlvp_sn))
+                    page.wait_for_timeout(1500)
+                    print(f"    [OK] 주소 선택: dlvp_sn={dlvp_sn}")
+                else:
+                    print(f"    [WARN] {account_id} 주소 매핑 없음 — 기본배송지 사용")
+            except Exception as e:
+                print(f"    [WARN] 주소 매핑 적용 실패: {e}")
 
-        # OK 입력
+        # 1) 포장함 (codegen: get_by_text("포장함").first/nth click)
+        page.get_by_text("포장함").first.click()
+        page.wait_for_timeout(500)
+        page.get_by_text("포장함").nth(1).click()
+        page.wait_for_timeout(500)
+        print("    [OK] 포장함 클릭")
+
+        # 2) 동의합니다 (#assent checkbox)
+        page.locator("#assent").scroll_into_view_if_needed()
+        page.locator("#assent").check(force=True)
+        page.wait_for_timeout(500)
+        print("    [OK] 동의합니다 체크")
+
+        # 3) direct 쿠폰 — modal 열고 각 select 첫 옵션 (placeholder 다음)
+        ifr = page.frame_locator('iframe[name="modal_ifrmWrap"]')
+        page.locator("#modal_btn_coupon").scroll_into_view_if_needed()
+        page.locator("#modal_btn_coupon").click(force=True)
+        page.wait_for_timeout(2000)
+        for i in range(8):
+            sel = ifr.locator(f"#direct_coupon_{i}")
+            if sel.count() == 0:
+                break
+            sel.select_option(index=1)
+            page.wait_for_timeout(200)
+        ifr.get_by_role("link", name="확인").click()
+        page.wait_for_timeout(1000)
+        print("    [OK] direct 쿠폰 적용")
+
+        # 4) plus 쿠폰 — 조회/적용 nth(1), 각 select 첫 옵션
+        page.get_by_role("link", name="조회/적용").nth(1).click()
+        page.wait_for_timeout(2000)
+        for i in range(8):
+            sel = ifr.locator(f"#plus_coupon_{i}")
+            if sel.count() == 0:
+                break
+            sel.select_option(index=1)
+            page.wait_for_timeout(200)
+        ifr.get_by_role("link", name="적용").click()
+        page.wait_for_timeout(1000)
+        print("    [OK] plus 쿠폰 적용")
+
+        # 5) "동의함" 이미지
+        page.get_by_role("img", name="동의함").click()
+        page.wait_for_timeout(500)
+
+        # 6) OK 입력
         ok_parts = split_ok_number(ok_number)
         page.locator("#ok_yes").check()
         page.get_by_role("textbox", name="OK캐쉬백 회원번호 첫번째 네자리 입력").fill(ok_parts[0])
@@ -620,10 +752,11 @@ def main() -> int:
             result = galleria_checkout(mall_page, ok_number)
         else:
             lotte_clear_cart(mall_page)
-            if not lotte_add_product(mall_page, "설화수"):
-                print("[FATAL] 상품 추가 실패")
+            print(f"[INFO] 조합 {combo_no} 추가: {COMBOS.get(combo_no)}")
+            if not lotte_add_combo(mall_page, combo_no):
+                print("[FATAL] 조합 추가 실패")
                 return 1
-            result = lotte_checkout(mall_page, ok_number)
+            result = lotte_checkout(mall_page, ok_number, account_id=acc["id"])
 
         if result["success"]:
             print(f"\n✓ [{mall}] #{idx} 진입 + OK번호 입력 완료 (DRY={DRY_PAYMENT})")

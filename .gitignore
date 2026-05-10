@@ -4,6 +4,8 @@ lotte.json
 galleria.json
 okcashbag.json
 gen-lang-*.json
+lotte_address_map.json
+3mall-secrets-*.zip
 
 # 동적 상품 ID (월 갱신, 민감)
 hsmaster/config/sulwhasoo-ids.json
