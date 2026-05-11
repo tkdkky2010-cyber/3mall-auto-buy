@@ -434,6 +434,14 @@ def do_checkout(page: Page) -> dict:
             out["card_brand"] = "카카오페이" if "카카오" in short else ("토스페이" if "토스" in short else short)
         out["is_pay"] = is_pay
 
+        # 카카오페이 선택 시 — cart까지만 (본폰 카카오페이로 user 수동 결제)
+        if out["card_brand"] == "카카오페이":
+            print(f"    [SKIP] 카카오페이 선택됨 — 결제하지 않고 cart만 유지 (본폰에서 수동 결제)")
+            out["success"] = True
+            out["cart_only"] = True
+            out["manual_payment_needed"] = "kakao_pay"
+            return out
+
         # 캐러셀 슬라이드 클릭 (Playwright real-click으로 React 핸들러 트리거)
         if not click_carousel_slide(page, cardcd):
             out["error"] = "캐러셀 슬라이드 클릭 실패"
