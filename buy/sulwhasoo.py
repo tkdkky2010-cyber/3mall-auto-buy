@@ -821,7 +821,8 @@ def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
 
         # 9) 카드사 select — 오늘 청구할인 카드. 매일 업데이트 필요
         # TODO: 매일 청구할인 안내 (#card_corp_dc_html) 파싱해서 자동 매핑
-        TODAY_CARD_CODE = "016"  # 국민카드 (2026-05-10)
+        # 카드코드: 016=KB국민, 018=NH농협, 047=롯데, 029=신한, 026=BC, 048=현대, 031=삼성, 021=우리, 020=하나
+        TODAY_CARD_CODE = "016"  # KB국민카드 (오늘 청구할인 5%, 2026-05-10)
         try:
             page.locator("#iscm_cd").select_option(TODAY_CARD_CODE)
             page.wait_for_timeout(500)
