@@ -819,14 +819,39 @@ def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
         except Exception:
             pass
 
-        # 9) 카드사 select — 오늘 청구할인 카드. 매일 업데이트 필요
-        # TODO: 매일 청구할인 안내 (#card_corp_dc_html) 파싱해서 자동 매핑
+        # 9) 카드사 select — 매일 청구할인 카드 자동 추출
         # 카드코드: 016=KB국민, 018=NH농협, 047=롯데, 029=신한, 026=BC, 048=현대, 031=삼성, 021=우리, 020=하나
-        TODAY_CARD_CODE = "016"  # KB국민카드 (오늘 청구할인 5%, 2026-05-10)
+        CARD_NAME_TO_CODE = {
+            "국민": "016", "KB": "016",
+            "농협": "018", "NH": "018",
+            "롯데": "047",
+            "신한": "029",
+            "BC": "026", "비씨": "026",
+            "현대": "048",
+            "삼성": "031",
+            "우리": "021",
+            "하나": "020",
+        }
+        today_card_code = None
         try:
-            page.locator("#iscm_cd").select_option(TODAY_CARD_CODE)
+            # 청구할인 안내 텍스트에서 카드사명 추출 (예: "국민카드(신용카드/L.PAY) 5%")
+            anno_text = page.locator("#card_corp_dc_html").inner_text()
+            for name, code in CARD_NAME_TO_CODE.items():
+                if name in anno_text:
+                    today_card_code = code
+                    print(f"    [INFO] 오늘 청구할인 카드 자동감지: {name} (code={code}) — '{anno_text[:60]}'")
+                    break
+            if not today_card_code:
+                today_card_code = "016"  # fallback to KB
+                print(f"    [WARN] 카드사 자동감지 실패 — KB로 fallback. 안내: '{anno_text[:60]}'")
+        except Exception as e:
+            today_card_code = "016"
+            print(f"    [WARN] 청구할인 안내 파싱 실패 — KB로 fallback: {e}")
+
+        try:
+            page.locator("#iscm_cd").select_option(today_card_code)
             page.wait_for_timeout(500)
-            print(f"    [OK] 카드사 선택: {TODAY_CARD_CODE}")
+            print(f"    [OK] 카드사 선택: {today_card_code}")
         except Exception as e:
             print(f"    [WARN] 카드사 선택 실패: {e}")
 

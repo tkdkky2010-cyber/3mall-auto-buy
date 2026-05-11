@@ -663,6 +663,10 @@ def click_payment_app_option(page: Page, card_brand: str) -> bool:
     brand_app_keywords: dict[str, list[str]] = {
         "SAMSUNG": ["monimo pay", "모니모"],
         "HYUNDAI": ["앱카드 결제"],   # 현대카드 popup의 "앱카드 결제" → 7자리(4-3) 화면
+        "KB": ["KB Pay", "KB페이", "앱으로 결제"],
+        "BC": ["페이북", "ISP", "BC페이북"],
+        "LOTTE": ["롯데카드 앱", "L.pay", "엘페이"],
+        "HANA": ["하나카드 앱", "하나페이", "1Q페이"],
     }
     keywords = brand_app_keywords.get(card_brand, [])
     if not keywords:
