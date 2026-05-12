@@ -162,10 +162,10 @@ def check_one_product(page: Page, prod: dict) -> dict:
     except Exception:
         pass
 
-    # Step 1: "10% 적립" 검출
-    if "10% 적립" not in body_text:
-        return out  # ten_percent=False (쿠폰 정보는 위에서 이미 채움)
-
+    # Step 1: "적립" 검출 (10% 외에도 5%, 최대 N원 등 모든 적립 행사 진입)
+    if "적립" not in body_text:
+        return out  # 적립 행사 자체 없음
+    # 10% 적립 여부는 events 수집 후 phrase 기준으로 다시 판정 (호환을 위해 임시 True)
     out["ten_percent"] = True
 
     # "구매 혜택" 아코디언 펼치기 — 모든 적립 행사가 그 안에 있음
@@ -261,14 +261,21 @@ def check_one_product(page: Page, prod: dict) -> dict:
     if out["tiers"]:
         out["max_reward"] = f"{out['tiers'][-1]['reward_pt']:,}P"
     out["event_end"] = " / ".join(e["event_end"] for e in out["events"] if e.get("event_end")) or None
-    # phrase: 행사명 join (없으면 본문에서 첫 매칭 사용)
+    # phrase: 행사명 join (없으면 본문에서 첫 N% 적립 매칭 사용)
     names = [e["name"] for e in out["events"] if e.get("name")]
     if names:
         out["phrase"] = " / ".join(names)
     else:
-        pm = re.search(r"([^\n]{0,50}?)10%\s*적립", body_text)
+        pm = re.search(r"([^\n]{0,50}?)\d+%\s*적립", body_text)
         if pm:
-            out["phrase"] = (pm.group(1) + "10% 적립").strip()
+            out["phrase"] = pm.group(0).strip()
+
+    # ten_percent 재판정: events 또는 phrase 에 '10%' 가 포함된 경우만 True
+    has_10pct = (
+        any(e.get("name") and re.search(r"10\s*%", e["name"]) for e in out["events"])
+        or (out["phrase"] and "10%" in out["phrase"])
+    )
+    out["ten_percent"] = bool(has_10pct)
 
     # 상품 페이지로 복귀 (이후 흐름에서 page 사용 위해)
     try:
