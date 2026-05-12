@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 import json
+import math
 import os
 import re
 import sys
@@ -212,6 +213,196 @@ def check_one_product(page: Page, prod: dict) -> dict:
     return out
 
 
+def _click_coupon(page: Page) -> None:
+    """상품 페이지에서 쿠폰 받기 (buy/run.py 의 click_coupon_receive 축약)."""
+    try:
+        btn = page.locator("button").filter(has_text="쿠폰 받기").first
+        if not (btn.count() > 0 and btn.is_visible()):
+            return
+        btn.click()
+        page.wait_for_timeout(800)
+        for b in page.locator("button").filter(has_text="다운").all():
+            try:
+                if b.is_visible() and "다운 완료" not in b.inner_text():
+                    b.click()
+                    page.wait_for_timeout(400)
+                    for txt in ("확인", "예"):
+                        ok = page.locator("button").filter(has_text=txt).first
+                        if ok.count() > 0 and ok.is_visible():
+                            ok.click()
+                            page.wait_for_timeout(300)
+                            break
+            except Exception:
+                pass
+        page.evaluate("""
+            () => {
+                const btns = Array.from(document.querySelectorAll('button'));
+                const t = btns.find(b => b.offsetParent !== null
+                    && b.querySelector('span.hiding')?.textContent.trim() === '닫기');
+                if (t) t.click();
+            }
+        """)
+        page.wait_for_timeout(400)
+    except Exception:
+        pass
+
+
+def _execute_buy_now(page: Page, qty: int) -> bool:
+    """구매하기 → 옵션[선택 1] → qty + → 바로구매 → /order 페이지 도달 확인."""
+    try:
+        page.locator("button.btn-purchase").first.click()
+        page.wait_for_timeout(1500)
+    except Exception:
+        return False
+    try:
+        opt = page.locator("span.choice-num.title").filter(has_text="[선택 1]").first
+        if opt.count() > 0:
+            opt.click()
+            page.wait_for_timeout(700)
+    except Exception:
+        pass
+    if qty > 1:
+        try:
+            plus = page.locator("button.btn-plus").first
+            for _ in range(qty - 1):
+                plus.click()
+                page.wait_for_timeout(180)
+        except Exception:
+            pass
+    clicked = page.evaluate("""
+        () => {
+            const buyNow = Array.from(document.querySelectorAll('button'))
+                .find(b => b.offsetParent !== null && b.textContent.trim() === '바로구매');
+            if (buyNow) { buyNow.click(); return true; }
+            return false;
+        }
+    """)
+    if not clicked:
+        return False
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=20000)
+    except Exception:
+        pass
+    page.wait_for_timeout(3500)
+    return "/order" in (page.url or "")
+
+
+def _extract_order_page(page: Page) -> dict:
+    """결제 페이지에서 카드할인 슬라이드 + 정가/수량 추출."""
+    # 카드할인 섹션이 React-render 지연되는 케이스 대응 (최대 5초 대기)
+    try:
+        page.wait_for_selector('h2:has-text("카드할인")', timeout=5000)
+        page.wait_for_timeout(800)
+    except Exception:
+        pass
+    return page.evaluate("""
+        () => {
+            const out = {slides: [], list_total: null, qty: null, current_total: null};
+            const h2 = Array.from(document.querySelectorAll('h2'))
+                .find(h => h.textContent.trim() === '카드할인');
+            if (h2) {
+                let section = h2.closest('div');
+                for (let lvl = 0; lvl < 5 && section; lvl++) {
+                    const slides = Array.from(section.querySelectorAll('.swiper-slide'))
+                        .filter(s => s.offsetParent !== null);
+                    if (slides.length > 0) {
+                        out.slides = slides.map(s => {
+                            const txt = s.innerText.replace(/\\s+/g, ' ').trim();
+                            const alt = s.querySelector('img[alt]')?.alt || '';
+                            const pct = (txt.match(/(\\d+)\\s*%\\s*즉시할인/) || [])[1];
+                            const price = (txt.match(/([\\d,]{4,})\\s*원/) || [])[1];
+                            return {
+                                alt, text: txt.slice(0, 120),
+                                percent: pct ? parseInt(pct) : null,
+                                price: price ? parseInt(price.replace(/,/g, '')) : null,
+                            };
+                        });
+                        break;
+                    }
+                    section = section.parentElement;
+                }
+            }
+            const body = document.body ? document.body.innerText : '';
+            const qm = body.match(/(\\d+)개\\s*\\n?\\s*([\\d,]+)\\s*원/);
+            if (qm) {
+                out.qty = parseInt(qm[1]);
+                out.list_total = parseInt(qm[2].replace(/,/g, ''));
+            }
+            const all = Array.from(document.querySelectorAll('*'));
+            for (const el of all) {
+                if (el.children.length === 0 && el.textContent.trim() === '총 결제금액') {
+                    const p = el.parentElement;
+                    const txt = p ? p.innerText : '';
+                    const m = txt.match(/([\\d,]{4,})\\s*원/);
+                    if (m) { out.current_total = parseInt(m[1].replace(/,/g, '')); break; }
+                }
+            }
+            return out;
+        }
+    """) or {}
+
+
+def check_payment_flow(page: Page, prod: dict, tiers: list[dict]) -> dict:
+    """상품 페이지 → 쿠폰받기 → 바로구매 → 결제 페이지의 카카오페이 가격 추출.
+    카카오페이가 5만원 미만이면 카드할인 안 적용 → 수량 증대 후 1회 재시도.
+    적립 reward 는 카카오페이 가격이 어느 구간에 들어가는지로 계산.
+    """
+    url = ITEM_URL_FMT.format(slitmCd=prod["slitmCd"], extra=prod.get("url_extra", ""))
+    out = {
+        "qty": 1,
+        "list_total": None,
+        "kakao_price": None,
+        "card_slides": [],
+        "reward_pt": 0,
+        "final_cost": None,
+        "error": None,
+    }
+    qty = 1
+    for attempt in range(2):
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=20000)
+            page.wait_for_timeout(1500)
+        except Exception as e:
+            out["error"] = f"goto: {e}"
+            return out
+
+        _click_coupon(page)
+        if not _execute_buy_now(page, qty):
+            out["error"] = "바로구매 실패"
+            return out
+
+        info = _extract_order_page(page)
+        out["card_slides"] = info.get("slides") or []
+        out["list_total"] = info.get("list_total")
+        out["qty"] = info.get("qty") or qty
+
+        # 카카오페이 슬라이드 우선, 없으면 최고% 슬라이드 fallback
+        kakao = next((s for s in out["card_slides"] if "카카오" in (s.get("text") or "")), None)
+        best = max(out["card_slides"], key=lambda s: s.get("percent") or 0, default=None)
+        out["kakao_price"] = (kakao or best or {}).get("price")
+
+        if not out["kakao_price"]:
+            # 슬라이드 미발견 — 정가 < 5만원이면 5만원 임계 미달로 카드할인 자체가 안 뜸 → qty 늘려 재시도
+            if attempt == 0 and (out.get("list_total") or 0) > 0 and out["list_total"] < 50000:
+                qty = math.ceil(50000 / out["list_total"])
+                continue
+            out["error"] = "카드할인 슬라이드 미발견 (정가 < 5만원 또는 카드할인 정책 없음)"
+            break
+        if out["kakao_price"] >= 50000 or attempt == 1:
+            break
+        # 5만원 미만 → 수량 증대 후 재시도 (단가 = kakao_price / qty)
+        unit = out["kakao_price"] / max(out["qty"] or qty, 1)
+        qty = max(qty + 1, math.ceil(50000 / unit)) if unit > 0 else qty + 1
+
+    # 적립 reward: 결제기준액(카카오가 우선, 없으면 정가) 에 도달하는 가장 큰 구간
+    base_price = out["kakao_price"] or out["list_total"]
+    if base_price and tiers:
+        applicable = [t["reward_pt"] for t in tiers if base_price >= t["min_won"]]
+        out["reward_pt"] = max(applicable) if applicable else 0
+        out["final_cost"] = base_price - out["reward_pt"]
+    return out
+
+
 def write_to_sheet(results: list[dict], date_str: str) -> bool:
     """Step 1과 동일 시트의 "{M.DD}" 탭에 Hmall 10% 결과 추가 입력.
     기존 데이터 마지막 행에서 2행 띄운 후 헤더+상품 행들 입력.
@@ -264,7 +455,8 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
     max_tiers = max((len(r.get("tiers") or []) for r in results), default=0)
 
     section_title = [f"현대Hmall 10% 적립 체크 ({tab_candidates[0]}) — {len(results)}개 상품"]
-    headers = ["#", "제품명", "10%적립", "적립 문구", "최대적립", "쿠폰"]
+    headers = ["#", "제품명", "10%적립", "적립 문구", "최대적립", "쿠폰",
+               "수량", "정가합", "카카오할인가", "적립P", "실비"]
     headers += [f"구간{i+1}" for i in range(max_tiers)]
     headers += ["URL"]
 
@@ -275,17 +467,25 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
             phrase = r.get("error", "")
             max_r = ""
             coupon = ""
+            qty_s = list_s = kakao_s = reward_s = final_s = ""
             tier_cells = [""] * max_tiers
         else:
             ten = "✓" if r["ten_percent"] else "✗"
             phrase = r.get("phrase") or ""
             max_r = r.get("max_reward") or ""
             coupon = "🎟️ 보유" if r.get("has_coupon") else ""
+            p = r.get("payment") or {}
+            qty_s = str(p.get("qty")) if p.get("qty") else ""
+            list_s = f"{p['list_total']:,}" if p.get("list_total") else ""
+            kakao_s = f"{p['kakao_price']:,}" if p.get("kakao_price") else ""
+            reward_s = f"{p['reward_pt']:,}" if p.get("reward_pt") else ""
+            final_s = f"{p['final_cost']:,}" if p.get("final_cost") is not None else ""
             tiers = r.get("tiers") or []
             unit = tiers[0]["min_unit"] if tiers else "원"
             tier_cells = [f"{t['min_won']:,}{unit}/{t['reward_pt']:,}P" for t in tiers]
             tier_cells += [""] * (max_tiers - len(tier_cells))
-        rows.append([str(r["id"]), r["name"], ten, phrase, max_r, coupon] + tier_cells + [r.get("url", "")])
+        rows.append([str(r["id"]), r["name"], ten, phrase, max_r, coupon,
+                     qty_s, list_s, kakao_s, reward_s, final_s] + tier_cells + [r.get("url", "")])
 
     payload = [section_title] + [headers] + rows
     n_cols = len(headers)
@@ -320,20 +520,26 @@ def _tier_summary(tiers: list[dict]) -> str:
 
 def print_report(results: list[dict]) -> None:
     print("\n========= 10% 적립 체크 결과 =========")
-    print(f"{'#':>3} | {'제품명':38s} | {'10%':4s} | {'구간 적립 (min/reward)':28s} | {'최대적립':10s} | 쿠폰")
+    hdr = (f"{'#':>3} | {'제품명':30s} | {'10%':4s} | {'qty':>3} | {'정가합':>10} | "
+           f"{'카카오가':>10} | {'적립':>7} | {'실비':>10} | 쿠폰")
+    print(hdr)
     print("-" * 120)
     for r in results:
         if r.get("error"):
             mark_10 = "ERR"
-            tier_str = r["error"][:26]
-            max_r = "—"
+            qty = list_total = kakao = reward = final = "—"
         else:
             mark_10 = "✓" if r["ten_percent"] else "✗"
-            tier_str = _tier_summary(r.get("tiers") or [])
-            max_r = r.get("max_reward") or "—"
+            p = r.get("payment") or {}
+            qty = str(p.get("qty") or "—")
+            list_total = f"{p['list_total']:,}" if p.get("list_total") else "—"
+            kakao = f"{p['kakao_price']:,}" if p.get("kakao_price") else "—"
+            reward = f"{p['reward_pt']:,}P" if p.get("reward_pt") else "0P"
+            final = f"{p['final_cost']:,}" if p.get("final_cost") is not None else "—"
         coupon = "🎟️" if r.get("has_coupon") else "—"
-        name = (r["name"][:36] + "…") if len(r["name"]) > 37 else r["name"]
-        print(f"{r['id']:>3} | {name:38s} | {mark_10:4s} | {tier_str:28s} | {max_r:10s} | {coupon}")
+        name = (r["name"][:28] + "…") if len(r["name"]) > 29 else r["name"]
+        print(f"{r['id']:>3} | {name:30s} | {mark_10:4s} | {qty:>3} | {list_total:>10} | "
+              f"{kakao:>10} | {reward:>7} | {final:>10} | {coupon}")
 
 
 def main() -> int:
@@ -392,10 +598,18 @@ def _run(browser, acc) -> int:
 
         print(f"  #{prod['id']:>3} {prod['name'][:30]:30s} 검사 중...", flush=True)
         result = check_one_product(page, prod)
-        results.append(result)
         status = "✓" if result["ten_percent"] else ("ERR" if result.get("error") else "✗")
         n_tiers = len(result.get("tiers") or [])
         print(f"     → 10%={status}  구간={n_tiers}단  phrase={(result.get('phrase') or '')[:40]}")
+        # 10% 적립 상품만 결제 흐름 진행 (정가/카카오할인가/실비 추출)
+        if result.get("ten_percent") and not result.get("error"):
+            payment = check_payment_flow(page, prod, result.get("tiers") or [])
+            result["payment"] = payment
+            ppr = (f"qty={payment['qty']}  정가={payment.get('list_total') or '?'}원  "
+                   f"카카오={payment.get('kakao_price') or '?'}원  "
+                   f"적립={payment.get('reward_pt')}P  실비={payment.get('final_cost') or '?'}원")
+            print(f"     → 결제: {ppr}{' [' + payment['error'] + ']' if payment.get('error') else ''}")
+        results.append(result)
 
     print_report(results)
 
