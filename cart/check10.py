@@ -83,17 +83,12 @@ PRODUCTS = [
     {"id": 15, "name": "셀게이트 글루타치온 30p",               "slitmCd": "2244515588", "url_extra": ""},
     {"id": 16, "name": "루솔",                               "slitmCd": "2225275921", "url_extra": ""},
     {"id": 17, "name": "데이즈온 원데이 알파 18개",             "slitmCd": "2247036059", "url_extra": "&sectId=3059445"},
-    {"id": 19, "name": "뉴트리원 164",                        "slitmCd": "2120671185", "url_extra": "&sectId=3059445"},
     {"id": 20, "name": "바디랩 유기농 레몬즙 1박",              "slitmCd": "2244671296", "url_extra": "&sectId=3059445"},
-    {"id": 21, "name": "뉴트리원 브레인알파PS 8박",             "slitmCd": "2148410018", "url_extra": "&sectId=3059445"},
     {"id": 22, "name": "올바른건강식품 와이 9박",                "slitmCd": "2244934734", "url_extra": "&sectId=3059445"},
     {"id": 23, "name": "셀게이트 컬리케일 6박",                 "slitmCd": "2244447010", "url_extra": "&sectId=3059445"},
-    {"id": 24, "name": "알파CD 옐로우컷 20박",                  "slitmCd": "2245143490", "url_extra": "&sectId=3059445"},
     {"id": 25, "name": "유기농 석류젤리 9박(90개)",             "slitmCd": "2243971283", "url_extra": "&sectId=3059445"},
     {"id": 26, "name": "오라틱스 구강유산균 10박",              "slitmCd": "2244032427", "url_extra": "&sectId=3059445"},
-    {"id": 27, "name": "에이투젠 혈당유산균 3개 1박스",          "slitmCd": "2150414954", "url_extra": "&sectId=3059445"},
     {"id": 28, "name": "스키니랩 시서스 다이어트 11박",          "slitmCd": "2202464603", "url_extra": "&sectId=3059445"},
-    {"id": 29, "name": "뉴트리원 루테인 AX GR 100정",          "slitmCd": "2237504874", "url_extra": "&sectId=3059445"},
 ]
 
 
@@ -135,11 +130,12 @@ def check_one_product(page: Page, prod: dict) -> dict:
         "name": prod["name"],
         "url": url,
         "ten_percent": False,
-        "phrase": None,
-        "tiers": [],            # [{"min_won": 50000, "reward_pt": 5000}, ...] 구간별 적립
-        "max_reward": None,     # 마지막 구간 적립금 (예: "200,000P")
-        "event_end": None,      # 행사 종료 (예: "5.12 23:59") — H.Point 상세 페이지 '행사기간' th 의 ~ 이후
-        "has_coupon": False,    # strong.rvej6q8 (쿠폰 적용가 라벨) 존재 여부
+        "phrase": None,         # 행사명들 / 슬래시 join (예: "올인데이 10% 적립 / 릴레이푸드 최대 10% 적립")
+        "events": [],           # [{prmo, name, event_end, tiers}, ...] — 행사별 raw 데이터
+        "tiers": [],            # 모든 행사 합산 — 같은 min_won 에서 reward 합산
+        "max_reward": None,
+        "event_end": None,      # 행사별 종료 시각 / 슬래시 join (예: "5.12 23:59 / 5.24 23:59")
+        "has_coupon": False,
         "error": None,
     }
     try:
@@ -172,72 +168,114 @@ def check_one_product(page: Page, prod: dict) -> dict:
 
     out["ten_percent"] = True
 
-    # 적립 문구 추출 — "10% 적립" 앞 약 30자
-    m = re.search(r"([^\n]{0,50}?)10%\s*적립", body_text)
-    if m:
-        out["phrase"] = (m.group(1) + "10% 적립").strip()
-
-    # Step 2: H.Point 적립 상세 링크 click → 구간별 적립 표 추출
-    detail_link = page.locator('a[href*="evntHPointDtl"]').first
-    if detail_link.count() > 0:
-        try:
-            detail_link.click()
-            page.wait_for_load_state("domcontentloaded", timeout=10000)
-            page.wait_for_timeout(2000)
-            extracted = page.evaluate("""
-                () => {
-                    const out = {tiers: [], event_period: null};
-                    // 구간 적립 표 + 행사기간 행: 첫 테이블에 함께 있음
-                    const tables = document.querySelectorAll('table');
-                    for (const tbl of tables) {
-                        const rows = tbl.querySelectorAll('tr');
-                        for (const r of rows) {
-                            const cells = Array.from(r.querySelectorAll('td,th'))
-                                              .map(c => c.innerText.trim());
-                            if (cells.length < 2) continue;
-                            // 행사기간
-                            if (!out.event_period && cells[0] === '행사기간') {
-                                out.event_period = cells[1];
-                            }
-                            // 구간 적립
-                            if (/(원|개)\\s*이상/.test(cells[0]) && /\\dP/.test(cells[1].replace(/\\s/g,''))) {
-                                out.tiers.push(cells);
-                            }
-                        }
-                        if (out.tiers.length > 0) break;
-                    }
-                    const body = document.body ? document.body.innerText : '';
-                    const m = body.match(/최대\\s*([\\d,]+)\\s*P/);
-                    if (m) out.max_reward = m[1] + 'P';
-                    return out;
+    # "구매 혜택" 아코디언 펼치기 — 모든 적립 행사가 그 안에 있음
+    try:
+        page.evaluate("""() => {
+            const btns = Array.from(document.querySelectorAll('button.accordion-trigger'));
+            for (const b of btns) {
+                if ((b.textContent || '').includes('구매 혜택')
+                    && b.getAttribute('aria-expanded') !== 'true') {
+                    b.click();
                 }
-            """)
+            }
+        }""")
+        page.wait_for_timeout(800)
+    except Exception:
+        pass
+
+    # 모든 evntHPointDtl link 의 href 수집 (prmoNo dedup)
+    links = page.evaluate("""() => {
+        const anchors = Array.from(document.querySelectorAll('a[href*="evntHPointDtl"]'));
+        const seen = new Set();
+        const out = [];
+        for (const a of anchors) {
+            const m = a.href.match(/prmoNo=([^&]+)/);
+            const prmo = m ? m[1] : a.href;
+            if (seen.has(prmo)) continue;
+            seen.add(prmo);
+            out.push({prmo, href: a.href});
+        }
+        return out;
+    }""") or []
+
+    # 각 행사 detail page 방문해서 events list 만들기
+    for ld in links:
+        try:
+            page.goto(ld["href"], wait_until="domcontentloaded", timeout=10000)
+            page.wait_for_timeout(1800)
+            extracted = page.evaluate("""() => {
+                const out = {tiers: [], event_period: null, event_name: null};
+                const tables = document.querySelectorAll('table');
+                for (const tbl of tables) {
+                    const rows = tbl.querySelectorAll('tr');
+                    for (const r of rows) {
+                        const cells = Array.from(r.querySelectorAll('td,th'))
+                                          .map(c => c.innerText.trim());
+                        if (cells.length < 2) continue;
+                        if (!out.event_period && cells[0] === '행사기간') out.event_period = cells[1];
+                        if (!out.event_name && cells[0] === '행사상품') {
+                            // '행사상품' 셀의 마지막 줄 = 행사 라벨 (예: "올인데이 10%적립")
+                            const lines = cells[1].split('\\n').map(s => s.trim()).filter(Boolean);
+                            out.event_name = lines[lines.length - 1] || null;
+                        }
+                        if (/(원|개)\\s*이상/.test(cells[0]) && /\\dP/.test(cells[1].replace(/\\s/g,''))) {
+                            out.tiers.push(cells);
+                        }
+                    }
+                    if (out.tiers.length > 0) break;
+                }
+                return out;
+            }""")
+            event = {"prmo": ld["prmo"], "name": None, "event_end": None, "tiers": []}
             if extracted:
+                event["name"] = extracted.get("event_name")
                 for row in extracted.get("tiers", []):
                     min_m = re.search(r"([\d,]+)\s*(원|개)", row[0])
                     rw_m = re.search(r"([\d,]+)\s*P", row[1])
                     if not (min_m and rw_m):
                         continue
-                    out["tiers"].append({
+                    event["tiers"].append({
                         "min_won": int(min_m.group(1).replace(",", "")),
                         "min_unit": min_m.group(2),
                         "reward_pt": int(rw_m.group(1).replace(",", "")),
                     })
-                if out["tiers"]:
-                    out["max_reward"] = f"{out['tiers'][-1]['reward_pt']:,}P"
-                elif extracted.get("max_reward"):
-                    out["max_reward"] = extracted["max_reward"]
-                # 행사기간 → 종료 시각만 ("5.12 23:59" 형식)
                 ev = extracted.get("event_period")
                 if ev:
                     end_part = ev.split("~")[-1].strip()
                     em = re.search(r"(\d{4})\.(\d{1,2})\.(\d{1,2})\([^)]+\)\s*(\d{1,2}:\d{2})", end_part)
                     if em:
-                        out["event_end"] = f"{int(em.group(2))}.{int(em.group(3)):02d} {em.group(4)}"
-            page.go_back(wait_until="domcontentloaded", timeout=10000)
-            page.wait_for_timeout(1200)
+                        event["event_end"] = f"{int(em.group(2))}.{int(em.group(3)):02d} {em.group(4)}"
+            out["events"].append(event)
         except Exception:
-            pass
+            continue
+
+    # events 를 합산 → tiers, event_end, phrase 채움
+    combined: dict[int, int] = {}
+    unit = "원"
+    for e in out["events"]:
+        for t in e["tiers"]:
+            combined[t["min_won"]] = combined.get(t["min_won"], 0) + t["reward_pt"]
+            unit = t["min_unit"]
+    out["tiers"] = [{"min_won": k, "min_unit": unit, "reward_pt": v}
+                    for k, v in sorted(combined.items())]
+    if out["tiers"]:
+        out["max_reward"] = f"{out['tiers'][-1]['reward_pt']:,}P"
+    out["event_end"] = " / ".join(e["event_end"] for e in out["events"] if e.get("event_end")) or None
+    # phrase: 행사명 join (없으면 본문에서 첫 매칭 사용)
+    names = [e["name"] for e in out["events"] if e.get("name")]
+    if names:
+        out["phrase"] = " / ".join(names)
+    else:
+        pm = re.search(r"([^\n]{0,50}?)10%\s*적립", body_text)
+        if pm:
+            out["phrase"] = (pm.group(1) + "10% 적립").strip()
+
+    # 상품 페이지로 복귀 (이후 흐름에서 page 사용 위해)
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=10000)
+        page.wait_for_timeout(800)
+    except Exception:
+        pass
 
     return out
 
