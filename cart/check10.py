@@ -138,6 +138,7 @@ def check_one_product(page: Page, prod: dict) -> dict:
         "phrase": None,
         "tiers": [],            # [{"min_won": 50000, "reward_pt": 5000}, ...] 구간별 적립
         "max_reward": None,     # 마지막 구간 적립금 (예: "200,000P")
+        "event_end": None,      # 행사 종료 (예: "5.12 23:59") — H.Point 상세 페이지 '행사기간' th 의 ~ 이후
         "has_coupon": False,    # strong.rvej6q8 (쿠폰 적용가 라벨) 존재 여부
         "error": None,
     }
@@ -185,24 +186,25 @@ def check_one_product(page: Page, prod: dict) -> dict:
             page.wait_for_timeout(2000)
             extracted = page.evaluate("""
                 () => {
-                    const out = {tiers: []};
-                    // 구간 적립 표: 행마다 [<N원/개 이상>, <N,NNNP>]
+                    const out = {tiers: [], event_period: null};
+                    // 구간 적립 표 + 행사기간 행: 첫 테이블에 함께 있음
                     const tables = document.querySelectorAll('table');
                     for (const tbl of tables) {
                         const rows = tbl.querySelectorAll('tr');
-                        const tierRows = [];
                         for (const r of rows) {
                             const cells = Array.from(r.querySelectorAll('td,th'))
                                               .map(c => c.innerText.trim());
                             if (cells.length < 2) continue;
+                            // 행사기간
+                            if (!out.event_period && cells[0] === '행사기간') {
+                                out.event_period = cells[1];
+                            }
+                            // 구간 적립
                             if (/(원|개)\\s*이상/.test(cells[0]) && /\\dP/.test(cells[1].replace(/\\s/g,''))) {
-                                tierRows.push(cells);
+                                out.tiers.push(cells);
                             }
                         }
-                        if (tierRows.length > 0) {
-                            out.tiers = tierRows;
-                            break;
-                        }
+                        if (out.tiers.length > 0) break;
                     }
                     const body = document.body ? document.body.innerText : '';
                     const m = body.match(/최대\\s*([\\d,]+)\\s*P/);
@@ -225,6 +227,13 @@ def check_one_product(page: Page, prod: dict) -> dict:
                     out["max_reward"] = f"{out['tiers'][-1]['reward_pt']:,}P"
                 elif extracted.get("max_reward"):
                     out["max_reward"] = extracted["max_reward"]
+                # 행사기간 → 종료 시각만 ("5.12 23:59" 형식)
+                ev = extracted.get("event_period")
+                if ev:
+                    end_part = ev.split("~")[-1].strip()
+                    em = re.search(r"(\d{4})\.(\d{1,2})\.(\d{1,2})\([^)]+\)\s*(\d{1,2}:\d{2})", end_part)
+                    if em:
+                        out["event_end"] = f"{int(em.group(2))}.{int(em.group(3)):02d} {em.group(4)}"
             page.go_back(wait_until="domcontentloaded", timeout=10000)
             page.wait_for_timeout(1200)
         except Exception:
@@ -531,6 +540,7 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
                "카카오즉시할인가", "카카오실비"]
     for c in payback_cards_used:
         headers += [f"{c}즉시", f"{c}실비"]
+    headers += ["행사종료"]
     headers += [f"구간{i+1}" for i in range(max_tiers)]
     headers += ["URL"]
 
@@ -545,6 +555,7 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
             coupon = ""
             qty_s = lp_s = mp_s = kk_s = kk_fin_s = ""
             pb_cells = ["", ""] * len(payback_cards_used)
+            event_end_s = ""
             tier_cells = [""] * max_tiers
         else:
             ten = "✓" if r["ten_percent"] else "✗"
@@ -561,12 +572,13 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
             for c in payback_cards_used:
                 e = pb.get(c) or {}
                 pb_cells += [_fmt(e.get("immediate_price")), _fmt(e.get("final_cost"))]
+            event_end_s = r.get("event_end") or ""
             tiers_p = r.get("tiers") or []
             unit = tiers_p[0]["min_unit"] if tiers_p else "원"
             tier_cells = [f"{t['min_won']:,}{unit}/{t['reward_pt']:,}P" for t in tiers_p]
             tier_cells += [""] * (max_tiers - len(tier_cells))
         rows.append([str(r["id"]), r["name"], ten, phrase, coupon,
-                     qty_s, lp_s, mp_s, kk_s, kk_fin_s] + pb_cells + tier_cells + [r.get("url", "")])
+                     qty_s, lp_s, mp_s, kk_s, kk_fin_s] + pb_cells + [event_end_s] + tier_cells + [r.get("url", "")])
 
     payload = [section_title] + [headers] + rows
     n_cols = len(headers)
