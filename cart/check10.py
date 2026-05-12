@@ -398,9 +398,8 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict]) -> dict:
         "kakao_price": None,       # 카카오페이 즉시할인가
         "kakao_reward_pt": 0,
         "kakao_final_cost": None,
-        "paybacks": {},            # {카드명: {after, reward_pt, final_cost, payback_pct}}
-        "best_card": None,
-        "best_final_cost": None,
+        # 슬라이드에 등장한 페이백 5개 카드만 — 즉시할인 + 페이백 둘 다 받는 케이스
+        "paybacks": {},            # {카드명: {immediate_price, payback_pct, after_payback, reward_pt, final_cost}}
         "error": None,
     }
     qty = 1
@@ -434,43 +433,35 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict]) -> dict:
             continue
         break
 
-    base = out["member_price"] or out["list_price"]
-    if not base:
-        out["error"] = out.get("error") or "우수가/정가 추출 실패"
-        return out
-
-    # 카드별 최종가 계산
-    candidates: list[tuple[str, int, int]] = []  # (카드명, 할인후가, 실비)
-
+    # 카카오페이 (즉시할인 슬라이드)
     if kakao_slide and kakao_slide.get("price"):
         kk = kakao_slide["price"]
         rw = _compute_reward(kk, tiers)
         out["kakao_price"] = kk
         out["kakao_reward_pt"] = rw
         out["kakao_final_cost"] = kk - rw
-        candidates.append(("카카오페이", kk, kk - rw))
 
-    # 페이백 카드는 페이지에 결제수단으로 노출된 카드만 적용
-    # (설화수 가이드 §6: "당일 페이지에서 확인된 카드만 페이백 해당 여부 판단")
-    visible_text = info.get("payment_methods_text") or ""
-    for s in out["card_slides"]:
-        visible_text += " " + (s.get("text") or "")
-    for name, pct in EVERYDAY_PAYBACK_CARDS:
-        if name not in visible_text:
+    # 페이백 5개 카드 — 카드할인 슬라이드에 등장한 경우에만 적용
+    # (예: 어느 날 슬라이드에 '롯데 7%즉시할인' 가 뜨면 → 즉시할인가 × 0.98 - 적립)
+    # 오늘처럼 슬라이드가 카카오페이+KB국민/현대카드 뿐이면 페이백 매칭 없음.
+    for slide in out["card_slides"]:
+        text = slide.get("text") or ""
+        imm = slide.get("price")
+        if not imm:
             continue
-        after = round(base * (1 - pct))
-        rw = _compute_reward(after, tiers)
-        final = after - rw
-        out["paybacks"][name] = {
-            "after": after, "reward_pt": rw, "final_cost": final,
-            "payback_pct": pct * 100,
-        }
-        candidates.append((name, after, final))
-
-    if candidates:
-        candidates.sort(key=lambda c: c[2])
-        out["best_card"] = candidates[0][0]
-        out["best_final_cost"] = candidates[0][2]
+        for name, pct in EVERYDAY_PAYBACK_CARDS:
+            short = name.replace("카드", "")
+            if name in text or short in text:
+                after = round(imm * (1 - pct))
+                rw = _compute_reward(after, tiers)
+                out["paybacks"][name] = {
+                    "immediate_price": imm,
+                    "payback_pct": pct * 100,
+                    "after_payback": after,
+                    "reward_pt": rw,
+                    "final_cost": after - rw,
+                }
+                break
     return out
 
 
@@ -525,12 +516,21 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
     # 구간 수 최대값 → 컬럼 수 결정
     max_tiers = max((len(r.get("tiers") or []) for r in results), default=0)
 
+    # 슬라이드 페이백 카드 (union 순서 유지: EVERYDAY_PAYBACK_CARDS 우선순)
+    payback_card_order = [name for name, _ in EVERYDAY_PAYBACK_CARDS]
+    payback_cards_used: list[str] = []
+    for r in results:
+        for k in ((r.get("payment") or {}).get("paybacks") or {}).keys():
+            if k not in payback_cards_used:
+                payback_cards_used.append(k)
+    payback_cards_used.sort(key=lambda c: payback_card_order.index(c) if c in payback_card_order else 99)
+
     section_title = [f"현대Hmall 10% 적립 체크 ({tab_candidates[0]}) — {len(results)}개 상품"]
     headers = ["#", "제품명", "10%적립", "적립 문구", "쿠폰",
                "수량", "정가", "우수가",
-               "카카오즉시할인가", "카카오실비",
-               "롯데실비(2%)", "비씨실비(1.5%)", "삼성실비(1%)", "하나실비(1%)", "농협실비(1%)",
-               "best카드", "best실비"]
+               "카카오즉시할인가", "카카오실비"]
+    for c in payback_cards_used:
+        headers += [f"{c}즉시", f"{c}실비"]
     headers += [f"구간{i+1}" for i in range(max_tiers)]
     headers += ["URL"]
 
@@ -544,8 +544,7 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
             phrase = r.get("error", "")
             coupon = ""
             qty_s = lp_s = mp_s = kk_s = kk_fin_s = ""
-            lt_fin = bc_fin = ss_fin = hn_fin = nh_fin = ""
-            best_card = best_fin = ""
+            pb_cells = ["", ""] * len(payback_cards_used)
             tier_cells = [""] * max_tiers
         else:
             ten = "✓" if r["ten_percent"] else "✗"
@@ -558,21 +557,16 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
             kk_s = _fmt(p.get("kakao_price"))
             kk_fin_s = _fmt(p.get("kakao_final_cost"))
             pb = p.get("paybacks") or {}
-            lt_fin = _fmt((pb.get("롯데카드") or {}).get("final_cost"))
-            bc_fin = _fmt((pb.get("비씨카드") or {}).get("final_cost"))
-            ss_fin = _fmt((pb.get("삼성카드") or {}).get("final_cost"))
-            hn_fin = _fmt((pb.get("하나카드") or {}).get("final_cost"))
-            nh_fin = _fmt((pb.get("농협카드") or {}).get("final_cost"))
-            best_card = p.get("best_card") or ""
-            best_fin = _fmt(p.get("best_final_cost"))
+            pb_cells = []
+            for c in payback_cards_used:
+                e = pb.get(c) or {}
+                pb_cells += [_fmt(e.get("immediate_price")), _fmt(e.get("final_cost"))]
             tiers_p = r.get("tiers") or []
             unit = tiers_p[0]["min_unit"] if tiers_p else "원"
             tier_cells = [f"{t['min_won']:,}{unit}/{t['reward_pt']:,}P" for t in tiers_p]
             tier_cells += [""] * (max_tiers - len(tier_cells))
         rows.append([str(r["id"]), r["name"], ten, phrase, coupon,
-                     qty_s, lp_s, mp_s, kk_s, kk_fin_s,
-                     lt_fin, bc_fin, ss_fin, hn_fin, nh_fin,
-                     best_card, best_fin] + tier_cells + [r.get("url", "")])
+                     qty_s, lp_s, mp_s, kk_s, kk_fin_s] + pb_cells + tier_cells + [r.get("url", "")])
 
     payload = [section_title] + [headers] + rows
     n_cols = len(headers)
@@ -607,14 +601,14 @@ def _tier_summary(tiers: list[dict]) -> str:
 
 def print_report(results: list[dict]) -> None:
     print("\n========= 10% 적립 + 결제 흐름 결과 =========")
-    hdr = (f"{'#':>3} | {'제품명':28s} | {'qty':>3} | {'정가':>9} | {'우수가':>9} | "
-           f"{'카카오':>9} | {'카카오실비':>9} | {'best카드':10s} | {'best실비':>9}")
+    hdr = (f"{'#':>3} | {'제품명':30s} | {'qty':>3} | {'정가':>9} | {'우수가':>9} | "
+           f"{'카카오즉시':>9} | {'카카오실비':>9} | 페이백카드")
     print(hdr)
-    print("-" * 130)
+    print("-" * 120)
     for r in results:
-        name = (r["name"][:26] + "…") if len(r["name"]) > 27 else r["name"]
+        name = (r["name"][:28] + "…") if len(r["name"]) > 29 else r["name"]
         if r.get("error"):
-            print(f"{r['id']:>3} | {name:28s} | ERR {r['error'][:30]}")
+            print(f"{r['id']:>3} | {name:30s} | ERR {r['error'][:30]}")
             continue
         p = r.get("payment") or {}
         qty = str(p.get("qty") or "—")
@@ -622,10 +616,10 @@ def print_report(results: list[dict]) -> None:
         mp = f"{p['member_price']:,}" if p.get("member_price") else "—"
         kk = f"{p['kakao_price']:,}" if p.get("kakao_price") else "—"
         kkf = f"{p['kakao_final_cost']:,}" if p.get("kakao_final_cost") is not None else "—"
-        bc = p.get("best_card") or "—"
-        bf = f"{p['best_final_cost']:,}" if p.get("best_final_cost") is not None else "—"
-        print(f"{r['id']:>3} | {name:28s} | {qty:>3} | {lp:>9} | {mp:>9} | "
-              f"{kk:>9} | {kkf:>9} | {bc:10s} | {bf:>9}")
+        pb = p.get("paybacks") or {}
+        pb_str = ", ".join(f"{k}={v['final_cost']:,}" for k, v in pb.items()) if pb else "—"
+        print(f"{r['id']:>3} | {name:30s} | {qty:>3} | {lp:>9} | {mp:>9} | "
+              f"{kk:>9} | {kkf:>9} | {pb_str}")
 
 
 def main() -> int:
@@ -691,11 +685,13 @@ def _run(browser, acc) -> int:
         if result.get("ten_percent") and not result.get("error"):
             payment = check_payment_flow(page, prod, result.get("tiers") or [])
             result["payment"] = payment
+            pb = payment.get("paybacks") or {}
+            pb_str = " / ".join(f"{k}={v['final_cost']:,}" for k, v in pb.items()) if pb else "-"
             ppr = (f"qty={payment['qty']}  정가={payment.get('list_price') or '?'}  "
                    f"우수가={payment.get('member_price') or '?'}  "
                    f"카카오={payment.get('kakao_price') or '?'}  "
                    f"카카오실비={payment.get('kakao_final_cost') or '?'}  "
-                   f"best={payment.get('best_card') or '-'}({payment.get('best_final_cost') or '?'})")
+                   f"페이백[{pb_str}]")
             print(f"     → 결제: {ppr}{' [' + payment['error'] + ']' if payment.get('error') else ''}")
         results.append(result)
 
