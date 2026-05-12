@@ -364,6 +364,19 @@ def _extract_order_page(page: Page) -> dict:
             };
             out.list_price = grab('상품금액');    // 정가 (소비자가격)
             out.member_price = grab('총 결제금액');  // 우수고객 혜택가 (카드할인 임계 기준)
+            // 결제수단 영역 본문 — 페이백 카드 노출 여부 판정용
+            const ms = Array.from(document.querySelectorAll('*')).find(el =>
+                el.children.length === 0 && el.textContent.trim() === '결제수단');
+            if (ms) {
+                let sec = ms.parentElement;
+                for (let i = 0; i < 5 && sec; i++) {
+                    if (sec.innerText && sec.innerText.length > 50) {
+                        out.payment_methods_text = sec.innerText.slice(0, 2000);
+                        break;
+                    }
+                    sec = sec.parentElement;
+                }
+            }
             return out;
         }
     """) or {}
@@ -437,7 +450,14 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict]) -> dict:
         out["kakao_final_cost"] = kk - rw
         candidates.append(("카카오페이", kk, kk - rw))
 
+    # 페이백 카드는 페이지에 결제수단으로 노출된 카드만 적용
+    # (설화수 가이드 §6: "당일 페이지에서 확인된 카드만 페이백 해당 여부 판단")
+    visible_text = info.get("payment_methods_text") or ""
+    for s in out["card_slides"]:
+        visible_text += " " + (s.get("text") or "")
     for name, pct in EVERYDAY_PAYBACK_CARDS:
+        if name not in visible_text:
+            continue
         after = round(base * (1 - pct))
         rw = _compute_reward(after, tiers)
         final = after - rw
