@@ -162,41 +162,45 @@ def check_one_product(page: Page, prod: dict) -> dict:
     except Exception:
         pass
 
-    # Step 1: "적립" 검출 (10% 외에도 5%, 최대 N원 등 모든 적립 행사 진입)
-    if "적립" not in body_text:
-        return out  # 적립 행사 자체 없음
-    # 10% 적립 여부는 events 수집 후 phrase 기준으로 다시 판정 (호환을 위해 임시 True)
-    out["ten_percent"] = True
-
-    # "구매 혜택" 아코디언 펼치기 — 모든 적립 행사가 그 안에 있음
-    try:
-        page.evaluate("""() => {
-            const btns = Array.from(document.querySelectorAll('button.accordion-trigger'));
-            for (const b of btns) {
-                if ((b.textContent || '').includes('구매 혜택')
-                    && b.getAttribute('aria-expanded') !== 'true') {
-                    b.click();
-                }
+    # "구매 혜택" 아코디언 펼치기 + 그 panel scope 안에서만 적립/링크 검사
+    # (본문 전체에서 검색하면 카드할인 영역의 'N% 적립'·'H.Point 적립' 등과 혼동됨)
+    panel_data = page.evaluate("""() => {
+        const btns = Array.from(document.querySelectorAll('button.accordion-trigger'));
+        let panel = null;
+        for (const b of btns) {
+            if (!(b.textContent || '').includes('구매 혜택')) continue;
+            if (b.getAttribute('aria-expanded') !== 'true') b.click();
+            const ctrl = b.getAttribute('aria-controls');
+            if (ctrl) { panel = document.getElementById(ctrl); }
+            if (!panel) {
+                const h3 = b.closest('h3');
+                if (h3 && h3.nextElementSibling) panel = h3.nextElementSibling;
             }
-        }""")
-        page.wait_for_timeout(800)
-    except Exception:
-        pass
-
-    # 모든 evntHPointDtl link 의 href 수집 (prmoNo dedup)
-    links = page.evaluate("""() => {
-        const anchors = Array.from(document.querySelectorAll('a[href*="evntHPointDtl"]'));
+            break;
+        }
+        if (!panel) return {has_reward: false, links: []};
+        const text = panel.textContent || '';
+        const has_reward = /적립/.test(text);
+        const anchors = Array.from(panel.querySelectorAll('a[href*="evntHPointDtl"]'));
         const seen = new Set();
-        const out = [];
+        const links = [];
         for (const a of anchors) {
             const m = a.href.match(/prmoNo=([^&]+)/);
             const prmo = m ? m[1] : a.href;
             if (seen.has(prmo)) continue;
             seen.add(prmo);
-            out.push({prmo, href: a.href});
+            links.push({prmo, href: a.href});
         }
-        return out;
-    }""") or []
+        return {has_reward, links, panel_text: text.slice(0, 500)};
+    }""") or {}
+    page.wait_for_timeout(800)
+
+    # Step 1: '구매 혜택' panel 안에 '적립' 키워드가 있어야 진입 (카드할인 영역과 혼동 방지)
+    if not panel_data.get("has_reward"):
+        return out  # 적립 행사 자체 없음
+    out["ten_percent"] = True  # 임시, events 수집 후 재판정
+
+    links = panel_data.get("links") or []
 
     # 각 행사 detail page 방문해서 events list 만들기
     for ld in links:

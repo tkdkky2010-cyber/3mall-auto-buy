@@ -138,15 +138,35 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 
 각 상품 URL로 이동한 후 다음 단계를 수행한다.
 
-#### Step 1: '적립' 문구 존재 여부 확인
+#### Step 1: '구매 혜택' panel 안에서 '적립' 검출
 
-- `get_page_text` 로 페이지 텍스트를 가져온다.
-- 텍스트 내에 **"적립"** 문구가 포함되어 있는지 확인한다 ('10% 적립' 만이
-  아니라 5% / 7% / 최대 N원 적립 등 모든 적립 행사 후보).
-- **포함되어 있지 않으면**: 해당 상품은 `❌ 없음`으로 기록하고 다음 상품으로 넘어간다.
-- **포함되어 있으면**: Step 2로 진행 (events 수집).
-- ten_percent 라벨은 events 수집 끝난 뒤 phrase 또는 events.name 에 '10%'
-  가 포함된 경우에만 True 로 최종 판정 (결제 흐름은 ten_percent=True 일 때만).
+> **⚠️ 검사 범위 한정**: 본문 전체가 아닌 **"구매 혜택" 아코디언 panel
+> 안쪽에서만** '적립' 키워드를 검사한다. 본문 전체로 검사하면 카드할인
+> 영역의 'N% 적립' / 'H.Point N원 적립' 같은 문구와 혼동된다 (카드사
+> 7% 즉시할인 등은 적립 행사가 아니다).
+
+1. 아코디언 트리거 식별: `button.accordion-trigger` 중 span 텍스트가
+   '구매 혜택'.
+   ```html
+   <h3 class="selected">
+     <button class=" accordion-trigger" aria-expanded="true">
+       <i class="icon "></i><span>구매 혜택</span>
+     </button>
+   </h3>
+   ```
+2. `aria-expanded !== 'true'` 면 click 으로 펼친다.
+3. panel element 확보:
+   - 우선 `aria-controls` 가 가리키는 `document.getElementById(ctrl)`,
+   - fallback 으로 부모 `<h3>` 의 `nextElementSibling`.
+4. `panel.textContent` 에 **'적립'** 문자가 있는지 확인 — 없으면 `❌ 없음` 기록.
+5. 있으면 같은 panel 안의 `a[href*="evntHPointDtl"]` 모두 수집 (prmoNo
+   기준 dedup) → Step 2로 진행.
+
+> 99% 케이스가 '10% 적립' 이고, 가끔 '7% 적립' 도 등장한다 (카드사 7%
+> 즉시할인과는 완전히 다른 항목). ten_percent 라벨은 events 수집 후
+> phrase / events.name 에 '10%' 가 포함된 경우에만 True 로 최종 판정.
+> 7% 적립 상품은 events 에 정보는 남지만 ten_percent=False 가 되어
+> 결제 흐름(check_payment_flow)에는 진입하지 않는다.
 
 #### Step 2: 행사별 구간 적립 정보 수집 (dual 적립 가능)
 
