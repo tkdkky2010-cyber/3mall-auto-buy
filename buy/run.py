@@ -420,22 +420,31 @@ def do_checkout(page: Page) -> dict:
             return out
 
         cardcd = pick.get("cardCd", "")
-        is_pay = not pick.get("isCard", True)
-        tag = "카드" if pick.get("isCard") else "페이"
+        brand_text = pick.get("brand", "")
+        # 카카오페이/토스페이는 alt='cardCdXX' 라도 brand 텍스트 기준으로 페이로 강제 분류
+        # (alt.startsWith('cardCd') 만으로는 카카오페이를 카드로 오분류 → 결제까지 진행되는 버그)
+        is_kakao = "카카오" in brand_text
+        is_toss = "토스" in brand_text and "페이" in brand_text
+        is_pay_brand = is_kakao or is_toss or (not pick.get("isCard", True))
+        tag = "페이" if is_pay_brand else "카드"
         mode = "override" if TODAY_BRAND_OVERRIDE else "auto"
-        print(f"    [OK] {tag} {mode} 선택: '{pick.get('brand')}' {pick.get('percent')}% ({cardcd})")
+        print(f"    [OK] {tag} {mode} 선택: '{brand_text}' {pick.get('percent')}% ({cardcd})")
 
-        if pick.get("isCard"):
-            internal_brand = CARD_CD_TO_BRAND.get(cardcd, "UNKNOWN")
-            out["card_brand"] = CARD_CD_TO_NAME.get(cardcd, pick.get("brand", ""))
-        else:
+        if is_pay_brand:
             internal_brand = "PAY"
-            short = pick.get("brand", "")
-            out["card_brand"] = "카카오페이" if "카카오" in short else ("토스페이" if "토스" in short else short)
-        out["is_pay"] = is_pay
+            if is_kakao:
+                out["card_brand"] = "카카오페이"
+            elif is_toss:
+                out["card_brand"] = "토스페이"
+            else:
+                out["card_brand"] = brand_text
+        else:
+            internal_brand = CARD_CD_TO_BRAND.get(cardcd, "UNKNOWN")
+            out["card_brand"] = CARD_CD_TO_NAME.get(cardcd, brand_text)
+        out["is_pay"] = is_pay_brand
 
         # 카카오페이 선택 시 — cart까지만 (본폰 카카오페이로 user 수동 결제)
-        if out["card_brand"] == "카카오페이":
+        if "카카오페이" in out["card_brand"]:
             print(f"    [SKIP] 카카오페이 선택됨 — 결제하지 않고 cart만 유지 (본폰에서 수동 결제)")
             out["success"] = True
             out["cart_only"] = True
@@ -897,16 +906,38 @@ def main() -> int:
 def _run_with_browser(browser, accounts, target_indices, account_plan, summary) -> int:
 
     context = browser.contexts[0] if browser.contexts else browser.new_context()
-    for idx in target_indices:
-        account = accounts[idx - 1]
-        items = account_plan.get(idx, [])
-        try:
-            ok, total, cleared, ckt = process_account(context, idx, account, items, cdp_mode=True)
-            summary.append((idx, account["id"], ok, total, cleared, ckt))
-        except Exception as e:
-            print(f"  [FATAL] #{idx} {account['id']}: {e}")
-            summary.append((idx, account["id"], 0, len(items), False, None))
-        time.sleep(ACCOUNT_DELAY_SEC)
+
+    def _process(idx_list, pass_label):
+        local_results: dict[int, tuple] = {}
+        for idx in idx_list:
+            account = accounts[idx - 1]
+            items = account_plan.get(idx, [])
+            print(f"\n  ─── {pass_label} #{idx} {account['id']} (items={len(items)}) ───")
+            try:
+                ok, total, cleared, ckt = process_account(context, idx, account, items, cdp_mode=True)
+                local_results[idx] = (idx, account["id"], ok, total, cleared, ckt)
+            except Exception as e:
+                print(f"  [FATAL] #{idx} {account['id']}: {e}")
+                local_results[idx] = (idx, account["id"], 0, len(items), False, None)
+            time.sleep(ACCOUNT_DELAY_SEC)
+        return local_results
+
+    # 1차 pass
+    first = _process(target_indices, pass_label="1차")
+    summary.extend(first[idx] for idx in target_indices)
+
+    # 실패 계정 추출 (담은 게 plan 의 모든 row보다 적으면 fail)
+    failed_indices = [
+        idx for idx in target_indices
+        if first[idx][2] < first[idx][3]  # ok < total
+    ]
+    if failed_indices:
+        print(f"\n========= 재시도 (1차 fail: {failed_indices}) =========")
+        retry = _process(failed_indices, pass_label="재시도")
+        # summary 갱신 — 재시도 결과를 우선
+        for i, row in enumerate(summary):
+            if row[0] in retry:
+                summary[i] = retry[row[0]]
 
     print("\n========= SUMMARY =========")
     for idx, aid, ok, total, cleared, ckt in summary:

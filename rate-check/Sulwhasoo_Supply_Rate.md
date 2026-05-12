@@ -1492,33 +1492,39 @@ h(자음생크림리치세트): ??%
 
 ### 9-2.5. ★ 추가 적립 이벤트 확인 (구매사은·혜택 섹션)
 
-> **상품 페이지 하단 "구매사은 · 혜택" 섹션에서 적립 이벤트만 추출.**
-> 매칭 룰: 항목 텍스트에 "최대" + "적립" 두 단어가 모두 포함된 경우만 처리.
-> 페이백/L.CLUB/이리오십쇼/가정의달 등은 무시 (lotte_ignore_keywords.txt로 관리).
+> **상품 페이지 `#eventBanner` (구매사은 · 혜택) 섹션에서 적립 이벤트만 추출.**
+> 1차 negative 키워드 매칭으로 거른 뒤, 2차 **data-url 진입 후 페이지 구조로 검증**해서
+> 실제 "N원 이상 N원 적립" 구간표 또는 "최대 N,NNN원 적립" 패턴이 있을 때만 채택한다.
+> 단순 키워드 매칭만으로 결정하지 않는다 — 의미 없는 이벤트(가입 권유 등)는
+> data-url 페이지에 적립 구조가 없으므로 자동 제외된다.
 
-#### ① 섹션 추출 (DOM)
+#### ① 섹션 추출 (DOM — #eventBanner)
 
-    var headers = document.querySelectorAll('h3.title');
-    var allItems = [];
-    for (var h of headers) {
-      if (h.textContent.includes('구매사은') || h.textContent.includes('혜택')) {
-        var listEl = h.nextElementSibling;
-        var links = listEl ? listEl.querySelectorAll('a, li') : [];
-        for (var item of links) {
-          allItems.push(item.textContent.trim());
-        }
-        break;
-      }
-    }
-    allItems;
+```javascript
+const banner = document.querySelector('#eventBanner');
+const lis = banner ? banner.querySelectorAll('li.swiper_slide, li.swiper-slide, li') : [];
+const items = [];
+for (const li of lis) {
+  const a = li.querySelector('a[data-url], a[href]');
+  const img = li.querySelector('img[alt]');
+  const strong = li.querySelector('strong');
+  const p = li.querySelector('p');
+  items.push({
+    text: li.textContent.replace(/\s+/g,' ').trim(),
+    alt: img ? img.alt : '',
+    title: strong ? strong.textContent.trim() : '',
+    subtitle: p ? p.textContent.trim() : '',
+    data_url: a ? (a.getAttribute('data-url') || a.getAttribute('href')) : null,
+  });
+}
+```
 
-#### ② 필터링 (positive + negative)
+> `<a href="javascript:void(0)" data-url="/event/...">` 형태이므로 **`data-url`** 속성으로
+> 실제 이벤트 페이지 URL 을 얻는다.
 
-**Positive 매칭 (추출 대상):**
-- 정규식: `/최대.*적립/`
-- 예: "광세일 패션/리빙 최대 20% 적립"
+#### ② 1차 필터 — Negative 키워드 (lotte_ignore_keywords.txt)
 
-**Negative 매칭 (무시 — lotte_ignore_keywords.txt에서 로드):**
+`alt + text` 에 아래 키워드 중 하나라도 포함되면 즉시 제외:
 
 초기값:
 - 페이백
@@ -1526,43 +1532,55 @@ h(자음생크림리치세트): ??%
 - 이리오십쇼
 - 가정의달
 - 선물하기
-- 쇼데이
 - 무료가입
 - 창립
 - 게이트페이지
 
-매번 작업 시작 시 위 파일 로드. 새 무시 키워드 발견 시 사용자 확인 후 자동 append.
+> ⚠️ **"쇼데이" 는 무시 키워드 X.** 메가쇼데이·뷰티 DAYS 등 적립 이벤트의 일부.
+> 키워드 추가는 신중히 — 적립 키워드를 잘못 무시하면 손실. 새 키워드 추가 시
+> 1) 그 키워드가 들어간 이벤트가 **공통적으로 적립과 무관** 한지 확인
+> 2) 2차 검증(③)으로 어차피 걸러지는 경우라면 키워드 추가 불필요
 
-#### ③ 처리 흐름
+#### ③ 2차 검증 — data-url 진입 후 구조 검사 (핵심)
 
-    for item in allItems:
-      if any(kw in item for kw in ignore_list):
-        continue  // 무시
-      if re.search(r'최대.*적립', item):
-        process_reward_event(item)  // 클릭 → 팝업 → 최대 적립금(원) 확인
-      else:
-        ask_user("이 항목 무시해도 되나요? '{item}' (y/n)")
-        if y: ignore_list.append(키워드); save_to_file()
-        if n: process_reward_event(item)
+1차 통과한 항목의 `data-url` 에 navigate 후, 페이지 본문에서 아래 두 패턴 중
+하나라도 매칭되면 **실제 적립 이벤트** 로 채택:
 
-#### ④ 적립 이벤트 처리 (positive 매칭된 항목만)
+| 패턴 | 정규식 | 의미 |
+|---|---|---|
+| 구간 적립표 | `/([\d,]{3,})\s*원\s*이상[\s\S]{0,80}?([\d,]{2,})\s*(?:원|P)\s*적립/g` | "50,000원 이상 → 7,500원 적립" 식 다행 표 |
+| 최대 한도 | `/최대\s*([\d,]+)\s*(?:원|P)\s*적립/g` | "최대 50,000원 적립" 단일 한도 |
 
-1. 항목 클릭 → 팝업/레이어 열림
-2. 팝업 안에서 **최대 적립금(원)** 만 확인 → 기록
-3. 팝업 닫고 다음 항목
+둘 다 없으면 적립 이벤트 아님 (가입 권유 / 안내 페이지 등) → **자동 제외**.
 
-> 해당 상품 페이지의 "구매사은 · 혜택" 섹션에 노출된 시점에서 그 상품은 이미 적립 대상이다. 팝업 안의 카테고리 문구(예: "패션/리빙")로 설화수 제외 여부를 다시 판단하지 않는다.
+> **이 2차 검증이 더 강력하다.** 키워드 필터를 우회한 false-positive 도
+> 페이지 구조가 적립 형식이 아니면 자동으로 제외된다. 따라서 키워드 list 를
+> 매번 갱신할 필요 없이 자동화가 유지된다.
 
-> **공급률 계산에 쓰는 값은 "최대 적립금" 단일 금액 한 개뿐.** 구간별 적립률표는 필요 없다.
+#### ④ 최대 적립금 산출
+
+채택된 항목별로:
+- 구간표가 있으면: `max(tier_rows.reward)` — 가장 큰 구간 reward
+- 단일 한도 패턴만 있으면: 그 숫자
+- 둘 다 있으면: 단일 한도 우선
 
 #### ⑤ 기록 형식
 
-    [추가 적립 이벤트 — 처리됨]
-    - 광세일 패션/리빙 최대 20% 적립 (5/4~7)
-      최대 적립금: 50,000원
+```
+[적립 이벤트 — 확인됨]
+- 뷰티 DAYS 일반 상품 최대 15% 적립 (data-url: /event/viewSaunEventMain.lotte?evt_no=291015)
+  구간: 50,000원 이상 → 7,500원
+  최대 적립금: 7,500원
 
-    [무시됨]
-    - 이리오십쇼 5월 가정의달 선물 → 키워드 "가정의달"
+[1차 키워드 제외]
+- 5만원이상 구매시 L.CLUB 무료 가입 혜택 → ['L.CLUB', '무료가입']
+
+[2차 검증 실패] (있을 때만 기록)
+- (없음)
+```
+
+> **공급률 계산에 쓰는 값은 "최대 적립금" 단일 금액 합산.** 자동화 구현:
+> `rate-check/_check_lotte_reward.py` (정상 작동 검증됨 — 7개 상품 b~h 일괄 처리).
     - 26년 5월 L.CLUB 무료가입 → 키워드 "L.CLUB"
 
     [새 항목 — 사용자 확인 대기]
