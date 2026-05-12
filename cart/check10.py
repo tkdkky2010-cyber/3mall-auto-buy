@@ -115,9 +115,8 @@ def check_one_product(page: Page, prod: dict) -> dict:
         "url": url,
         "ten_percent": False,
         "phrase": None,
-        "min_purchase": None,   # 최소 구매금액 (예: "30,000원 이상", "1원 이상")
-        "rate": None,           # 적립률 (예: "10%")
-        "max_reward": None,     # 최대 적립금 (예: "200,000P")
+        "tiers": [],            # [{"min_won": 50000, "reward_pt": 5000}, ...] 구간별 적립
+        "max_reward": None,     # 마지막 구간 적립금 (예: "200,000P")
         "has_coupon": False,    # strong.rvej6q8 (쿠폰 적용가 라벨) 존재 여부
         "error": None,
     }
@@ -156,7 +155,7 @@ def check_one_product(page: Page, prod: dict) -> dict:
     if m:
         out["phrase"] = (m.group(1) + "10% 적립").strip()
 
-    # Step 2: H.Point 적립 상세 링크 click → 표에서 최소구매/적립률 + 본문에서 최대적립
+    # Step 2: H.Point 적립 상세 링크 click → 구간별 적립 표 추출
     detail_link = page.locator('a[href*="evntHPointDtl"]').first
     if detail_link.count() > 0:
         try:
@@ -165,26 +164,25 @@ def check_one_product(page: Page, prod: dict) -> dict:
             page.wait_for_timeout(2000)
             extracted = page.evaluate("""
                 () => {
-                    const out = {};
-                    // 표 첫 데이터 행: 최소구매금액 | 적립률
+                    const out = {tiers: []};
+                    // 구간 적립 표: 행마다 [<N원/개 이상>, <N,NNNP>]
                     const tables = document.querySelectorAll('table');
                     for (const tbl of tables) {
                         const rows = tbl.querySelectorAll('tr');
+                        const tierRows = [];
                         for (const r of rows) {
-                            const cells = r.querySelectorAll('td');
-                            if (cells.length >= 2) {
-                                const c0 = cells[0].textContent.trim();
-                                const c1 = cells[1].textContent.trim();
-                                if (/원\\s*이상|개\\s*이상/.test(c0) && /%/.test(c1)) {
-                                    out.min_purchase = c0;
-                                    out.rate = c1;
-                                    break;
-                                }
+                            const cells = Array.from(r.querySelectorAll('td,th'))
+                                              .map(c => c.innerText.trim());
+                            if (cells.length < 2) continue;
+                            if (/(원|개)\\s*이상/.test(cells[0]) && /\\dP/.test(cells[1].replace(/\\s/g,''))) {
+                                tierRows.push(cells);
                             }
                         }
-                        if (out.min_purchase) break;
+                        if (tierRows.length > 0) {
+                            out.tiers = tierRows;
+                            break;
+                        }
                     }
-                    // 본문에서 "최대 N,NNN P 까지만" 추출
                     const body = document.body ? document.body.innerText : '';
                     const m = body.match(/최대\\s*([\\d,]+)\\s*P/);
                     if (m) out.max_reward = m[1] + 'P';
@@ -192,9 +190,20 @@ def check_one_product(page: Page, prod: dict) -> dict:
                 }
             """)
             if extracted:
-                out["min_purchase"] = extracted.get("min_purchase")
-                out["rate"] = extracted.get("rate")
-                out["max_reward"] = extracted.get("max_reward")
+                for row in extracted.get("tiers", []):
+                    min_m = re.search(r"([\d,]+)\s*(원|개)", row[0])
+                    rw_m = re.search(r"([\d,]+)\s*P", row[1])
+                    if not (min_m and rw_m):
+                        continue
+                    out["tiers"].append({
+                        "min_won": int(min_m.group(1).replace(",", "")),
+                        "min_unit": min_m.group(2),
+                        "reward_pt": int(rw_m.group(1).replace(",", "")),
+                    })
+                if out["tiers"]:
+                    out["max_reward"] = f"{out['tiers'][-1]['reward_pt']:,}P"
+                elif extracted.get("max_reward"):
+                    out["max_reward"] = extracted["max_reward"]
             page.go_back(wait_until="domcontentloaded", timeout=10000)
             page.wait_for_timeout(1200)
         except Exception:
@@ -216,9 +225,9 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
         print("[WARN] gspread 미설치 (pip install gspread google-auth) — 시트 입력 skip")
         return False
 
-    # 탭명 = "M.DD" (zero-padded DD): 2026-05-08 → "5.08"
+    # 탭명 = "M.DD 식품" (식품 전용 탭, rate-check의 "M.DD" 와 분리)
     dt = datetime.strptime(date_str, "%Y-%m-%d")
-    tab_candidates = [f"{dt.month}.{dt.day:02d}", f"{dt.month}.{dt.day}"]
+    tab_candidates = [f"{dt.month}.{dt.day:02d} 식품", f"{dt.month}.{dt.day} 식품"]
 
     try:
         gc = gspread.service_account(filename=str(GSPREAD_KEY))
@@ -245,105 +254,86 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
             print(f"[WARN] 탭 생성 실패: {e}")
             return False
 
+    # 전용 탭이므로 통째로 클리어 후 새로 쓰기
     try:
-        all_vals = ws.get_all_values()
+        ws.clear()
     except Exception as e:
-        print(f"[WARN] 탭 읽기 실패: {e}")
-        return False
+        print(f"[WARN] 탭 클리어 실패: {e}")
 
-    # 기존 "현대Hmall 10% 적립 체크" 섹션이 있으면 그 행부터 다음 빈 행까지만 지움
-    # — 다른 섹션 (rate-check 결과 등)은 안 건드림
-    section_marker = "현대Hmall 10% 적립 체크"
-    hmall_start_idx = None  # 0-based
-    for i, row in enumerate(all_vals):
-        if row and row[0].strip().startswith(section_marker):
-            hmall_start_idx = i
-            break
-    if hmall_start_idx is not None:
-        # 섹션 끝 = 다음 완전 빈 행 (모든 셀 빈 칸)
-        hmall_end_idx = len(all_vals)
-        for j in range(hmall_start_idx + 1, len(all_vals)):
-            if not any(c.strip() for c in all_vals[j]):
-                hmall_end_idx = j
-                break
-        clear_range = f"A{hmall_start_idx + 1}:Z{hmall_end_idx}"
-        try:
-            ws.batch_clear([clear_range])
-            print(f"[INFO] 기존 Hmall 섹션 삭제: {clear_range}")
-        except Exception as e:
-            print(f"[WARN] 기존 섹션 삭제 실패: {e}")
-        # 다시 읽기 — 삭제 후 마지막 데이터 행 재계산
-        try:
-            all_vals = ws.get_all_values()
-        except Exception:
-            pass
+    # 구간 수 최대값 → 컬럼 수 결정
+    max_tiers = max((len(r.get("tiers") or []) for r in results), default=0)
 
-    # 마지막 데이터 행 찾기
-    last_row = 0
-    for i, row in enumerate(all_vals):
-        if any(c.strip() for c in row):
-            last_row = i + 1
-    start_row = last_row + 3 if last_row > 0 else 1   # 2행 띄움 (rate-check 데이터와 시각적 분리)
-
-    # 데이터 준비
     section_title = [f"현대Hmall 10% 적립 체크 ({tab_candidates[0]}) — {len(results)}개 상품"]
-    headers = ["#", "제품명", "10%적립", "적립 문구", "최소구매", "적립률", "최대적립", "쿠폰", "URL"]
+    headers = ["#", "제품명", "10%적립", "적립 문구", "최대적립", "쿠폰"]
+    headers += [f"구간{i+1}" for i in range(max_tiers)]
+    headers += ["URL"]
+
     rows = []
     for r in results:
         if r.get("error"):
             ten = "ERR"
             phrase = r.get("error", "")
-            min_p = ""
-            rate = ""
             max_r = ""
             coupon = ""
+            tier_cells = [""] * max_tiers
         else:
             ten = "✓" if r["ten_percent"] else "✗"
             phrase = r.get("phrase") or ""
-            min_p = r.get("min_purchase") or ""
-            rate = r.get("rate") or ""
             max_r = r.get("max_reward") or ""
             coupon = "🎟️ 보유" if r.get("has_coupon") else ""
-        rows.append([str(r["id"]), r["name"], ten, phrase, min_p, rate, max_r, coupon, r.get("url", "")])
+            tiers = r.get("tiers") or []
+            unit = tiers[0]["min_unit"] if tiers else "원"
+            tier_cells = [f"{t['min_won']:,}{unit}/{t['reward_pt']:,}P" for t in tiers]
+            tier_cells += [""] * (max_tiers - len(tier_cells))
+        rows.append([str(r["id"]), r["name"], ten, phrase, max_r, coupon] + tier_cells + [r.get("url", "")])
 
-    # 한 번에 입력 (gspread batch update — Chrome UI 조작 X)
     payload = [section_title] + [headers] + rows
-    end_row = start_row + len(payload) - 1
-    range_str = f"A{start_row}:I{end_row}"
+    n_cols = len(headers)
+    # 1-based col index → A1 column letter (AA, AB, ... 지원)
+    def _col(n: int) -> str:
+        s = ""
+        while n > 0:
+            n, r = divmod(n - 1, 26)
+            s = chr(ord("A") + r) + s
+        return s
+    range_str = f"A1:{_col(n_cols)}{len(payload)}"
     try:
         ws.update(values=payload, range_name=range_str, value_input_option="USER_ENTERED")
-        print(f"[OK] 시트 입력 완료: {ws.title}!{range_str} ({len(rows)}개 상품)")
+        print(f"[OK] 시트 입력 완료: {ws.title}!{range_str} ({len(rows)}개 상품, 최대 {max_tiers}개 구간)")
         return True
     except Exception as e:
         print(f"[WARN] 시트 입력 실패: {e}")
         return False
 
 
-def _short_min(v: str | None) -> str:
-    """'30,000원 이상' → '30,000원↑', '1원 이상' → '1원↑'."""
-    if not v:
+def _tier_summary(tiers: list[dict]) -> str:
+    """[{50000,5000},{100000,10000},...] → '50K/5K … 500K/50K (6단)'."""
+    if not tiers:
         return "—"
-    return v.replace("이상", "").strip() + "↑" if "이상" in v else v
+    def k(n): return f"{n//1000}K" if n >= 1000 else str(n)
+    first = f"{k(tiers[0]['min_won'])}/{k(tiers[0]['reward_pt'])}"
+    last = f"{k(tiers[-1]['min_won'])}/{k(tiers[-1]['reward_pt'])}"
+    if len(tiers) == 1:
+        return f"{first} (1단)"
+    return f"{first} … {last} ({len(tiers)}단)"
 
 
 def print_report(results: list[dict]) -> None:
     print("\n========= 10% 적립 체크 결과 =========")
-    print(f"{'#':>3} | {'제품명':38s} | {'10%':4s} | {'최소구매':12s} | {'적립률':6s} | {'최대적립':10s} | 쿠폰")
-    print("-" * 110)
+    print(f"{'#':>3} | {'제품명':38s} | {'10%':4s} | {'구간 적립 (min/reward)':28s} | {'최대적립':10s} | 쿠폰")
+    print("-" * 120)
     for r in results:
         if r.get("error"):
             mark_10 = "ERR"
-            min_p = r["error"][:10]
-            rate = "—"
+            tier_str = r["error"][:26]
             max_r = "—"
         else:
             mark_10 = "✓" if r["ten_percent"] else "✗"
-            min_p = _short_min(r.get("min_purchase"))
-            rate = r.get("rate") or "—"
+            tier_str = _tier_summary(r.get("tiers") or [])
             max_r = r.get("max_reward") or "—"
         coupon = "🎟️" if r.get("has_coupon") else "—"
         name = (r["name"][:36] + "…") if len(r["name"]) > 37 else r["name"]
-        print(f"{r['id']:>3} | {name:38s} | {mark_10:4s} | {min_p:12s} | {rate:6s} | {max_r:10s} | {coupon}")
+        print(f"{r['id']:>3} | {name:38s} | {mark_10:4s} | {tier_str:28s} | {max_r:10s} | {coupon}")
 
 
 def main() -> int:
@@ -404,8 +394,8 @@ def _run(browser, acc) -> int:
         result = check_one_product(page, prod)
         results.append(result)
         status = "✓" if result["ten_percent"] else ("ERR" if result.get("error") else "✗")
-        type_str = result.get("type") or "—"
-        print(f"     → 10%={status}  type={type_str}  phrase={(result.get('phrase') or '')[:40]}")
+        n_tiers = len(result.get("tiers") or [])
+        print(f"     → 10%={status}  구간={n_tiers}단  phrase={(result.get('phrase') or '')[:40]}")
 
     print_report(results)
 
