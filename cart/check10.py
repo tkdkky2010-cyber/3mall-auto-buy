@@ -242,26 +242,80 @@ def check_one_product(page: Page, prod: dict) -> dict:
                 // 단순 N% 행사 추출 (tier 브래킷 없는 경우) — 본문 + 테이블 모두 스캔
                 if (out.tiers.length === 0) {
                     const body = document.body.innerText || '';
-                    // 패턴 1: "X원 이상 ~ Y원 이하 N% 적립" 또는 "X원 이상 Y원 이하 N%"
-                    const p1 = body.match(/([\\d,]+)\\s*원\\s*이상[^A-Za-z]{0,40}?([\\d,]+)\\s*원\\s*이하[^A-Za-z]{0,40}?(\\d+)\\s*%/);
-                    // 패턴 2: "X원 이상 N% 적립 (최대 Y원)" or "최대 Y원"
-                    const p2 = body.match(/([\\d,]+)\\s*원\\s*이상[^A-Za-z]{0,40}?(\\d+)\\s*%[^A-Za-z]{0,40}?최대[^A-Za-z]{0,10}?([\\d,]+)\\s*원/);
-                    if (p1) {
-                        out.simple_range = {
-                            min_won: parseInt(p1[1].replace(/,/g, '')),
-                            max_won: parseInt(p1[2].replace(/,/g, '')),
-                            pct: parseInt(p1[3])
-                        };
-                    } else if (p2) {
-                        out.simple_range = {
-                            min_won: parseInt(p2[1].replace(/,/g, '')),
-                            max_won: parseInt(p2[3].replace(/,/g, '')),
-                            pct: parseInt(p2[2])
-                        };
+                    // 패턴 A (가이드 명시): table cell — cells[0]='X원 이상', cells[1] 안에 N% 또는 Y원 이하
+                    for (const tbl of tables) {
+                        const rows = tbl.querySelectorAll('tr');
+                        for (const r of rows) {
+                            const cells = Array.from(r.querySelectorAll('td,th')).map(c => c.innerText.trim());
+                            if (cells.length < 2) continue;
+                            const minM = cells[0].match(/([\\d,]+)\\s*원\\s*이상/);
+                            if (!minM) continue;
+                            const c1 = cells[1];
+                            const pctM = c1.match(/(\\d+)\\s*%/);
+                            const maxInline = c1.match(/([\\d,]+)\\s*원\\s*이하/);
+                            if (!pctM && !maxInline) continue;
+                            // max_won: cells[1] 있으면 그거, 없으면 본문 "X원 초과" 또는 default 1천만원
+                            let maxWon = maxInline ? parseInt(maxInline[1].replace(/,/g, '')) : null;
+                            if (!maxWon) {
+                                const overM = body.match(/([\\d,]{4,})\\s*원\\s*초과/);
+                                if (overM) maxWon = parseInt(overM[1].replace(/,/g, ''));
+                            }
+                            if (!maxWon) maxWon = 10000000;
+                            out.simple_range = {
+                                min_won: parseInt(minM[1].replace(/,/g, '')),
+                                max_won: maxWon,
+                                pct: pctM ? parseInt(pctM[1]) : 10,
+                            };
+                            break;
+                        }
+                        if (out.simple_range) break;
+                    }
+                    // 패턴 B (본문 inline): "X원 이상 ~ Y원 이하 N%"
+                    if (!out.simple_range) {
+                        const p1 = body.match(/([\\d,]+)\\s*원\\s*이상[^A-Za-z]{0,40}?([\\d,]+)\\s*원\\s*이하[^A-Za-z]{0,40}?(\\d+)\\s*%/);
+                        if (p1) {
+                            out.simple_range = {
+                                min_won: parseInt(p1[1].replace(/,/g, '')),
+                                max_won: parseInt(p1[2].replace(/,/g, '')),
+                                pct: parseInt(p1[3]),
+                            };
+                        }
+                    }
+                    // 패턴 C: "X원 이상 N% 적립 (최대 Y원)"
+                    if (!out.simple_range) {
+                        const p2 = body.match(/([\\d,]+)\\s*원\\s*이상[^A-Za-z]{0,40}?(\\d+)\\s*%[^A-Za-z]{0,40}?최대[^A-Za-z]{0,10}?([\\d,]+)\\s*원/);
+                        if (p2) {
+                            out.simple_range = {
+                                min_won: parseInt(p2[1].replace(/,/g, '')),
+                                max_won: parseInt(p2[3].replace(/,/g, '')),
+                                pct: parseInt(p2[2]),
+                            };
+                        }
                     }
                 }
                 return out;
             }""")
+            if os.environ.get("DEBUG_ORDER"):
+                # detail 페이지 본문에서 '원 이상' 주변 200자 + table cell 미리보기
+                debug_info = page.evaluate("""() => {
+                    const body = document.body.innerText || '';
+                    const idx = body.search(/([\\d,]+)\\s*원\\s*이상/);
+                    const around = idx >= 0 ? body.slice(Math.max(0, idx-100), idx+200) : '(없음)';
+                    const tableCells = [];
+                    document.querySelectorAll('table tr').forEach(r => {
+                        const cs = Array.from(r.querySelectorAll('td,th')).map(c => c.innerText.trim()).filter(Boolean);
+                        if (cs.length >= 2) tableCells.push(cs);
+                    });
+                    return {around, tableCells: tableCells.slice(0, 8), url: location.href};
+                }""")
+                print(f"[DEBUG_DETAIL] prmo={ld['prmo']}")
+                print(f"[DEBUG_DETAIL]   url: {debug_info.get('url', '')[:100]}")
+                print(f"[DEBUG_DETAIL]   '원 이상' 주변: {repr(debug_info.get('around', '')[:300])}")
+                print(f"[DEBUG_DETAIL]   table cells (up to 8 rows):")
+                for cs in debug_info.get("tableCells", []):
+                    print(f"[DEBUG_DETAIL]     {cs}")
+                print(f"[DEBUG_DETAIL]   extracted.simple_range: {extracted.get('simple_range')}")
+                print(f"[DEBUG_DETAIL]   extracted.tiers_count: {len(extracted.get('tiers') or [])}")
             event = {"prmo": ld["prmo"], "name": None, "event_end": None, "tiers": [], "simple_range": None}
             if extracted:
                 event["name"] = extracted.get("event_name")
