@@ -932,15 +932,43 @@ def main() -> int:
     print(f"[INFO] 사용 계정 #{acc_idx} {acc['id']}")
     print(f"[INFO] PW backend: {PW_BACKEND}")
 
+    # CDP 9223 자동 launch — 없으면 launch-check10-chrome.sh 호출
+    _ensure_chrome()
+
     with sync_playwright() as p:
         try:
             browser = p.chromium.connect_over_cdp(CDP_ENDPOINT, slow_mo=300)
         except Exception as e:
             print(f"[FATAL] CDP {CDP_PORT} 연결 실패: {e}")
-            print(f"  먼저 'bash launch-check10-chrome.sh' 실행 필요")
+            print(f"  수동 실행: bash {PROJECT_ROOT}/launch-check10-chrome.sh")
             return 1
         context = browser.contexts[0] if browser.contexts else browser.new_context()
         return _run(context, acc)
+
+
+def _ensure_chrome() -> None:
+    """CDP 9223 안 떠있으면 launch-check10-chrome.sh 자동 호출."""
+    import subprocess
+    import urllib.error
+    import urllib.request
+
+    try:
+        urllib.request.urlopen(f"{CDP_ENDPOINT}/json/version", timeout=1.5)
+        return  # 이미 살아있음
+    except (urllib.error.URLError, OSError):
+        pass
+
+    launcher = PROJECT_ROOT / "launch-check10-chrome.sh"
+    if not launcher.exists():
+        print(f"[WARN] {launcher} 없음 — Chrome 수동 실행 필요")
+        return
+    print(f"[INFO] CDP {CDP_PORT} 안 떠있음 — {launcher.name} 자동 실행...")
+    try:
+        subprocess.run(["bash", str(launcher)], check=True, timeout=15)
+    except subprocess.CalledProcessError as e:
+        print(f"[WARN] launch script 실패 (exit {e.returncode})")
+    except subprocess.TimeoutExpired:
+        print(f"[WARN] launch script timeout (15s)")
 
 
 def _run(context, acc) -> int:

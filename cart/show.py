@@ -1,9 +1,9 @@
 """cart/today.json 빠른 확인 — Step 2 결과 한눈에.
 
 사용:
-    python3 cart/inspect.py                     # 기본 (전체)
-    python3 cart/inspect.py --only-10pct        # 10% 적립 상품만
-    python3 cart/inspect.py --raw 1             # 특정 ID raw JSON 덤프
+    python3 cart/show.py                     # 기본 (전체)
+    python3 cart/show.py --only-10pct        # 10% 적립 상품만
+    python3 cart/show.py --raw 1             # 특정 ID raw JSON 덤프
 
 표시 항목:
 - # / 제품명 / 10%적립 / qty / 우수가 / 즉시할인가(H) / 실비(I) / tier수 / simple_range / 페이백카드

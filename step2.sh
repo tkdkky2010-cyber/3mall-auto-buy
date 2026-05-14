@@ -1,22 +1,17 @@
 #!/bin/bash
-# Step 2 한 번에 — Chrome launch (idempotent) + check10.py + inspect 결과 표시.
+# Step 2 한 번에 — check10.py (Chrome 자동 launch 포함) + inspect.
 # 사용: bash step2.sh
 cd "$(dirname "$0")"
 
 echo "▶ Step 2 시작 (Hmall 10% 적립 체크) — $(date '+%Y-%m-%d %H:%M:%S')"
 echo
 
-# 1) Chrome CDP 9223 (이미 떠있으면 즉시 OK)
-bash launch-check10-chrome.sh
-echo
-
-# 2) check10 — 23개 상품 약 5-10분
+# check10.py 가 9223 자동 launch + 23개 상품 체크 + 시트 입력
 python3 cart/check10.py
 CHECK_RC=$?
 echo
 
-# 3) 빠른 확인 (today.json 표 형태)
-echo "═════════ 빠른 확인 (cart/inspect.py) ═════════"
-python3 cart/inspect.py
+echo "═════════ 빠른 확인 (cart/show.py) ═════════"
+python3 cart/show.py
 
 exit $CHECK_RC
