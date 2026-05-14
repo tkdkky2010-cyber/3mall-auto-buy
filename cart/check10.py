@@ -37,7 +37,7 @@ load_dotenv(PROJECT_ROOT / "buy" / ".env")
 ACCOUNTS_FILE = Path(os.environ.get("HMALL_CONFIG_PATH") or (PROJECT_ROOT / "hmall_config.json"))
 TODAY_OUT = ROOT / "today.json"
 
-CDP_PORT = os.environ.get("CDP_PORT", "9223")
+CDP_PORT = "9223"  # check10 전용 (launch-check10-chrome.sh와 일치). buy/.env 의 CDP_PORT는 buy/run.py 용(9222)이라 별도.
 CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
 LOGIN_URL = "https://www.hmall.com/mo/cob/loginForm"
 ITEM_URL_FMT = "https://www.hmall.com/md/pda/itemPtc?slitmCd={slitmCd}{extra}"
@@ -409,17 +409,78 @@ def _execute_buy_now(page: Page, qty: int) -> bool:
 def _extract_order_page(page: Page) -> dict:
     """결제 페이지에서 카드할인 슬라이드 + 정가/수량 추출."""
     # 카드할인 섹션이 React-render 지연되는 케이스 대응 (최대 5초 대기)
+    h2_found = False
     try:
         page.wait_for_selector('h2:has-text("카드할인")', timeout=5000)
         page.wait_for_timeout(800)
+        h2_found = True
     except Exception:
         pass
+    if os.environ.get("DEBUG_ORDER"):
+        diag = page.evaluate("""() => {
+            const out = {};
+            const h2 = Array.from(document.querySelectorAll('h2')).find(h => h.textContent.trim() === '카드할인');
+            if (h2) {
+                // h2.parentElement 부터 5단계 위로 올라가며 innerText 길이 가장 긴 것 = 카드 정보 컨테이너
+                let best = null, bestLen = 0;
+                let cur = h2.parentElement;
+                for (let i = 0; i < 6 && cur; i++) {
+                    const len = (cur.innerText || '').length;
+                    if (len > bestLen && len > 30) { best = cur; bestLen = len; }
+                    cur = cur.parentElement;
+                }
+                if (best) {
+                    out.containerTag = best.tagName + '.' + (best.className || '').toString().slice(0, 80);
+                    out.containerText = (best.innerText || '').slice(0, 1500).replace(/\\n/g, ' | ');
+                    // 자식 요소들 큰 그림
+                    out.directChildren = Array.from(best.children).slice(0, 10).map(c => ({
+                        tag: c.tagName, cls: (c.className || '').toString().slice(0, 80),
+                        text: (c.innerText || '').slice(0, 100).replace(/\\n/g, ' | ')
+                    }));
+                }
+                // h2의 next sibling chain
+                let sib = h2.nextElementSibling;
+                out.h2_next_sibling = sib ? {
+                    tag: sib.tagName, cls: (sib.className || '').toString().slice(0, 80),
+                    text: (sib.innerText || '').slice(0, 800).replace(/\\n/g, ' | ')
+                } : null;
+            }
+            // 페이지에서 '즉시할인' 텍스트 둘러싼 element 5개
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+            const immBlocks = [];
+            let n;
+            while ((n = walker.nextNode()) && immBlocks.length < 5) {
+                if (n.nodeValue.includes('즉시할인')) {
+                    const p = n.parentElement;
+                    immBlocks.push({
+                        tag: p.tagName, cls: (p.className || '').toString().slice(0, 100),
+                        text: p.innerText.slice(0, 200).replace(/\\n/g, ' | ')
+                    });
+                }
+            }
+            out.imm_blocks = immBlocks;
+            return out;
+        }""")
+        print(f"[DEBUG] h2_wait_found={h2_found}")
+        if diag.get("containerTag"):
+            print(f"[DEBUG] containerTag: {diag['containerTag']}")
+            print(f"[DEBUG] containerText: {diag['containerText'][:500]}")
+            print(f"[DEBUG] directChildren:")
+            for c in diag.get("directChildren", []):
+                print(f"[DEBUG]   - <{c['tag']} class='{c['cls']}'> {c['text'][:120]}")
+        if diag.get("h2_next_sibling"):
+            sib = diag["h2_next_sibling"]
+            print(f"[DEBUG] h2_next_sibling: <{sib['tag']} cls='{sib['cls']}'> {sib['text'][:300]}")
+        print(f"[DEBUG] imm_blocks ({len(diag.get('imm_blocks', []))}):")
+        for b in diag.get("imm_blocks", []):
+            print(f"[DEBUG]   <{b['tag']} cls='{b['cls']}'> {b['text']}")
     return page.evaluate("""
         () => {
             const out = {slides: [], list_price: null, member_price: null, qty: null, list_total: null};
             const h2 = Array.from(document.querySelectorAll('h2'))
                 .find(h => h.textContent.trim() === '카드할인');
             if (h2) {
+                // ── 1차: 옛 swiper-slide 구조 시도 (DOM 롤백 대비) ──
                 let section = h2.closest('div');
                 for (let lvl = 0; lvl < 5 && section; lvl++) {
                     const slides = Array.from(section.querySelectorAll('.swiper-slide'))
@@ -439,6 +500,53 @@ def _extract_order_page(page: Page) -> dict:
                         break;
                     }
                     section = section.parentElement;
+                }
+                // ── 2차: 새 orderSection.payment 텍스트 라인 파싱 (현재 Hmall DOM) ──
+                if (out.slides.length === 0) {
+                    // h2의 부모 chain 중 가장 큰 innerText 노드 = 카드 정보 컨테이너
+                    let best = null, bestLen = 0;
+                    let cur = h2.parentElement;
+                    for (let i = 0; i < 6 && cur; i++) {
+                        const len = (cur.innerText || '').length;
+                        if (len > bestLen && len > 30) { best = cur; bestLen = len; }
+                        cur = cur.parentElement;
+                    }
+                    // 카드할인 sub-section만 좁히기 (h2 직속 wrapper)
+                    let cardSec = h2.parentElement;
+                    while (cardSec && cardSec.parentElement) {
+                        const txt = cardSec.innerText || '';
+                        // 카드할인 + 즉시할인 같이 들어있고 너무 커지지 않은 단계
+                        if (txt.includes('즉시할인') && txt.length < 800) break;
+                        cardSec = cardSec.parentElement;
+                        if (!cardSec || (cardSec.innerText || '').length > 1500) break;
+                    }
+                    const target = (cardSec && (cardSec.innerText || '').includes('즉시할인')) ? cardSec : best;
+                    if (target) {
+                        const lines = target.innerText.split(/\\n/).map(l => l.trim()).filter(Boolean);
+                        for (let i = 0; i < lines.length; i++) {
+                            const m = lines[i].match(/(\\d+)\\s*%\\s*즉시할인/);
+                            if (!m) continue;
+                            const pct = parseInt(m[1]);
+                            // 카드명 = 직전 라인 (숫자/% 시작 아님)
+                            let card = '';
+                            if (i > 0) {
+                                const prev = lines[i-1];
+                                if (prev && !/^\\d/.test(prev) && !prev.includes('%') && !prev.includes('원') && prev.length < 30) {
+                                    card = prev;
+                                }
+                            }
+                            // 가격 = 다음 4줄 안에서 첫 "X원"
+                            let price = null;
+                            for (let j = i+1; j < Math.min(i+5, lines.length); j++) {
+                                const pm = lines[j].match(/([\\d,]{4,})\\s*원/);
+                                if (pm) { price = parseInt(pm[1].replace(/,/g, '')); break; }
+                            }
+                            out.slides.push({
+                                alt: card, text: (card + ' ' + lines[i]).trim().slice(0, 120),
+                                percent: pct, price: price,
+                            });
+                        }
+                    }
                 }
             }
             const body = document.body ? document.body.innerText : '';
@@ -791,7 +899,8 @@ def _run(context, acc) -> int:
     # 중복 URL은 한 번만 체크 (alias_of 처리)
     cache: dict[str, dict] = {}
     results: list[dict] = []
-    for prod in PRODUCTS:
+    products_to_run = PRODUCTS[:1] if os.environ.get("DEBUG_ORDER") else PRODUCTS
+    for prod in products_to_run:
         if prod.get("alias_of"):
             base = next((r for r in results if r["id"] == prod["alias_of"]), None)
             if base:
