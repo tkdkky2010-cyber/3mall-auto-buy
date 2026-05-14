@@ -7,9 +7,11 @@
     pip install -r requirements.txt
     patchright install chromium
     cp .env.example .env  # 그 후 PIN/카드명 채움
-    python run.py            # 전체 (INACTIVE 자동 제외)
-    python run.py 4          # 단일 계정
-    python run.py 5-19       # 범위
+    python run.py                # 전체, 장바구니까지만 (default — 안전)
+    python run.py 4              # 단일 계정, 장바구니까지만
+    python run.py 5-19           # 범위, 장바구니까지만
+    python run.py --checkout     # 전체, 결제까지 (리셀러 시간차 확보 후 호출)
+    python run.py 4 --checkout   # 단일 계정 결제까지
 """
 from __future__ import annotations
 import json
@@ -786,7 +788,7 @@ def extract_monimo_code(page: Page) -> str | None:
 
 
 def process_account(context: BrowserContext, idx: int, account: dict, items: list[dict],
-                     cdp_mode: bool = False) -> tuple[int, int, bool, dict | None]:
+                     cdp_mode: bool = False, enable_checkout: bool = False) -> tuple[int, int, bool, dict | None]:
     print(f"\n=== #{idx} {account['id']} — 담을 상품 {len(items)}개 ===")
     page = context.new_page()
 
@@ -813,7 +815,7 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
             success += 1
 
     checkout_result: dict | None = None
-    if success > 0:
+    if success > 0 and enable_checkout:
         print(f"  [CHECKOUT] #{idx} 시작...")
         checkout_result = do_checkout(page)
         if checkout_result["success"]:
@@ -840,9 +842,12 @@ def main() -> int:
     plan = load_json(PLAN_FILE)
     account_plan = build_account_plan(plan, products)
 
+    enable_checkout = "--checkout" in sys.argv[1:]
+    pos_args = [a for a in sys.argv[1:] if not a.startswith("--")]
+
     arg_indices: list[int] | None = None
-    if len(sys.argv) > 1:
-        a = sys.argv[1]
+    if pos_args:
+        a = pos_args[0]
         try:
             if "-" in a:
                 lo_s, hi_s = a.split("-", 1)
@@ -852,7 +857,7 @@ def main() -> int:
             else:
                 arg_indices = [int(a)]
         except ValueError:
-            print(f"[ERR] argv[1]은 정수 또는 'N-M' 형식: {a}")
+            print(f"[ERR] 위치 인자는 정수 또는 'N-M' 형식: {a}")
             return 1
 
     all_indices = list(range(1, len(accounts) + 1))
@@ -865,6 +870,7 @@ def main() -> int:
         target_indices = [idx for idx in all_indices if idx not in INACTIVE_ACCOUNTS]
 
     print(f"[INFO] 처리할 계정: {target_indices}")
+    print(f"[INFO] 모드: {'결제까지 진행 (--checkout)' if enable_checkout else '장바구니까지만 (default — 결제 진행 안 함)'}")
     print(f"[INFO] DRY_PAYMENT={DRY_PAYMENT}")
     print(f"[INFO] CDP endpoint={CDP_ENDPOINT}")
 
@@ -890,7 +896,7 @@ def main() -> int:
                 print(f"        Chrome을 --remote-debugging-port={CDP_PORT} 옵션으로 띄웠는지 확인")
                 return 1
         else:
-            return _run_with_browser(browser, accounts, target_indices, account_plan, summary)
+            return _run_with_browser(browser, accounts, target_indices, account_plan, summary, enable_checkout)
     # patchright 실패 시 plain playwright로 재실행
     from playwright.sync_api import sync_playwright as sync_pw_plain
     print(f"[INFO] PW backend (fallback): playwright")
@@ -900,10 +906,10 @@ def main() -> int:
         except Exception as e:
             print(f"[FATAL] playwright CDP 연결도 실패: {e}")
             return 1
-        return _run_with_browser(browser, accounts, target_indices, account_plan, summary)
+        return _run_with_browser(browser, accounts, target_indices, account_plan, summary, enable_checkout)
 
 
-def _run_with_browser(browser, accounts, target_indices, account_plan, summary) -> int:
+def _run_with_browser(browser, accounts, target_indices, account_plan, summary, enable_checkout) -> int:
 
     context = browser.contexts[0] if browser.contexts else browser.new_context()
 
@@ -914,7 +920,7 @@ def _run_with_browser(browser, accounts, target_indices, account_plan, summary) 
             items = account_plan.get(idx, [])
             print(f"\n  ─── {pass_label} #{idx} {account['id']} (items={len(items)}) ───")
             try:
-                ok, total, cleared, ckt = process_account(context, idx, account, items, cdp_mode=True)
+                ok, total, cleared, ckt = process_account(context, idx, account, items, cdp_mode=True, enable_checkout=enable_checkout)
                 local_results[idx] = (idx, account["id"], ok, total, cleared, ckt)
             except Exception as e:
                 print(f"  [FATAL] #{idx} {account['id']}: {e}")
@@ -963,7 +969,10 @@ def _run_with_browser(browser, accounts, target_indices, account_plan, summary) 
     ckt_ok = sum(1 for s in summary if s[5] and s[5].get("success"))
     print(f"  비우기: {cleared_count}/{len(summary)}")
     print(f"  담기: {total_ok}/{total_all}")
-    print(f"  결제 코드 추출 성공: {ckt_ok}/{len(summary)}")
+    if enable_checkout:
+        print(f"  결제 코드 추출 성공: {ckt_ok}/{len(summary)}")
+    else:
+        print(f"  결제: 미진행 (cart-only 모드) — 결제는 별도 호출 `python run.py --checkout`")
     return 0
 
 

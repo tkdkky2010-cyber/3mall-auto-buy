@@ -122,20 +122,13 @@ def combo_data(idx, combo):
     }
 
 rows = [combo_data(i+1, c) for i, c in enumerate(COMBOS)]
-# 순위는 첫 번째 카드 기준
-if rows[0]['cards']:
-    rows_sorted = sorted(rows, key=lambda r: r['cards'][0]['rate'])
-else:
-    rows_sorted = rows
-for rk, r in enumerate(rows_sorted, start=1):
-    r['rank'] = rk
 
-# 결과 출력
-print(f"\n{'idx':3s} {'조합 본품':22s} {'소비자가':>9s} {'할인전':>9s} {'카드후':>9s} {'순구매가':>9s} {'공급률':>7s} {'순위':>3s}")
+# 결과 출력 — 조합번호(1~11) 순
+print(f"\n{'idx':3s} {'조합 본품':22s} {'소비자가':>9s} {'할인전':>9s} {'카드후':>9s} {'순구매가':>9s} {'공급률':>7s}")
 for r in rows:
     cn = combo_label_ko(r['combo'])
     c0 = r['cards'][0] if r['cards'] else {'final':0, 'net':0, 'rate':0}
-    print(f"{r['idx']:3d} {cn:22s} {r['소비자가']:>9,d} {r['할인전']:>9,d} {c0['final']:>9,d} {c0['net']:>9,d} {c0['rate']:>6.4f} {r['rank']:>3d}")
+    print(f"{r['idx']:3d} {cn:22s} {r['소비자가']:>9,d} {r['할인전']:>9,d} {c0['final']:>9,d} {c0['net']:>9,d} {c0['rate']:>6.4f}")
 
 # === gspread 이어쓰기: Hmall 섹션을 "5.14" 탭 행 65~ 부터 ===
 gc = gspread.service_account(filename='/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/gen-lang-client-0553550811-4b553902b0d0.json')
@@ -152,14 +145,14 @@ data.append([f"카드즉시할인: {card_summary}"])
 data.append([f"Hmall 기본할인 10% (정가 × 0.9)"])
 data.append([])
 
-# 순위표
-headers = ['순위', '조합', '소비자가', '추가증정', 'GWP가치', '총샘플가치', 'Hmall할인전']
+# 조합표 — 조합번호(1~11) 순
+headers = ['조합번호', '조합', '소비자가', '추가증정', 'GWP가치', '총샘플가치', 'Hmall할인전']
 for c in parsed_cards:
     headers += [f"{c['name']}최종", f"{c['name']}순구매가", f"{c['name']}공급률"]
 data.append(headers)
-for r in rows_sorted:
+for r in rows:
     cn = combo_label_ko(r['combo'])
-    row = [r['rank'], cn, r['소비자가'], r['추증'], GWP_6SET, r['총샘플'], r['할인전']]
+    row = [r['idx'], cn, r['소비자가'], r['추증'], GWP_6SET, r['총샘플'], r['할인전']]
     for cr in r['cards']:
         row += [cr['final'], cr['net'], round(cr['rate'], 4)]
     data.append(row)
@@ -175,4 +168,4 @@ ws.update(values=data, range_name=range_str, value_input_option='USER_ENTERED')
 print(f"\nHmall 섹션 입력: {range_str}")
 
 with open('/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/rate-check/_tmp/hmall_results.json', 'w') as f:
-    json.dump({'cards': parsed_cards, 'rows': rows_sorted}, f, ensure_ascii=False, indent=2, default=str)
+    json.dump({'cards': parsed_cards, 'rows': rows}, f, ensure_ascii=False, indent=2, default=str)

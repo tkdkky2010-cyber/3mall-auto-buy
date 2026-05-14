@@ -64,11 +64,32 @@ def verify_event_page():
     return driver.execute_script(r"""
         const body = document.body ? document.body.innerText : '';
         const out = {tier_rows: [], max_pt: null};
+        // 1) row-layout: "N원 이상 ... N원 적립" 같은 줄/근접 → 80자 내 페어
         const re1 = /([\d,]{3,})\s*원\s*이상[\s\S]{0,80}?([\d,]{2,})\s*(?:원|P)\s*적립/g;
         let m;
         while ((m = re1.exec(body)) !== null) {
             out.tier_rows.push({min: m[1], reward: m[2]});
             if (out.tier_rows.length >= 20) break;
+        }
+        // 2) column-layout: "적립조건" 헤더 뒤 조건/보상 분리 → 위치순 페어
+        // (테이블에서 조건열과 보상열이 본문 텍스트상 분리되는 경우 대응)
+        const idx = body.indexOf('적립조건');
+        if (idx >= 0) {
+            const region = body.slice(idx, idx + 800);
+            const condRe = /([\d,]{3,})\s*원\s*이상/g;
+            const conds = [];
+            while ((m = condRe.exec(region)) !== null) conds.push(m[1]);
+            const rewardRe = /적립금\s*([\d,]+)\s*원/g;
+            const rewards = [];
+            while ((m = rewardRe.exec(region)) !== null) rewards.push(m[1]);
+            const n = Math.min(conds.length, rewards.length);
+            // 기존 row-layout 결과보다 더 많이 잡혔으면 덮어쓰기
+            if (n > out.tier_rows.length) {
+                out.tier_rows = [];
+                for (let i = 0; i < n; i++) {
+                    out.tier_rows.push({min: conds[i], reward: rewards[i]});
+                }
+            }
         }
         const re2 = /최대\s*([\d,]+)\s*(?:원|P)\s*적립/g;
         const maxes = [];

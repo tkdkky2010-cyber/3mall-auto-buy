@@ -94,17 +94,19 @@ for code in 'bcdefgh':
 print(f"\n쿠폰: {coupons}")
 print(f"카드: {card_info}")
 
-# 적립 확인 — _lotte_reward_dump.json 활용 (있다면)
+# 적립 확인 — _lotte_reward_dump.json 필수 (구매사은혜택 클릭 진입으로 최대 적립금 확인됨)
+# ⚠️ dump 없거나 적립이 모두 0이면 절대 진행 안 함 — 가이드 9-2.5 click-in 필수
 import os
 reward_path = '/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/rate-check/_lotte_reward_dump.json'
-rewards = {code: 0 for code in 'bcdefgh'}
-if os.path.exists(reward_path):
-    rd = json.load(open(reward_path))
-    for code in 'bcdefgh':
-        rewards[code] = rd.get(code, {}).get('total_max', 0)
-    print(f"적립금 (dump): {rewards}")
-else:
-    print("적립금 dump 없음 — 0으로 처리. _check_lotte_reward.py 실행 권장.")
+if not os.path.exists(reward_path):
+    sys.exit(f"❌ {reward_path} 없음 — 먼저 `_check_lotte_reward.py all` 실행해서 "
+             f"구매사은혜택(#eventBanner) 클릭 진입으로 최대 적립금을 추출해야 함.")
+rd = json.load(open(reward_path))
+rewards = {code: rd.get(code, {}).get('total_max', 0) for code in 'bcdefgh'}
+missing = [c for c in 'bcdefgh' if c not in rd or 'total_max' not in rd[c]]
+if missing:
+    sys.exit(f"❌ 적립 dump에 누락 상품 {missing} — `_check_lotte_reward.py all` 재실행 필요.")
+print(f"적립금 (dump, 클릭 검증된 최대 적립금): {rewards}")
 
 # 카드 결정 (단일 카드 가정)
 CARD_NAME = (card_info.get('cards') or ['미확인'])[0] if card_info else '미확인'
@@ -129,7 +131,8 @@ def compute(combo):
     소비자 = sum(PRICES[c]*q for c,q in combo)
     추증 = sum(ADD_GIFT[c]*q for c,q in combo)
     총샘플 = 추증 + GWP_6
-    적립 = sum(rewards.get(c,0)*q for c,q in combo)
+    # 적립은 한 주문건(=1조합)당 최대 1회 적용. 본품 수량 무관.
+    적립 = max((rewards.get(c, 0) for c, _ in combo), default=0)
     # 상품별 최종가
     final = 0
     for c,q in combo:
@@ -146,22 +149,19 @@ for i, combo in enumerate(COMBOS, start=1):
     r = compute(combo)
     r['idx'] = i; r['combo'] = combo
     rows.append(r)
-rows_sorted = sorted(rows, key=lambda r: r['공급률'])
-for rk, r in enumerate(rows_sorted, start=1):
-    r['rank'] = rk
 
-print(f"\n{'idx':3s} {'조합':22s} {'소비자':>8s} {'쿠폰합':>7s} {'카드후':>8s} {'적립':>5s} {'순':>8s} {'공급률':>7s} {'순위':>3s}")
+print(f"\n{'idx':3s} {'조합':22s} {'소비자':>8s} {'쿠폰합':>7s} {'카드후':>8s} {'적립':>5s} {'순':>8s} {'공급률':>7s}")
 for r in rows:
     cn = combo_label_ko(r['combo'])
     # rough coupon avg display
-    print(f"{r['idx']:3d} {cn:22s} {r['소비자가']:>8,d} {'':>7s} {r['최종']:>8,d} {r['적립']:>5,d} {r['순']:>8,d} {r['공급률']:>6.4f} {r['rank']:>3d}")
+    print(f"{r['idx']:3d} {cn:22s} {r['소비자가']:>8,d} {'':>7s} {r['최종']:>8,d} {r['적립']:>5,d} {r['순']:>8,d} {r['공급률']:>6.4f}")
 
-# === gspread 이어쓰기: 행 100~ ===
+# === gspread 이어쓰기: Hmall(65~81) 뒤 3행 띄우고 85~ ===
 gc = gspread.service_account(filename='/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/gen-lang-client-0553550811-4b553902b0d0.json')
 sh = gc.open_by_key('1fxB0UvLRy2iQfonCWn5U5mWnXbzSdn6l4e2XuQluhwo')
 ws = sh.worksheet('5.14')
 
-START = 100
+START = 85
 data = []
 data.append(["━━━━ 3단계: 롯데홈쇼핑 공급률 분석 ━━━━"])
 data.append([])
@@ -170,10 +170,10 @@ data.append([f"상품별 쿠폰: {coupon_str}"])
 data.append([f"카드 청구할인: {CARD_NAME} {CARD_PCT}% (페이백 {round(PAYBACK*100,1)}%)"])
 data.append([f"적립금(상품별 max): {rewards}"])
 data.append([])
-data.append(['순위','조합','소비자가','추증','GWP','총샘플','적립','최종구매가','순구매가','공급률'])
-for r in rows_sorted:
+data.append(['조합번호','조합','소비자가','추증','GWP','총샘플','적립','최종구매가','순구매가','공급률'])
+for r in rows:
     cn = combo_label_ko(r['combo'])
-    data.append([r['rank'], cn, r['소비자가'], r['추증'], GWP_6, r['총샘플'], r['적립'], r['최종'], r['순'], round(r['공급률'],4)])
+    data.append([r['idx'], cn, r['소비자가'], r['추증'], GWP_6, r['총샘플'], r['적립'], r['최종'], r['순'], round(r['공급률'],4)])
 
 maxc = max(len(r) for r in data)
 for r in data:
