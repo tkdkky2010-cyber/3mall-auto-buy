@@ -764,7 +764,7 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
 
     section_title = [f"현대Hmall 10% 적립 체크 ({tab_candidates[0]}) — {len(results)}개 상품"]
     headers = ["#", "제품명", "10%적립", "적립 문구", "쿠폰",
-               "수량", "정가",
+               "수량", "혜택가",
                "즉시할인가", "실비(= 즉시할인가 × 카드페이백계수 − 적립금)"]
     headers += ["행사종료"]
     headers += [f"구간{i+1}" for i in range(max_tiers)]
@@ -788,7 +788,8 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
             coupon = "🎟️ 보유" if r.get("has_coupon") else ""
             p = r.get("payment") or {}
             qty_s = str(p.get("qty")) if p.get("qty") else ""
-            lp_s = _fmt(p.get("list_price"))
+            # G열 = 우수고객 혜택가 (있으면) → 없으면 소비자가(list_price)
+            lp_s = _fmt(p.get("benefit_unit_price") or p.get("list_price"))
             imm_s = _fmt(p.get("kakao_price"))         # 즉시할인가
             real_s = _fmt(p.get("kakao_final_cost"))   # 실비
             event_end_s = r.get("event_end") or ""
