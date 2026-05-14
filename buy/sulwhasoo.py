@@ -140,19 +140,112 @@ def dismiss_popup(page: Page) -> None:
 # ───────────── OKCashbag 진입 ─────────────
 
 
+def _okcashbag_login(page: Page, cfg: dict) -> bool:
+    """OK캐시백 자동 로그인 (ID/PW). 이미 로그인이면 즉시 True.
+
+    실패 시 False — caller 가 raise. 셀렉터는 OK캐시백 사이트 형태에 따라
+    여러 fallback 시도.
+    """
+    body = page.inner_text("body")
+    if "로그아웃" in body:
+        return True  # 이미 로그인
+
+    # 1) 로그인 페이지 이동 — '로그인' 링크 클릭 → 못 찾으면 직접 URL
+    moved = False
+    for sel in ("link:로그인", "a:로그인"):
+        try:
+            page.get_by_role("link", name="로그인").click(timeout=3000)
+            moved = True
+            break
+        except Exception:
+            continue
+    if not moved:
+        try:
+            page.goto("https://www.okcashbag.com/index.do?menuid=member-login",
+                      wait_until="domcontentloaded", timeout=15000)
+        except Exception:
+            return False
+    page.wait_for_timeout(1500)
+
+    # 2) ID/PW 입력 — 흔한 셀렉터 fallback
+    id_filled = pw_filled = False
+    for sel in ('input[name="userId"]', 'input[id="userId"]', 'input[name="loginId"]',
+                'input[type="text"][placeholder*="아이디"]'):
+        try:
+            page.fill(sel, cfg["id"], timeout=2000)
+            id_filled = True
+            break
+        except Exception:
+            continue
+    if not id_filled:
+        try:
+            page.get_by_placeholder("아이디").fill(cfg["id"], timeout=3000)
+            id_filled = True
+        except Exception:
+            pass
+    for sel in ('input[name="passwd"]', 'input[id="passwd"]', 'input[name="password"]',
+                'input[type="password"]'):
+        try:
+            page.fill(sel, cfg["pw"], timeout=2000)
+            pw_filled = True
+            break
+        except Exception:
+            continue
+    if not (id_filled and pw_filled):
+        print(f"[ERR] OKCashbag 로그인 입력 실패 (id_filled={id_filled}, pw_filled={pw_filled})")
+        return False
+
+    # 3) 로그인 버튼 클릭
+    page.wait_for_timeout(500)
+    clicked = False
+    for sel_fn in (
+        lambda: page.get_by_role("button", name="로그인").click(timeout=3000),
+        lambda: page.locator('button[type="submit"]').first.click(timeout=3000),
+        lambda: page.locator('input[type="submit"][value*="로그인"]').click(timeout=3000),
+    ):
+        try:
+            sel_fn()
+            clicked = True
+            break
+        except Exception:
+            continue
+    if not clicked:
+        print("[ERR] OKCashbag 로그인 버튼 못 찾음")
+        return False
+
+    page.wait_for_timeout(3500)
+
+    # 4) 검증 — 로그인 후 메인으로 자동 redirect 또는 명시 이동
+    if "로그아웃" not in page.inner_text("body"):
+        try:
+            page.goto(OKCASHBAG_URL, wait_until="domcontentloaded", timeout=10000)
+            page.wait_for_timeout(1500)
+        except Exception:
+            pass
+    if "로그아웃" in page.inner_text("body"):
+        print(f"[OK] OKCashbag 자동 로그인 ({cfg['id']})")
+        return True
+    return False
+
+
 def enter_via_okcashbag(page: Page, mall: str) -> Page:
     """OKCashbag 메인 → 해당 몰 진입. popup page 반환.
 
     mall: 'lotte' (홈쇼핑→롯데홈쇼핑) | 'galleria' (종합몰→갤러리아)
+    'hyundai'/'hmall' 미지원 — 현대Hmall은 OK캐시백 제휴 X (직접 진입 사용).
     """
+    if mall not in ("lotte", "galleria"):
+        raise ValueError(f"unsupported mall for okcashbag: {mall} (현대Hmall 등은 OKCB 제휴 X)")
+
     page.goto(OKCASHBAG_URL, wait_until="domcontentloaded", timeout=15000)
     page.wait_for_timeout(2000)
 
-    # 로그인 상태 체크 — Profile 6 cookies 기반
-    body = page.inner_text("body")
-    if "로그아웃" not in body:
-        print("[ERROR] OKCashbag 비로그인 — Chrome 창에서 카카오 로그인 1회 후 재시도")
-        raise RuntimeError("OKCashbag not logged in")
+    # 로그인 — Profile cookies 우선, 미로그인이면 ID/PW 자동 로그인
+    if "로그아웃" not in page.inner_text("body"):
+        cfg = load_json(OKCASHBAG_FILE)
+        if not _okcashbag_login(page, cfg):
+            print("[ERROR] OKCashbag 자동 로그인 실패 — Chrome 창에서 수동 로그인 1회 후 재시도")
+            raise RuntimeError("OKCashbag login failed (auto + manual fallback)")
 
     if mall == "lotte":
         page.get_by_role("button", name="홈쇼핑").click()

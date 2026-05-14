@@ -158,12 +158,16 @@ python3 buy/run.py --checkout 2>&1 | tee -a logs/YYYY-MM-DD.log
 - log는 append 모드 (`tee -a`)
 - 시간 ~5-10분 소요
 
-**3몰 적용 범위 (현재)**:
-- ✅ Hmall (현대) — `buy/run.py` Step 4 (cart) ✓, Step 5 (checkout, Phase 3-A 7자리 추출까지) ✓, Phase 3-B 폰 자동화 대기
-- ❌ 롯데홈쇼핑 — `buy/lotte.py` 미구현 (`hsmaster/`의 TypeScript는 cart 담기까지만)
-- ❌ 갤러리아 — `buy/galleria.py` 미구현 (동일)
+**3몰 적용 범위 + OK캐시백 진입 룰**:
+- ✅ **현대Hmall** — `buy/run.py` 직접 hmall.com 진입 (Step 4 cart ✓, Step 5 checkout Phase 3-A 7자리 추출 ✓). **OK캐시백 통과 X** (현대는 OK캐시백 제휴 안 됨). Phase 3-B 폰 자동화 대기.
+- ⚠️ **갤러리아** — `buy/sulwhasoo.py:galleria_*` 코드 있음 (login + cart + checkout + 네이버페이). **항상 OK캐시백 통과** (`enter_via_okcashbag(page, 'galleria')`). PM 통합 X, 작동 검증 X.
+- ⚠️ **롯데홈쇼핑** — `buy/sulwhasoo.py:lotte_*` 코드 있음 (login + cart + checkout + L포인트 + OK 16자리). **조건부 OK캐시백**: 상품 '구매사은·혜택' 영역(`#eventBanner`)에 적립 행사 **없을 때만** OK캐시백. 적립 있으면 직접 진입 (적립 중복 X). 적립 detection은 `rate-check/_check_lotte_reward.py` 가 함. PM 통합 X, 작동 검증 X.
 
-사용자가 "롯데도 결제까지" 요청하면: "현재 `buy/`는 hmall 전용. 롯데/갤러리아 결제 모듈 미구현 — 별도 작업 필요" 안내.
+**OK캐시백 자동 로그인** ⏳ 미구현:
+- 현재 `enter_via_okcashbag` 는 미로그인 시 raise — 사용자가 Chrome 창에서 카카오 1회 수동 로그인 후 재시도
+- `okcashbag.json` 의 `id`/`pw` 사용한 자동 로그인 추가 필요 (TODO)
+
+사용자가 "롯데/갤러리아 결제까지" 요청하면: "코드는 `buy/sulwhasoo.py`에 있지만 PM 통합 X / 작동 검증 X. OK캐시백 자동 로그인 미구현 — 우선 수동 로그인 후 시도 가능" 안내.
 
 ---
 
@@ -189,8 +193,10 @@ python3 buy/run.py --checkout 2>&1 | tee -a logs/YYYY-MM-DD.log
 - `rate-check/_common.py`, `rate-check/galleria.py`, `rate-check/inventory.py` — ✅ Phase 1 구현 (갤러리아 + 재고 비교 자동화). Step 1 참조.
 - `rate-check/hmall.py`, `rate-check/lotte.py`, `rate-check/run.py` — Phase 2 TODO. 임시로 `rate-check/_tmp/hmall_all.py` + `lotte_all.py` 패턴 또는 가이드 직접 수행.
 - `cart/check10.py` — ✅ 구현됨
-- `buy/run.py` — Phase 3-A 완성 (cart 담기 ✓, checkout 7자리 추출 ✓). Step 4(cart)/Step 5(checkout)는 `--checkout` 플래그로 분리됨. Phase 3-B(폰 자동화) 미구현 → Step 5 후 사용자 수동 결제
-- `buy/lotte.py`, `buy/galleria.py` — TODO
+- `buy/run.py` — 현대Hmall 직접 진입. Phase 3-A 완성 (cart 담기 ✓, checkout 7자리 추출 ✓). Step 4/5는 `--checkout` 플래그로 분리. Phase 3-B(폰 자동화) 미구현 → Step 5 후 사용자 수동 결제. **OK캐시백 통과 X (현대는 OKCB 제휴 X)**
+- `buy/sulwhasoo.py` — 갤러리아/롯데 buy + OK캐시백 진입 코드 있음 (galleria_login/clear_cart/add_combo/checkout, lotte_*). PM workflow 통합 X, 작동 검증 X
+- **OK캐시백 자동 로그인** — TODO. 현재 sulwhasoo.py 미로그인 시 raise. okcashbag.json id/pw 자동 로그인 추가 필요
+- 롯데 OK캐시백 조건부 분기 — TODO. `#eventBanner` 적립 있으면 직접, 없으면 OKCB
 
 해당 모듈 미존재 시: 사용자에게 "<모듈명> 미구현 — 가이드대로 사용자가 수동 진행 후 다음 단계 호출 부탁" 안내하고 다음 step으로 넘어가지 말 것.
 
