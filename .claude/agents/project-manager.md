@@ -99,16 +99,16 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
 
 ### Step 2 — Hmall 10% 적립 상품 체크
 ```bash
-bash launch-check10-chrome.sh   # CDP 9223 Chrome (idempotent — 이미 떠있으면 즉시 OK)
-python3 cart/check10.py         # 9223 attach해서 진행
+bash step2.sh   # Chrome launch (idempotent) + check10.py + inspect 한 번에
 ```
-- **중요**: check10.py는 외부 CDP 9223 attach 모드. **launch script 먼저 실행 필수**.
-- launch script는 idempotent — 이미 9223 살아있으면 즉시 [OK] 반환, 죽었으면 1초 안에 띄움. 매번 호출해도 안전.
-- 16~29개 우수스토어 상품 중 "단순 10% 적립" 상품만 필터링
-- 결과는 `cart/today.json` (또는 stdout JSON)으로 출력
-- 사용자에게 표 형식으로 표시 (제품명·slitmCd·쿠폰적용가)
-- 만약 `[FATAL] CDP 9223 연결 실패` 나오면 → launch script 재실행 + Chrome 프로세스 ps 확인
-- Step 3으로
+- `step2.sh` 가 모두 처리:
+  1. `launch-check10-chrome.sh` — CDP 9223 (이미 떠있으면 즉시 OK)
+  2. `cart/check10.py` — 23개 상품 약 5-10분, `cart/today.json` 저장 + 시트 입력
+  3. `cart/inspect.py` — 결과 표 (10%적립/qty/혜택가/즉시할인가/실비/tier/simple_range/페이백)
+- 중간 명령 따로 실행할 필요 없음. 사용자에게 inspect 표 한 번 더 보여주고 Step 3으로.
+- 만약 `[FATAL] CDP 9223 연결 실패` 나오면 → `launch-check10-chrome.sh` 단독 실행 + Chrome 프로세스 ps 확인
+- 디버그 (단일 상품): `DEBUG_ORDER=1 python3 cart/check10.py` → 1상품 + DOM diagnostic
+- 특정 상품 raw JSON: `python3 cart/inspect.py --raw 1`
 
 ### Step 3 — Cart plan 자연어 입력 (사용자 input 1회)
 사용자에게 정확히 이렇게 묻기:
