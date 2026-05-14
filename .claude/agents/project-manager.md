@@ -84,9 +84,16 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    - 차이 없으면 "변경 없음 — 활성 버전 사용" 보고
    - 차이 있으면 dry-run 출력 → 사용자 confirm 후 `--apply`로 새 버전 생성 (가이드 섹션 14-1 절차)
 
-4. **2단계 현대Hmall** (Phase 2 — 스크립트 미완성)
-   - 임시: `rate-check/_tmp/hmall_all.py` 패턴 참고하여 `hmall_config.json` 첫 계정 로그인 → 카드 즉시할인 1회 확인 → 7상품 페이지에서 정가×0.9 검증 → 카드별 최종구매가 수학 계산 → "{M.DD}" 탭 행 65~ 이어쓰기
-   - 향후: `python3 rate-check/hmall.py`로 자동화 예정
+4. **2단계 현대Hmall** ✓ 자동화됨 (2026-05-15 신규 — 실제 체크아웃 페이지 가격 기반)
+   ```bash
+   python3 rate-check/hmall.py             # 11조합 전체 (5~10분 소요)
+   python3 rate-check/hmall.py 11          # 11번 조합만 (테스트)
+   python3 rate-check/hmall.py --dry-sheet # 시트 입력 skip
+   ```
+   - 흐름: hmall_config[0] 로그인 → 조합별 cart 비우기 → 본품 add_to_cart → 일반상품 체크 → 구매하기 → 체크아웃 페이지 → 카드할인 캐러셀(`<div class="tarvxz0"><h2>카드할인</h2></div>` 다음 `<section>`)에서 카드 후보 추출 → 가장 높은 할인율 카드의 미리보기 가격 사용. 페이백 카드면 계수 곱.
+   - **결제하기 절대 클릭 X** — rate check 전용. cart 상태 그대로 두고 다음 조합으로.
+   - 캐러셀 밖 카드(청구할인 등 외부 섹션)는 후보 X.
+   - 종전 `_tmp/hmall_all.py` (정가×0.9 수식)는 폐기 — Hmall 페이지 표시가에 쿠폰까지 자동 반영돼서 수식이 실제보다 비싸게 나옴.
 
 5. **3단계 롯데홈쇼핑** (Phase 2 — 스크립트 미완성)
    - 임시: `rate-check/_tmp/lotte_all.py` + `rate-check/_check_lotte_reward.py all` 호출
@@ -191,7 +198,7 @@ python3 buy/run.py --checkout 2>&1 | tee -a logs/YYYY-MM-DD.log
 ## 미구현 모듈 (현재 상태)
 
 - `rate-check/_common.py`, `rate-check/galleria.py`, `rate-check/inventory.py` — ✅ Phase 1 구현 (갤러리아 + 재고 비교 자동화). Step 1 참조.
-- `rate-check/hmall.py`, `rate-check/lotte.py`, `rate-check/run.py` — Phase 2 TODO. 임시로 `rate-check/_tmp/hmall_all.py` + `lotte_all.py` 패턴 또는 가이드 직접 수행.
+- `rate-check/hmall.py` — ✓ 완성 (2026-05-15, 체크아웃 캐러셀 가격 기반). `rate-check/lotte.py`, `rate-check/run.py`는 Phase 2 TODO. 롯데는 임시로 `rate-check/_tmp/lotte_all.py` 패턴 사용.
 - `cart/check10.py` — ✅ 구현됨
 - `buy/run.py` — 현대Hmall 직접 진입. Phase 3-A 완성 (cart 담기 ✓, checkout 7자리 추출 ✓). Step 4/5는 `--checkout` 플래그로 분리. Phase 3-B(폰 자동화) 미구현 → Step 5 후 사용자 수동 결제. **OK캐시백 통과 X (현대는 OKCB 제휴 X)**
 - `buy/sulwhasoo.py` — 갤러리아/롯데 buy + OK캐시백 진입 코드 있음 (galleria_login/clear_cart/add_combo/checkout, lotte_*). PM workflow 통합 X, 작동 검증 X
