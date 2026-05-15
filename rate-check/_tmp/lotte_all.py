@@ -235,7 +235,7 @@ gc = gs_client()
 sh = gc.open_by_key(RATE_SHEET_ID)
 ws = sh.worksheet(today_tab_name())
 
-START = 100
+START = 62  # 사용자 layout: Hmall 44~60 다음 + 빈 1행 + Lotte 62~
 data = []
 data.append(["━━━━ 3단계: 롯데홈쇼핑 공급률 분석 ━━━━"])
 data.append([])
@@ -262,3 +262,42 @@ end_col = chr(ord('A')+maxc-1)
 rng = f"A{START}:{end_col}{START+len(data)-1}"
 ws.update(values=data, range_name=rng, value_input_option='USER_ENTERED')
 print(f"\n롯데 섹션 입력: {rng}")
+
+# J~M 비교 차트 — Lotte 컬럼 (M) 채움
+chart_m = [["롯데"]]
+for r in rows:
+    chart_m.append([round(r['공급률'], 4)])
+ws.update(values=chart_m, range_name="M1:M12", value_input_option='USER_ENTERED')
+print("M1:M12 (롯데 비교 차트 컬럼) 입력")
+
+# 조건부 서식: K2:M12 행별 최저값 셀 → 연두색 배경 (3사 중 가장 좋은 deal 강조)
+# 이미 같은 규칙이 있으면 중복 추가 — Sheets는 허용. 깨끗하게 하려면 미리 제거 가능.
+try:
+    sh.batch_update({
+        "requests": [{
+            "addConditionalFormatRule": {
+                "rule": {
+                    "ranges": [{
+                        "sheetId": ws.id,
+                        "startRowIndex": 1,    # 0-indexed row 2
+                        "endRowIndex": 12,     # row 12 (exclusive 13)
+                        "startColumnIndex": 10,  # K (0-indexed)
+                        "endColumnIndex": 13,    # N (exclusive)
+                    }],
+                    "booleanRule": {
+                        "condition": {
+                            "type": "CUSTOM_FORMULA",
+                            "values": [{"userEnteredValue": "=AND(ISNUMBER(K2),K2=MIN($K2:$M2))"}],
+                        },
+                        "format": {
+                            "backgroundColor": {"red": 0.72, "green": 0.92, "blue": 0.72},
+                        },
+                    },
+                },
+                "index": 0,
+            }
+        }]
+    })
+    print("조건부 서식 추가 — K2:M12 행별 최저 공급률 셀 연두색")
+except Exception as e:
+    print(f"⚠️ 조건부 서식 실패: {e}")

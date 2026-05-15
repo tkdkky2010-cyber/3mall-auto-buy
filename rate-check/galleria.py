@@ -370,7 +370,17 @@ def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
                          f"{p.coupon_pct:.0f}%"]
         setrow(30 + i, *row_data)
 
-    return C.write_grid(ws, 1, rows)
+    rng = C.write_grid(ws, 1, rows)
+
+    # ★ J~M 비교 차트 (3사 공급률 비교 영역) — 갤러리아 컬럼만 채움
+    # 사용자 layout: J1="조합", K1="갤러리아몰", L1="Hmall", M1="롯데"
+    # 행 2~12: 조합번호 1~11 + 각 몰 공급률 (hmall/lotte는 자기 스크립트에서 채움)
+    chart_data = [["조합", "갤러리아몰"]]
+    for r in combos:
+        chart_data.append([r["idx"], round(r["공급률"], 4)])
+    ws.update(values=chart_data, range_name="J1:K12", value_input_option="USER_ENTERED")
+
+    return rng
 
 
 # ============================================================

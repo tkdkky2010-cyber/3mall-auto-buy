@@ -114,39 +114,55 @@ def cart_uncheck_all():
     time.sleep(0.5)
 
 def cart_inspect():
-    """장바구니 전체 아이템 메타 (name, qty, checked) 조회 — 매번 호출 (인덱스 변동 대응)."""
+    """장바구니 전체 아이템 메타 (name, qty, checked) 조회 — 매번 호출 (인덱스 변동 대응).
+
+    실제 cart DOM (5/15 확정): 컨테이너 = `div.pdwrap.pdlist`, 상품명은 innerText 첫 라인.
+    qty: "N개" 패턴 (가격 "X원"이 아님)
+    """
     js = """
     const cbs = document.querySelectorAll('input[name="backet"]');
     return Array.from(cbs).map((cb, idx) => {
-      // cart item 컨테이너 — 가장 가까운 li 또는 큰 div
-      let item = cb.closest('li');
+      // 컨테이너 — div.pdwrap (5/15 확정) 또는 옵션변경 텍스트 있는 상위
+      let item = cb.closest('div.pdwrap, div.pdlist, li');
       if (!item) {
         let p = cb.parentElement;
-        for (let i = 0; i < 6 && p; i++) {
-          if ((p.innerText || '').includes('옵션변경')) { item = p; break; }
+        for (let i = 0; i < 8 && p; i++) {
+          const t = p.innerText || '';
+          if (t.indexOf('옵션변경') >= 0) { item = p; break; }
           p = p.parentElement;
         }
       }
       if (!item) item = cb.parentElement;
-      // 상품명 — 다양한 셀렉터 시도
-      let name = '';
-      for (const sel of ['.prd-name', '.txt-name', '.product-name', '.item-name', 'a.title', 'p.name', 'a']) {
-        const el = item.querySelector(sel);
-        if (el && el.textContent.trim().length > 3) { name = el.textContent.trim(); break; }
-      }
-      // 현재 수량
+
+      // 상품명 — innerText 첫 라인 (보통 "[본사직영]설화수 [공통]XXX 세트")
+      const lines = (item.innerText || '').split('\\n').map(s => s.trim()).filter(s => s);
+      let name = lines[0] || '';
+      // "[본사직영]" "[공통]" 등 brackets 제거 — 순수 상품명만
+      name = name.replace(/^\\[[^\\]]+\\]\\s*/g, '').replace(/^설화수\\s*/, '').trim();
+
+      // qty — "N개" 패턴 매칭 (가격 "X원" 제외)
       let qty = 1;
-      for (const sel of ['.qty-num', '.quantity', '.qty-display', 'em.cnt', '[class*="qty"]', 'span[class*="count"]']) {
-        const el = item.querySelector(sel);
-        if (el) {
-          const n = parseInt((el.textContent || '').replace(/\\D/g, ''));
-          if (n > 0) { qty = n; break; }
-        }
+      for (const line of lines) {
+        const m = line.match(/^(\\d+)개$/);
+        if (m) { qty = parseInt(m[1]); break; }
       }
-      return { idx, name, qty, checked: cb.checked };
+      return { idx, name, raw_first_line: lines[0] || '', qty, checked: cb.checked };
     });
     """
     return driver.execute_script(js) or []
+
+
+# ★ Hmall cart 텍스트는 풀네임 — NAME 닉네임 substring 매칭 안 됨.
+# 5/15 진단 확정: cart의 실제 상품명 첫 줄 키워드로 매핑
+CART_KEYWORDS = {
+    'b': '에센셜 퍼스트',         # 윤조3종 = 에센셜 퍼스트케어 세트
+    'c': '에센셜 데일리',         # 자음2종 = 에센셜 데일리 세트
+    'd': '본윤 데일리',           # 본윤2종 = 본윤 데일리 루틴 세트
+    'e': '에센셜 탄력',           # 탄력3종 = 에센셜 탄력케어 세트
+    'f': '윤조에센스 6세대',       # 윤조에센스90 = 윤조에센스 6세대 90ml
+    'g': '자음생 2종',            # 자음생2종 = 자음생 2종 세트
+    'h': '자음생크림 리치',        # 자음생크림리치세트
+}
 
 def cart_check_one(item_idx: int):
     """특정 인덱스의 체크박스 체크."""
@@ -231,7 +247,8 @@ def cart_check_combo(combo):
     1. (반복) inspect → 수량 다른 첫 매칭 상품 발견 시 옵션변경 팝업 → 일치할 때까지 반복
     2. 모두 체크 해제 → inspect (인덱스 변동 대응) → 매칭 상품만 체크
     """
-    targets = {NAME[c]: q for c, q in combo}
+    # ★ NAME (윤조3종 등) 닉네임 X — CART_KEYWORDS (cart 풀네임 substring) 사용
+    targets = {CART_KEYWORDS[c]: q for c, q in combo}
 
     # 1단계: 수량 조정 — 매번 inspect (변경하기 후 인덱스 리셋되므로)
     for _ in range(15):
@@ -247,7 +264,7 @@ def cart_check_combo(combo):
         if not to_change:
             break  # 모두 일치
         item, tqty = to_change
-        print(f"    qty 조정: '{item['name'][:25]}' {item['qty']}→{tqty}")
+        print(f"    qty 조정: '{item['name'][:30]}' {item['qty']}→{tqty}")
         cart_change_qty_via_popup(item['idx'], tqty, item['qty'])
 
     # 2단계: 모두 체크 해제 → 매칭 상품만 체크 (재 inspect 필수)
@@ -258,7 +275,7 @@ def cart_check_combo(combo):
         for tname in targets:
             if tname in item['name']:
                 cart_check_one(item['idx'])
-                matched.append(f"{item['name'][:20]} x{item['qty']}")
+                matched.append(f"{item['name'][:25]} x{item['qty']}")
                 break
     print(f"  cart 매칭/체크: {matched}")
 
@@ -418,7 +435,7 @@ sh = gc.open_by_key('1fxB0UvLRy2iQfonCWn5U5mWnXbzSdn6l4e2XuQluhwo')
 from datetime import datetime
 ws = sh.worksheet(datetime.now().strftime('%-m.%-d'))
 
-START = 65
+START = 44  # 사용자 layout: Galleria 1~41 다음 + 빈 2행 + Hmall 44~
 data = []
 data.append([f"━━━━ 2단계: 현대Hmall 공급률 분석 (결제페이지 실측) ━━━━"])
 data.append([])
@@ -448,3 +465,11 @@ range_str = f"A{START}:{end_col}{START + len(data) - 1}"
 ws.update(values=data, range_name=range_str, value_input_option='USER_ENTERED')
 print(f"\nHmall 섹션 입력: {range_str}")
 # ★ 로컬 결과파일(hmall_results.json) 저장 X — sheet가 SoT
+
+# J~M 비교 차트 — Hmall 컬럼 (L) 만 채움. 첫 카드 공급률 사용.
+chart_l = [["Hmall"]]
+for r in results:
+    c0_rate = r['cards'][0]['rate'] if r['cards'] else 0
+    chart_l.append([round(c0_rate, 4)])
+ws.update(values=chart_l, range_name="L1:L12", value_input_option='USER_ENTERED')
+print("L1:L12 (Hmall 비교 차트 컬럼) 입력")
