@@ -265,15 +265,113 @@ def galleria_combo(idx: int, combo: list[tuple[str, int]],
 # ============================================================
 # gspread helper
 # ============================================================
-def load_today_composition(date: str | None = None) -> dict:
-    """galleria.py 가 만든 today_composition_{date}.json 로드.
+def _parse_won(text) -> int:
+    """'16,600원' → 16600. None/빈문자열 → 0."""
+    if not text:
+        return 0
+    digits = re.sub(r"[^\d]", "", str(text))
+    return int(digits) if digits else 0
 
-    당일 추가증정/GWP 구성과 가치 — hmall.py / lotte.py 가 하드코딩 대신 이걸 사용.
-    galleria 단계가 먼저 돌지 않았으면 FileNotFoundError.
+
+def load_galleria_composition_from_sheet(ws) -> dict:
+    """galleria가 시트(통합 탭)에 쓴 결과를 직접 읽는다 — **캐시 JSON 절대 사용 X**.
+
+    SoT 원칙: 모든 결과는 Google Sheets에만 보존. 로컬 파일/캐시는 stale 위험으로 금지.
+    매 실행마다 sheet에서 fresh 읽기 — 재실행 시 옛 캐시 따라 쓰는 버그 방지.
+
+    Returns: {"add_gift_value": {b: int, ...}, "gwp_1set": int, "gwp_6set": int}
+    galleria가 미실행이면 ValueError.
     """
-    date = date or datetime.now().strftime("%Y-%m-%d")
-    path = TMP_DIR / f"today_composition_{date}.json"
-    return json.loads(path.read_text(encoding="utf-8"))
+    # 1) 추가증정가치 행 — "추가증정가치" 라벨 검색 (row 17~30 안에 있음, max_samples에 따라 가변)
+    block = ws.get("A15:H30")
+    add_gift_value = {}
+    for row in block:
+        if row and row[0].strip().startswith("추가증정가치"):
+            for i, code in enumerate("bcdefgh", start=1):
+                cell = row[i] if i < len(row) else ""
+                add_gift_value[code] = _parse_won(cell)
+            break
+    if not add_gift_value or len(add_gift_value) < 7:
+        raise ValueError("'추가증정가치' 행 sheet에서 못찾음 — galleria 먼저 실행 필요")
+
+    # 2) GWP 1세트/6세트 — "1세트 합계" / "6세트 합계" 라벨 검색 (row 6~15)
+    gwp_block = ws.get("A6:C15")
+    gwp_1set = gwp_6set = 0
+    for row in gwp_block:
+        if not row:
+            continue
+        label = row[0].strip()
+        val = _parse_won(row[2] if len(row) > 2 else "")
+        if label.startswith("1세트 합계"):
+            gwp_1set = val
+        elif label.startswith("6세트 합계"):
+            gwp_6set = val
+    if not gwp_6set:
+        raise ValueError("'6세트 합계' sheet에서 못찾음 — galleria 먼저 실행 필요")
+
+    return {"add_gift_value": add_gift_value, "gwp_1set": gwp_1set, "gwp_6set": gwp_6set}
+
+
+def load_galleria_samples_from_sheet(ws) -> dict:
+    """galleria sheet에서 per-product per-sample composition 파싱 (inventory.py 용).
+
+    각 cell 텍스트 형식: '{name} x{qty} ({price}원)'. s코드는 SAMPLE_TABLE lookup.
+    Returns: {code: [{name, qty, price, code}, ...]}
+    캐시 X — sheet가 SoT.
+    """
+    block = ws.get("A15:H30")
+    products = {c: [] for c in "bcdefgh"}
+    for row in block[1:]:  # row 0 = 헤더
+        if not row:
+            continue
+        label = row[0].strip()
+        if label.startswith("추가증정가치"):
+            break
+        if not label.startswith("샘플"):
+            continue
+        for c_idx, code in enumerate("bcdefgh", start=1):
+            cell = row[c_idx] if c_idx < len(row) else ""
+            if not cell.strip():
+                continue
+            m = re.match(r"(.+?)\s*x(\d+)\s*\(([\d,]+)원\)", cell.strip())
+            if m:
+                name = m.group(1).strip()
+                hit = lookup_sample(name)
+                products[code].append({
+                    "name": name,
+                    "qty": int(m.group(2)),
+                    "price": int(m.group(3).replace(",", "")),
+                    "code": hit[2] if hit else None,
+                })
+    return products
+
+
+def load_galleria_gwp_from_sheet(ws) -> list[dict]:
+    """galleria sheet의 GWP 1세트 샘플 리스트 파싱 (inventory.py 용).
+
+    Sheet row 7~11 (변동 가능): col A=name, col B='x{qty}', col C='{price}원'
+    Returns: [{name, qty, price, code}, ...]
+    """
+    block = ws.get("A7:C13")
+    set_items = []
+    for row in block:
+        if not row or not row[0].strip():
+            continue
+        label = row[0].strip()
+        if label.startswith("1세트 합계") or label.startswith("6세트 합계"):
+            break
+        qty_match = re.match(r"x(\d+)", row[1].strip() if len(row) > 1 else "")
+        if not qty_match:
+            continue
+        price = _parse_won(row[2] if len(row) > 2 else "")
+        hit = lookup_sample(label)
+        set_items.append({
+            "name": label,
+            "qty": int(qty_match.group(1)),
+            "price": price,
+            "code": hit[2] if hit else None,
+        })
+    return set_items
 
 
 def gs_client() -> gspread.Client:

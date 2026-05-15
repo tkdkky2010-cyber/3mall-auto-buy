@@ -10,20 +10,24 @@
      d. 페이백 카드면 페이백계수 추가 적용
   3. gspread 시트 입력
 
-당일 추가증정가치/GWP는 _common.load_today_composition()으로 로드 (하드코딩 제거).
+당일 추가증정가치/GWP는 sheet에서 직접 읽는다 (_common.load_galleria_composition_from_sheet).
+**캐시 파일 절대 사용 X** — sheet가 SoT, 매 실행 fresh.
 """
-import json, sys, time, re
+import json, os, sys, time, re
 from pathlib import Path
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import gspread
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from _common import combo_label_ko, load_today_composition
+from _common import combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID, today_tab_name, gs_client
 
+_CDP_PORT = os.environ.get("HMALL_CDP_PORT", "9222")
 opts = Options()
-opts.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
+opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{_CDP_PORT}")
 driver = webdriver.Chrome(options=opts)
+print(f"CDP attach: 127.0.0.1:{_CDP_PORT}")
 
 # 7상품 정가 — 본품 정가는 안정적
 PRODUCTS = [
@@ -46,12 +50,15 @@ COMBOS = [
     [('c',1),('f',4)], [('c',2),('f',3)], [('f',5)],
 ]
 
-# === 당일 추가증정가치/GWP — galleria 출력 JSON에서 로드 (하드코딩 X) ===
-comp = load_today_composition()
-ADD_GIFT_VALUE = {c: comp["products"][c]["add_gift_value"] for c in "bcdefgh"}
-GWP_6SET = comp["gwp"]["6set_value"]
-print(f"당일 추증가치: {ADD_GIFT_VALUE}")
-print(f"당일 GWP 6세트: {GWP_6SET:,}원")
+# === 당일 추가증정가치/GWP — sheet에서 직접 읽기 (캐시 X) ===
+_gc = gs_client()
+_sh = _gc.open_by_key(RATE_SHEET_ID)
+_ws_read = _sh.worksheet(today_tab_name())
+_comp = load_galleria_composition_from_sheet(_ws_read)
+ADD_GIFT_VALUE = _comp["add_gift_value"]
+GWP_6SET = _comp["gwp_6set"]
+print(f"당일 추증가치 (sheet): {ADD_GIFT_VALUE}")
+print(f"당일 GWP 6세트 (sheet): {GWP_6SET:,}원")
 
 PAYBACK = {
     '롯데카드': 0.02, '비씨카드': 0.015, '삼성카드': 0.01,
@@ -440,6 +447,4 @@ end_col = chr(ord('A') + maxcols - 1)
 range_str = f"A{START}:{end_col}{START + len(data) - 1}"
 ws.update(values=data, range_name=range_str, value_input_option='USER_ENTERED')
 print(f"\nHmall 섹션 입력: {range_str}")
-
-with open('/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/rate-check/_tmp/hmall_results.json', 'w') as f:
-    json.dump({'cards': cards_seen, 'rows': results}, f, ensure_ascii=False, indent=2, default=str)
+# ★ 로컬 결과파일(hmall_results.json) 저장 X — sheet가 SoT

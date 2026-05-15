@@ -11,8 +11,8 @@ GWP resume 패턴:
 - 같은 명령 재실행 → 자동으로 _tmp/gwp_{date}.json 로드 (또는 --gwp-config 명시)
 
 산출물:
-- gspread "{M.DD}" 탭의 갤러리아 섹션 (행 1~60)
-- rate-check/_tmp/today_composition_{date}.json (inventory.py가 사용)
+- gspread "{M.DD}" 탭의 갤러리아 섹션 (행 1~45) — **유일한 결과 저장소**
+- ★ 로컬 캐시/JSON 파일 절대 생성 X — 재실행 시 옛 캐시 따라쓰는 버그 방지 (sheet가 SoT)
 """
 from __future__ import annotations
 import argparse
@@ -452,40 +452,9 @@ def main(argv=None):
     for r in rows_list:
         print(f"  {r['idx']:>3d} {r['name'][:40]:40s} {r['소비자가']:>10,d} {r['추가증정']:>8,d} {r['gwp_value']:>8,d} {r['총샘플']:>8,d} {r['최종구매가']:>10,d} {r['순구매가']:>10,d} {r['공급률']:>6.4f}")
 
-    # today_composition_{date}.json 저장 (inventory.py 가 사용)
-    composition_path = C.TMP_DIR / f"today_composition_{today}.json"
-    composition = {
-        "date": today,
-        "tab": tab,
-        "products": {
-            c: {
-                "basic_discount_pct": products[c].basic_discount_pct,
-                "coupon_pct": products[c].coupon_pct,
-                "add_gifts": [
-                    {"name": s.name, "qty": s.qty, "price": s.price, "code": s.code}
-                    for s in products[c].add_gifts
-                ],
-                "add_gift_value": products[c].add_gift_value,
-                "new_items": products[c].new_items,
-            }
-            for c in C.PRODUCT_CODES if c in products
-        },
-        "gwp": {
-            "period": gwp.period,
-            "set": [{"name": s.name, "qty": s.qty, "price": s.price, "code": s.code}
-                    for s in gwp.set_items],
-            "1set_value": gwp.set_value,
-            "6set_value": gwp.set_value * 6,
-        },
-        "combos": [{"idx": r["idx"], "name": r["name"],
-                    "소비자가": r["소비자가"], "총샘플": r["총샘플"],
-                    "최종구매가": r["최종구매가"], "순구매가": r["순구매가"],
-                    "공급률": round(r["공급률"], 4)}
-                   for r in rows_list],
-    }
-    composition_path.parent.mkdir(parents=True, exist_ok=True)
-    composition_path.write_text(json.dumps(composition, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n  composition 저장: {composition_path}")
+    # ★ today_composition.json 등 로컬 캐시 파일 생성 X — sheet가 SoT.
+    # hmall/lotte/inventory는 _common.load_galleria_composition_from_sheet(ws) /
+    # load_galleria_samples_from_sheet(ws) 로 직접 sheet에서 읽는다.
 
     # 시트 입력
     if args.skip_sheet:

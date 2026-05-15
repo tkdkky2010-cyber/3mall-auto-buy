@@ -10,7 +10,7 @@ from selenium.webdriver.chrome.options import Options
 import gspread
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from _common import combo_label_ko, load_today_composition
+from _common import combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID, today_tab_name, gs_client
 
 opts = Options()
 opts.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
@@ -122,12 +122,15 @@ COMBOS = [
     [('b',2),('d',2)], [('e',2),('f',2)], [('c',3),('h',1)], [('c',3),('d',2)],
     [('c',1),('f',4)], [('c',2),('f',3)], [('f',5)],
 ]
-# 당일 추가증정가치/GWP — galleria 출력 JSON에서 로드 (하드코딩 X, 당일 계산 원칙)
-_comp = load_today_composition()
-ADD_GIFT = {c: _comp["products"][c]["add_gift_value"] for c in "bcdefgh"}
-GWP_6 = _comp["gwp"]["6set_value"]
-print(f"당일 추증가치: {ADD_GIFT}")
-print(f"당일 GWP 6세트: {GWP_6:,}원")
+# 당일 추가증정가치/GWP — sheet에서 직접 읽기 (캐시 X, sheet가 SoT)
+_gc_lotte = gs_client()
+_sh_lotte = _gc_lotte.open_by_key(RATE_SHEET_ID)
+_ws_lotte = _sh_lotte.worksheet(today_tab_name())
+_comp = load_galleria_composition_from_sheet(_ws_lotte)
+ADD_GIFT = _comp["add_gift_value"]
+GWP_6 = _comp["gwp_6set"]
+print(f"당일 추증가치 (sheet): {ADD_GIFT}")
+print(f"당일 GWP 6세트 (sheet): {GWP_6:,}원")
 
 def compute(combo):
     소비자 = sum(PRICES[c]*q for c,q in combo)

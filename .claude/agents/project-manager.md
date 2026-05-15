@@ -79,13 +79,13 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    python3 rate-check/inventory.py            # dry-run (기본)
    python3 rate-check/inventory.py --apply    # 차이 발견 시 새 버전 자동 추가
    ```
-   - galleria.py가 만든 `_tmp/today_composition_{date}.json` 사용
+   - galleria가 sheet에 쓴 결과를 직접 sheet에서 읽음 (캐시 JSON 사용 X — sheet가 SoT)
    - MAP 활성 버전 자동 감지 → 1:1 비교
    - 차이 없으면 "변경 없음 — 활성 버전 사용" 보고
    - 차이 있으면 dry-run 출력 → 사용자 confirm 후 `--apply`로 새 버전 생성 (가이드 섹션 14-1 절차)
 
 4. **2단계 현대Hmall** (Phase 2 — 스크립트 미완성)
-   - 임시: `rate-check/_tmp/hmall_all.py` 패턴 참고하여 `hmall_config.json` 첫 계정 로그인 → 카드 즉시할인 후보 1회 확인 → **11조합 × 카드별 결제 페이지 진입해서 캐러셀 즉시할인 금액 실측** → 페이백 적용 → "{M.DD}" 탭 행 65~ 이어쓰기. 추증/GWP는 `_common.load_today_composition()` 으로 갤러리아 결과 재사용 (하드코딩 X)
+   - 임시: `rate-check/_tmp/hmall_all.py` 패턴 참고하여 `hmall_config.json` 첫 계정 로그인 → 카드 즉시할인 후보 1회 확인 → **11조합 × 카드별 결제 페이지 진입해서 캐러셀 즉시할인 금액 실측** → 페이백 적용 → "{M.DD}" 탭 행 65~ 이어쓰기. 추증/GWP는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet에서 직접 읽음 (캐시 X — sheet가 SoT)
    - 향후: `python3 rate-check/hmall.py`로 자동화 예정
 
 5. **3단계 롯데홈쇼핑** (Phase 2 — 스크립트 미완성)
@@ -95,7 +95,7 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
 
 사용자에게 한 줄 요약 보고("Step 1 완료: 11개 조합 공급률 {min}~{max}, 신규 품목 N개") 후 Step 2로.
 
-> **중요**: 1단계 갤러리아에서 확인한 추가증정·40/70만 GWP 구성은 `_tmp/today_composition_{date}.json`에 저장됨. 2단계·3단계는 이 JSON을 재사용한다. 사이트별로 다시 확인하지 않는다.
+> **중요**: 1단계 갤러리아에서 확인한 추가증정·40/70만 GWP 구성은 **공급률 시트(통합 탭)에만 기록**된다. 2단계·3단계는 이 sheet를 직접 읽는다 (`_common.load_galleria_composition_from_sheet`). **로컬 캐시 JSON 절대 사용 X** — 재실행 시 stale 데이터 따라쓰기 방지.
 
 ### Step 2 — Hmall 10% 적립 상품 체크
 ```bash

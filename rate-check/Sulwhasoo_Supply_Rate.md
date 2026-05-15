@@ -1,7 +1,21 @@
 # 설화수 3플랫폼 공급률 분석 + 재고관리 통합 가이드
 
-> **최종 수정일**: 2026-03-31
+> **최종 수정일**: 2026-05-15
 > **목적**: Cowork 스케줄 1회 실행으로 갤러리아몰 → 현대Hmall → 롯데홈쇼핑 3개 플랫폼 공급률 분석을 순서대로 완료하고, 샘플 구성 변경 시 재고관리 스프레드시트까지 자동 수정하는 통합 문서
+
+---
+
+## ★★★ 절대 룰 — 캐시 금지 / 시트가 SoT (Single Source of Truth)
+
+> **이 룰은 모든 단계(갤러리아 / 현대Hmall / 롯데 / inventory)에 공통 적용. 위반 시 stale 캐시로 잘못된 결과 입력되는 버그 발생.**
+
+1. **공급률 체크 결과는 절대 로컬 파일/JSON으로 저장하지 않는다.** 모든 결과는 Google Sheets("{M.DD}" 통합 탭)에만 기록.
+2. **재실행 시 이전 캐시 파일(`today_composition_*.json`, `hmall_results.json` 등) 절대 읽지 않는다.** — 옛 단가표 / 옛 쿠폰율로 계산된 stale 데이터 따라쓰기 금지.
+3. **galleria.py / hmall.py / lotte.py / inventory.py 모두 sheet에서 직접 읽고 sheet에만 쓴다.**
+   - hmall/lotte는 `_common.load_galleria_composition_from_sheet(ws)`로 추증가치/GWP 읽기
+   - inventory는 `_common.load_galleria_samples_from_sheet(ws)` + `load_galleria_gwp_from_sheet(ws)` 로 per-sample composition 읽기
+4. **매 실행마다 모든 데이터를 fresh 스크랩한다** — 어제값 / 오늘 새벽값 사용 X. 쿠폰율은 매일 변경, 추증 구성도 변경 가능.
+5. `_common.load_today_composition()` 함수는 **삭제됨** (옛 캐시 reader). 사용 시도 시 ImportError.
 
 ---
 
@@ -1230,7 +1244,7 @@ ws.update('A31:J41', summary_data)
 - 조합별 카드 금액은 **결제 페이지 카드 캐러셀**에서 카드 section마다 읽는다 (히든 추가쿠폰 반영)
 - 즉시할인 카드 종류는 매일 바뀌므로, 당일 확인된 카드를 전부 기록한다
 - 페이백 대상: 롯데(2%), 비씨(1.5%), 삼성/하나/농협(1%). 그 외 카드는 페이백 없음
-- **추가증정가치/GWP는 절대 하드코딩하지 않는다** — 갤러리아 단계 출력 JSON(`today_composition_{date}.json`)에서 로드
+- **추가증정가치/GWP는 절대 하드코딩하지 않는다 + 캐시 JSON도 사용 X** — `_common.load_galleria_composition_from_sheet(ws)`로 sheet에서 직접 fresh 읽기 (sheet가 SoT)
 - 소수점 처리: 공급률은 4자리, 금액은 정수 (반올림)
 
 ---
