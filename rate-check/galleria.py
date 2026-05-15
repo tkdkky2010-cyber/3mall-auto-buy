@@ -53,15 +53,15 @@ const out = {};
 const fullText = document.body.innerText;
 out.length = fullText.length;
 
-// ★ 쿠폰 추출 — 사용자 5/15 확정 DOM (page-wide regex 절대 X):
-//   <button class="down" onclick="...couponListLayer..."><em>[화장] 더블쿠폰 14%</em></button>
-//   이 button 안의 <em> 텍스트에서만 추출. Q&A 영역 / 배너 텍스트 영향 0.
+// ★ 쿠폰 추출 — button.down em 안의 텍스트에서만 (page-wide regex 절대 X):
+//   <button class="down" onclick="...couponListLayer..."><em>[카테고리] 쿠폰명 N%</em></button>
+//   이 button 안의 <em> 텍스트에서만 추출. Q&A 영역 / 배너 텍스트 / 기타 영역 모두 사용 X.
 out.coupon_text = null;
 const couponBtns = document.querySelectorAll('button.down em, button[onclick*="couponListLayer"] em');
 for (const em of couponBtns) {
     const t = (em.textContent || '').trim();
     if (t.includes('쿠폰') && /\d+\s*%/.test(t)) {
-        out.coupon_text = t;  // 예: "[화장] 더블쿠폰 14%"
+        out.coupon_text = t;  // "[카테고리] 쿠폰명 N%" 형태
         break;
     }
 }
