@@ -1,12 +1,9 @@
-"""설화수 자동구매 — OKCashbag 경유 (롯데 + 갤러리아).
+"""설화수 자동구매 — 롯데 + 갤러리아 직접 진입.
 
 Hmall 식품(buy/run.py)과 다른 모듈:
-- OKCashbag 메인 → 쇼핑몰(롯데/갤러리아) 클릭 → "복사" → "쇼핑몰로 이동" → popup
-- popup에서 그 몰 로그인 + 카트 + 결제
-- 결제 마지막 OK캐쉬백 회원번호 4×4 입력 → 추가 적립
+- mall 홈 직접 진입 → 로그인 → 상품 URL → 카트 → 결제
 
 가이드: cart codegen 결과(롯데/갤러리아) + Sulwhasoo_Supply_Rate.md.
-주의: Hmall 설화수는 OKCashbag 경유 X (카드 할인 못 받음). 별도 흐름 또는 buy/run.py 활용.
 
 사용법:
     bash hsmaster/scripts/launch-hmall-chrome.sh   # CFT 띄우기
@@ -22,16 +19,18 @@ import time
 from pathlib import Path
 from dotenv import load_dotenv
 
-# sulwhasoo는 OKCashbag/galleria/lotte 모두 정상 user session (cookies 영구) 사용 →
+# galleria/lotte 모두 정상 user session (cookies 영구) 사용 →
 # stealth (patchright) 불필요. 단순한 playwright 사용으로 Chrome 148 호환성 확보.
 from playwright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError
 PW_BACKEND = "playwright"
 
 ROOT = Path(__file__).parent
 PROJECT_ROOT = ROOT.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+from chrome_launcher import ensure_chrome  # noqa: E402
 load_dotenv(ROOT / ".env")
 
-OKCASHBAG_FILE = PROJECT_ROOT / "okcashbag.json"
+CREDENTIALS_FILE = PROJECT_ROOT / "credentials.json"
 LOTTE_ACCOUNTS = PROJECT_ROOT / "lotte.json"
 GALLERIA_ACCOUNTS = PROJECT_ROOT / "galleria.json"
 
@@ -39,7 +38,6 @@ CDP_PORT = os.environ.get("CDP_PORT", "9222")
 CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
 DRY_PAYMENT = os.environ.get("DRY_PAYMENT", "true").lower() == "true"
 
-OKCASHBAG_URL = "https://www.okcashbag.com/"
 GALLERIA_HOME = "https://www.galleria.co.kr/main/initMain.action"
 LOTTE_HOME = "https://www.lotteimall.com/"
 
@@ -88,37 +86,6 @@ def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def split_ok_number(num16: str) -> list[str]:
-    """OK캐쉬백 16자리 → 4자리 4개."""
-    digits = re.sub(r"\D", "", num16)
-    if len(digits) != 16:
-        raise ValueError(f"OK 번호는 16자리여야 함: {digits!r}")
-    return [digits[0:4], digits[4:8], digits[8:12], digits[12:16]]
-
-
-def pre_logout_mall(page: Page, mall: str) -> None:
-    """⚠️ OKCashbag 진입 전 필수 단계.
-    OKCashbag → mall popup 진입 시 이미 로그인되어 있으면 OKCashbag tracking 활성 안 됨.
-    그래서 사전에 mall에 직접 가서 로그아웃 후 다시 OKCashbag 통해 진입해야 함.
-    """
-    home = LOTTE_HOME if mall == "lotte" else GALLERIA_HOME
-    try:
-        page.goto(home, wait_until="domcontentloaded", timeout=15000)
-        page.wait_for_timeout(2500)
-        body = page.inner_text("body")
-        if "로그아웃" in body:
-            try:
-                page.get_by_role("link", name="로그아웃").first.click(timeout=5000)
-                page.wait_for_timeout(2500)
-                print(f"  [OK] {mall} 사전 로그아웃 (OKCashbag tracking 활성 위해)")
-            except Exception as e:
-                print(f"  [WARN] {mall} 로그아웃 실패: {e}")
-        else:
-            print(f"  [INFO] {mall} 이미 로그아웃 상태")
-    except Exception as e:
-        print(f"  [WARN] 사전 로그아웃 단계 실패: {e}")
-
-
 def dismiss_popup(page: Page) -> None:
     """페이지에 popup 뜨면 '닫기' 텍스트 찾아 클릭. 없으면 그냥 return."""
     for _ in range(3):  # 여러 popup 동시 뜨는 경우
@@ -135,149 +102,6 @@ def dismiss_popup(page: Page) -> None:
                 continue
         if not clicked:
             break
-
-
-# ───────────── OKCashbag 진입 ─────────────
-
-
-def _okcashbag_login(page: Page, cfg: dict) -> bool:
-    """OK캐시백 자동 로그인 (ID/PW). 이미 로그인이면 즉시 True.
-
-    실패 시 False — caller 가 raise. 셀렉터는 OK캐시백 사이트 형태에 따라
-    여러 fallback 시도.
-    """
-    body = page.inner_text("body")
-    if "로그아웃" in body:
-        return True  # 이미 로그인
-
-    # 1) 로그인 페이지 이동 — '로그인' 링크 클릭 → 못 찾으면 직접 URL
-    moved = False
-    for sel in ("link:로그인", "a:로그인"):
-        try:
-            page.get_by_role("link", name="로그인").click(timeout=3000)
-            moved = True
-            break
-        except Exception:
-            continue
-    if not moved:
-        try:
-            page.goto("https://www.okcashbag.com/index.do?menuid=member-login",
-                      wait_until="domcontentloaded", timeout=15000)
-        except Exception:
-            return False
-    page.wait_for_timeout(1500)
-
-    # 2) ID/PW 입력 — 흔한 셀렉터 fallback
-    id_filled = pw_filled = False
-    for sel in ('input[name="userId"]', 'input[id="userId"]', 'input[name="loginId"]',
-                'input[type="text"][placeholder*="아이디"]'):
-        try:
-            page.fill(sel, cfg["id"], timeout=2000)
-            id_filled = True
-            break
-        except Exception:
-            continue
-    if not id_filled:
-        try:
-            page.get_by_placeholder("아이디").fill(cfg["id"], timeout=3000)
-            id_filled = True
-        except Exception:
-            pass
-    for sel in ('input[name="passwd"]', 'input[id="passwd"]', 'input[name="password"]',
-                'input[type="password"]'):
-        try:
-            page.fill(sel, cfg["pw"], timeout=2000)
-            pw_filled = True
-            break
-        except Exception:
-            continue
-    if not (id_filled and pw_filled):
-        print(f"[ERR] OKCashbag 로그인 입력 실패 (id_filled={id_filled}, pw_filled={pw_filled})")
-        return False
-
-    # 3) 로그인 버튼 클릭
-    page.wait_for_timeout(500)
-    clicked = False
-    for sel_fn in (
-        lambda: page.get_by_role("button", name="로그인").click(timeout=3000),
-        lambda: page.locator('button[type="submit"]').first.click(timeout=3000),
-        lambda: page.locator('input[type="submit"][value*="로그인"]').click(timeout=3000),
-    ):
-        try:
-            sel_fn()
-            clicked = True
-            break
-        except Exception:
-            continue
-    if not clicked:
-        print("[ERR] OKCashbag 로그인 버튼 못 찾음")
-        return False
-
-    page.wait_for_timeout(3500)
-
-    # 4) 검증 — 로그인 후 메인으로 자동 redirect 또는 명시 이동
-    if "로그아웃" not in page.inner_text("body"):
-        try:
-            page.goto(OKCASHBAG_URL, wait_until="domcontentloaded", timeout=10000)
-            page.wait_for_timeout(1500)
-        except Exception:
-            pass
-    if "로그아웃" in page.inner_text("body"):
-        print(f"[OK] OKCashbag 자동 로그인 ({cfg['id']})")
-        return True
-    return False
-
-
-def enter_via_okcashbag(page: Page, mall: str) -> Page:
-    """OKCashbag 메인 → 해당 몰 진입. popup page 반환.
-
-    mall: 'lotte' (홈쇼핑→롯데홈쇼핑) | 'galleria' (종합몰→갤러리아)
-    'hyundai'/'hmall' 미지원 — 현대Hmall은 OK캐시백 제휴 X (직접 진입 사용).
-    """
-    if mall not in ("lotte", "galleria"):
-        raise ValueError(f"unsupported mall for okcashbag: {mall} (현대Hmall 등은 OKCB 제휴 X)")
-
-    page.goto(OKCASHBAG_URL, wait_until="domcontentloaded", timeout=15000)
-    page.wait_for_timeout(2000)
-
-    # 로그인 — Profile cookies 우선, 미로그인이면 ID/PW 자동 로그인
-    if "로그아웃" not in page.inner_text("body"):
-        cfg = load_json(OKCASHBAG_FILE)
-        if not _okcashbag_login(page, cfg):
-            print("[ERROR] OKCashbag 자동 로그인 실패 — Chrome 창에서 수동 로그인 1회 후 재시도")
-            raise RuntimeError("OKCashbag login failed (auto + manual fallback)")
-
-    if mall == "lotte":
-        page.get_by_role("button", name="홈쇼핑").click()
-        page.wait_for_timeout(800)
-        page.get_by_role("img", name="롯데홈쇼핑").click()
-    elif mall == "galleria":
-        page.get_by_role("button", name="종합몰").click()
-        page.wait_for_timeout(800)
-        page.get_by_role("img", name="갤러리아").click()
-    else:
-        raise ValueError(f"unknown mall: {mall}")
-
-    page.wait_for_timeout(1500)
-    # "복사" 버튼: OK 번호 클립보드 복사 (자동화에서는 직접 입력 시 안 씀, 단계 호환 위해 클릭만)
-    try:
-        page.get_by_role("button", name="복사").click(timeout=3000)
-        page.wait_for_timeout(500)
-    except Exception:
-        pass
-
-    # "쇼핑몰로 이동하기" → popup 으로 mall 열림
-    with page.expect_popup() as popup_info:
-        page.get_by_role("button", name="쇼핑몰로 이동하기").click()
-    mall_page = popup_info.value
-    # 최소 대기 — 일부 mall popup은 inactive 시 auto-close
-    try:
-        mall_page.wait_for_load_state("domcontentloaded", timeout=10000)
-    except Exception:
-        pass
-    mall_page.wait_for_timeout(1500)
-    print(f"[OK] OKCashbag → {mall} popup: {mall_page.url[:80]}")
-    return mall_page
 
 
 # ───────────── 갤러리아 ─────────────
@@ -468,8 +292,8 @@ def naver_pay_input_password(pay_page, password_6: str) -> bool:
     return True
 
 
-def galleria_checkout(page: Page, ok_number: str, naver_id: str = "", naver_pw: str = "", naver_pay_pw: str = "") -> dict:
-    """갤러리아 카트 → 주문하기 → OK 캐쉬백 조회/사용 → 번호 입력 → DRY 모드 종료."""
+def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_pay_pw: str = "") -> dict:
+    """갤러리아 카트 → 주문하기 → 결제 popup → Naver Pay → DRY 모드 종료."""
     out = {"success": False, "error": None}
     try:
         # 카트 link 클릭 (URL 직접보다 안정)
@@ -507,39 +331,14 @@ def galleria_checkout(page: Page, ok_number: str, naver_id: str = "", naver_pw: 
         except Exception as e:
             print(f"    [WARN] 포인트 전체사용 실패: {e}")
 
-        # 3) OK캐시백 사용 동의 체크박스 ON — label "개인정보 및 주문정보 제공에 동의합니다"
-        # input이 label로 가려져 있으므로 label 클릭 (또는 force=True)
-        # ⚠️ "[필수] LIVE 포인트 사용을 위한 개인정보 제3자 동의" (#ckTerms_hlive) 는 X
-        try:
-            page.locator("label[for='afcr_okcashback_checkbox']").click(timeout=3000)
-            page.wait_for_timeout(800)
-            print("    [OK] OK캐시백 사용 동의 체크박스 ON")
-        except Exception as e:
-            # fallback: force check
-            try:
-                page.locator("#afcr_okcashback_checkbox").check(force=True, timeout=2000)
-                print("    [OK] OK캐시백 체크박스 (force)")
-            except Exception as e2:
-                print(f"    [WARN] OK캐시백 체크박스 실패: {e2}")
-
-        # OK 번호 입력 — 4자리×4
-        ok_parts = split_ok_number(ok_number)
-        page.get_by_role("textbox", name="OK캐쉬백 포인트 카드번호").wait_for(state="visible", timeout=8000)
-        page.get_by_role("textbox", name="OK캐쉬백 포인트 카드번호").fill(ok_parts[0])
-        page.get_by_role("textbox", name="두번째자리 입력").fill(ok_parts[1])
-        page.get_by_role("textbox", name="세번째자리 입력").fill(ok_parts[2])
-        page.get_by_role("textbox", name="네번째자리 입력").fill(ok_parts[3])
-        page.wait_for_timeout(500)
-        print(f"    [OK] OK 번호 입력: {ok_parts[0]}-...-{ok_parts[3]}")
-
-        # 4) 약관 전체 동의 — #ckTerms_all 체크 (보통 default true이지만 안전 차원)
+        # 3) 약관 전체 동의 — #ckTerms_all 체크 (보통 default true이지만 안전 차원)
         try:
             page.locator("#ckTerms_all").check(force=True, timeout=2000)
             page.wait_for_timeout(300)
         except Exception:
             pass
 
-        # 5) 결제하기 — id `regist_order_button` 직접 클릭
+        # 4) 결제하기 — id `regist_order_button` 직접 클릭
         # alert이 떠서 popup 막힐 수 있으므로 dialog handler 등록
         dialog_messages = []
         page.on("dialog", lambda d: (dialog_messages.append(d.message), d.dismiss()))
@@ -782,8 +581,8 @@ def lotte_add_combo(page: Page, combo_no: int) -> bool:
     return True
 
 
-def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
-    """롯데 카트 → 주문 → 주소 선택 → OK 번호 입력 (DRY)."""
+def lotte_checkout(page: Page, account_id: str = "") -> dict:
+    """롯데 카트 → 주문 → 주소 선택 → 쿠폰/L포인트 → KB Pay (DRY)."""
     out = {"success": False, "error": None}
     try:
         page.get_by_role("link", name="장바구니 장바구니").click()
@@ -882,25 +681,7 @@ def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
         page.get_by_role("img", name="동의함").click()
         page.wait_for_timeout(500)
 
-        # 6) OK 입력
-        ok_parts = split_ok_number(ok_number)
-        page.locator("#ok_yes").check()
-        page.get_by_role("textbox", name="OK캐쉬백 회원번호 첫번째 네자리 입력").fill(ok_parts[0])
-        page.get_by_role("textbox", name="OK캐쉬백 회원번호 두번째 네자리 입력").fill(ok_parts[1])
-        page.get_by_role("textbox", name="OK캐쉬백 회원번호 세번째 네자리 입력").fill(ok_parts[2])
-        page.get_by_role("textbox", name="OK캐쉬백 회원번호 마지막 네자리 입력").fill(ok_parts[3])
-        page.wait_for_timeout(500)
-        print(f"    [OK] OK 번호 입력 완료: {ok_parts[0]}-...-{ok_parts[3]}")
-
-        # 7) OK캐시백 모두사용 (활성화돼있을 때만)
-        try:
-            page.get_by_role("link", name="모두사용").first.click(timeout=2000)
-            page.wait_for_timeout(500)
-            print("    [OK] OK캐시백 모두사용")
-        except Exception:
-            pass
-
-        # 8) L포인트 모두사용 (활성화돼있을 때만 — #modal_btn_lpoint_all_use 가 visible 인지 확인)
+        # 6) L포인트 모두사용 (활성화돼있을 때만 — #modal_btn_lpoint_all_use 가 visible 인지 확인)
         lpoint_used = False
         try:
             btn = page.locator("#modal_btn_lpoint_all_use")
@@ -912,7 +693,7 @@ def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
         except Exception:
             pass
 
-        # 9) 카드사 select — 매일 청구할인 카드 자동 추출
+        # 7) 카드사 select — 매일 청구할인 카드 자동 추출
         # 카드코드: 016=KB국민, 018=NH농협, 047=롯데, 029=신한, 026=BC, 048=현대, 031=삼성, 021=우리, 020=하나
         CARD_NAME_TO_CODE = {
             "국민": "016", "KB": "016",
@@ -954,7 +735,7 @@ def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
             out["lpoint_used"] = lpoint_used
             return out
 
-        # 10) 결제하기 1차 + 사업자등록번호 (L포인트 사용 시) + 결제하기 2차
+        # 8) 결제하기 1차 + 사업자등록번호 (L포인트 사용 시) + 결제하기 2차
         # 첫 결제하기 click → "현금영수증 신청하시겠습니까?" confirm dialog → accept(예) 해야 사업자번호 페이지로 진입
         def _handle_dialog(d):
             print(f"    [dialog] type={d.type} msg={d.message[:80]}")
@@ -979,7 +760,7 @@ def lotte_checkout(page: Page, ok_number: str, account_id: str = "") -> dict:
         except Exception as e:
             print(f"    [WARN] 사업자번호 단계 실패: {e}")
 
-        # 11) KCP modal → KB Pay 버튼 클릭 (이중 iframe: MPI_cert > kbframe)
+        # 9) KCP modal → KB Pay 버튼 클릭 (이중 iframe: MPI_cert > kbframe)
         try:
             page.wait_for_selector('iframe[name^="MPI_cert"]', timeout=15000)
             page.wait_for_timeout(2000)
@@ -1029,16 +810,16 @@ def main() -> int:
         return 1
     acc = accounts[idx - 1]
 
-    # OK 번호 + Naver 자격증명 로드
-    ok_cfg = load_json(OKCASHBAG_FILE)
-    ok_number = ok_cfg["ok_number"]
-    naver_id = ok_cfg.get("naver_id", "")
-    naver_pw = ok_cfg.get("naver_pw", "")
-    naver_pay_pw = ok_cfg.get("naver_pay_pw", "")
+    # Naver 자격증명 로드 (갤러리아 네이버페이용)
+    cred = load_json(CREDENTIALS_FILE)
+    naver_id = cred.get("naver_id", "")
+    naver_pw = cred.get("naver_pw", "")
+    naver_pay_pw = cred.get("naver_pay_pw", "")
 
     print(f"[INFO] mall={mall}, account #{idx} {acc['id']}, DRY={DRY_PAYMENT}")
     print(f"[INFO] PW backend: {PW_BACKEND}")
 
+    ensure_chrome(int(CDP_PORT))
     with sync_playwright() as p:
         try:
             browser = p.chromium.connect_over_cdp(CDP_ENDPOINT)
@@ -1046,16 +827,15 @@ def main() -> int:
             print(f"[FATAL] CDP 연결 실패: {e}")
             return 1
         context = browser.contexts[0] if browser.contexts else browser.new_context()
-        ok_page = context.new_page()
+        mall_page = context.new_page()
 
-        # ★ 사전 로그아웃 (OKCashbag tracking 활성 위해 필수)
-        pre_logout_mall(ok_page, mall)
-
+        home = LOTTE_HOME if mall == "lotte" else GALLERIA_HOME
         try:
-            mall_page = enter_via_okcashbag(ok_page, mall)
+            mall_page.goto(home, wait_until="domcontentloaded", timeout=15000)
+            mall_page.wait_for_timeout(2000)
         except Exception as e:
-            print(f"[FATAL] OKCashbag 진입 실패: {e}")
-            ok_page.close()
+            print(f"[FATAL] {mall} 홈 진입 실패: {e}")
+            mall_page.close()
             return 1
 
         if mall == "lotte":
@@ -1065,7 +845,6 @@ def main() -> int:
         if not ok:
             print("[FATAL] mall 로그인 실패")
             mall_page.close()
-            ok_page.close()
             return 1
         print(f"[OK] {mall} 로그인")
 
@@ -1076,17 +855,17 @@ def main() -> int:
             if not galleria_add_combo(mall_page, combo_no):
                 print("[FATAL] 조합 추가 실패")
                 return 1
-            result = galleria_checkout(mall_page, ok_number, naver_id=naver_id, naver_pw=naver_pw, naver_pay_pw=naver_pay_pw)
+            result = galleria_checkout(mall_page, naver_id=naver_id, naver_pw=naver_pw, naver_pay_pw=naver_pay_pw)
         else:
             lotte_clear_cart(mall_page)
             print(f"[INFO] 조합 {combo_no} 추가: {COMBOS.get(combo_no)}")
             if not lotte_add_combo(mall_page, combo_no):
                 print("[FATAL] 조합 추가 실패")
                 return 1
-            result = lotte_checkout(mall_page, ok_number, account_id=acc["id"])
+            result = lotte_checkout(mall_page, account_id=acc["id"])
 
         if result["success"]:
-            print(f"\n✓ [{mall}] #{idx} 진입 + OK번호 입력 완료 (DRY={DRY_PAYMENT})")
+            print(f"\n✓ [{mall}] #{idx} 결제 진행 완료 (DRY={DRY_PAYMENT})")
             return 0
         else:
             print(f"\n✗ [{mall}] #{idx} 실패: {result['error']}")

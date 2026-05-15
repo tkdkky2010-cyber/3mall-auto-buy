@@ -79,23 +79,25 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    python3 rate-check/inventory.py            # dry-run (기본)
    python3 rate-check/inventory.py --apply    # 차이 발견 시 새 버전 자동 추가
    ```
-   - galleria.py가 만든 `_tmp/today_composition_{date}.json` 사용
+   - galleria가 sheet에 쓴 결과를 직접 sheet에서 읽음 (캐시 JSON 사용 X — sheet가 SoT)
    - MAP 활성 버전 자동 감지 → 1:1 비교
    - 차이 없으면 "변경 없음 — 활성 버전 사용" 보고
    - 차이 있으면 dry-run 출력 → 사용자 confirm 후 `--apply`로 새 버전 생성 (가이드 섹션 14-1 절차)
 
 4. **2단계 현대Hmall** (Phase 2 — 스크립트 미완성)
-   - 임시: `rate-check/_tmp/hmall_all.py` 패턴 참고하여 `hmall_config.json` 첫 계정 로그인 → 카드 즉시할인 1회 확인 → 7상품 페이지에서 정가×0.9 검증 → 카드별 최종구매가 수학 계산 → "{M.DD}" 탭 행 65~ 이어쓰기
-   - 향후: `python3 rate-check/hmall.py`로 자동화 예정
+   - 임시: `rate-check/_tmp/hmall_all.py` 패턴 참고하여 `hmall_config.json` 첫 계정 로그인 → 카드 즉시할인 후보 1회 확인 → **11조합 × 카드별 결제 페이지 진입해서 캐러셀 즉시할인 금액 실측** → 페이백 적용 → "{M.DD}" 탭 행 44~ 이어쓰기 (RULES.md §13 layout). 추증/GWP는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet에서 직접 읽음 (캐시 X — sheet가 SoT)
+   - 향후: `python3 rate-check/hmall.py`로 자동화 예정 (현재 초안만 있음, 미사용)
 
 5. **3단계 롯데홈쇼핑** (Phase 2 — 스크립트 미완성)
-   - 임시: `rate-check/_tmp/lotte_all.py` + `rate-check/_check_lotte_reward.py all` 호출
-   - **알려진 이슈** (회고 #6/#7): 페이백 5종 카드 검출 누락 가능, 7% 28만원 한도 미반영. 결과 검토 시 주의.
+   - 임시: `rate-check/_tmp/lotte_all.py` + `rate-check/_check_lotte_reward.py all` 호출 (행 62~ 입력)
+   - **알려진 이슈**:
+     - 적립금 정규식 (`_check_lotte_reward.py`) 이 단일 tier만 잡고 상위 tier 누락 가능. 7개 상품이 전부 동일한 값으로 나오면 의심 → 이벤트 페이지에서 최대 구간 직접 확인, 시트 G69:J79 + M2:M12 수동 패치 (RULES.md §7)
+     - 페이백 5종 카드 검출 누락 가능, 청구할인 한도 미반영 — 결과 검토 시 주의
    - 향후: `python3 rate-check/lotte.py`로 자동화 예정
 
 사용자에게 한 줄 요약 보고("Step 1 완료: 11개 조합 공급률 {min}~{max}, 신규 품목 N개") 후 Step 2로.
 
-> **중요**: 1단계 갤러리아에서 확인한 추가증정·40/70만 GWP 구성은 `_tmp/today_composition_{date}.json`에 저장됨. 2단계·3단계는 이 JSON을 재사용한다. 사이트별로 다시 확인하지 않는다.
+> **중요**: 1단계 갤러리아에서 확인한 추가증정·40/70만 GWP 구성은 **공급률 시트(통합 탭)에만 기록**된다. 2단계·3단계는 이 sheet를 직접 읽는다 (`_common.load_galleria_composition_from_sheet`). **로컬 캐시 JSON 절대 사용 X** — 재실행 시 stale 데이터 따라쓰기 방지.
 
 ### Step 2 — Hmall 10% 적립 상품 체크
 ```bash
@@ -158,16 +160,12 @@ python3 buy/run.py --checkout 2>&1 | tee -a logs/YYYY-MM-DD.log
 - log는 append 모드 (`tee -a`)
 - 시간 ~5-10분 소요
 
-**3몰 적용 범위 + OK캐시백 진입 룰**:
-- ✅ **현대Hmall** — `buy/run.py` 직접 hmall.com 진입 (Step 4 cart ✓, Step 5 checkout Phase 3-A 7자리 추출 ✓). **OK캐시백 통과 X** (현대는 OK캐시백 제휴 안 됨). Phase 3-B 폰 자동화 대기.
-- ⚠️ **갤러리아** — `buy/sulwhasoo.py:galleria_*` 코드 있음 (login + cart + checkout + 네이버페이). **항상 OK캐시백 통과** (`enter_via_okcashbag(page, 'galleria')`). PM 통합 X, 작동 검증 X.
-- ⚠️ **롯데홈쇼핑** — `buy/sulwhasoo.py:lotte_*` 코드 있음 (login + cart + checkout + L포인트 + OK 16자리). **조건부 OK캐시백**: 상품 '구매사은·혜택' 영역(`#eventBanner`)에 적립 행사 **없을 때만** OK캐시백. 적립 있으면 직접 진입 (적립 중복 X). 적립 detection은 `rate-check/_check_lotte_reward.py` 가 함. PM 통합 X, 작동 검증 X.
+**3몰 적용 범위 (모두 직접 진입 — OK캐시백 dead)**:
+- ✅ **현대Hmall** — `buy/run.py` 직접 hmall.com 진입 (Step 4 cart ✓, Step 5 checkout Phase 3-A 7자리 추출 ✓). Phase 3-B 폰 자동화 대기.
+- ⚠️ **갤러리아** — `buy/sulwhasoo.py:galleria_*` 코드 있음 (login + cart + checkout + 네이버페이). 갤러리아 홈 직접 진입. PM 통합 X, 작동 검증 X.
+- ⚠️ **롯데홈쇼핑** — `buy/sulwhasoo.py:lotte_*` 코드 있음 (login + cart + checkout + L포인트). 롯데 홈 직접 진입. PM 통합 X, 작동 검증 X.
 
-**OK캐시백 자동 로그인** ⏳ 미구현:
-- 현재 `enter_via_okcashbag` 는 미로그인 시 raise — 사용자가 Chrome 창에서 카카오 1회 수동 로그인 후 재시도
-- `okcashbag.json` 의 `id`/`pw` 사용한 자동 로그인 추가 필요 (TODO)
-
-사용자가 "롯데/갤러리아 결제까지" 요청하면: "코드는 `buy/sulwhasoo.py`에 있지만 PM 통합 X / 작동 검증 X. OK캐시백 자동 로그인 미구현 — 우선 수동 로그인 후 시도 가능" 안내.
+사용자가 "롯데/갤러리아 결제까지" 요청하면: "코드는 `buy/sulwhasoo.py`에 있지만 PM 통합 X / 작동 검증 X" 안내.
 
 ---
 
@@ -193,10 +191,8 @@ python3 buy/run.py --checkout 2>&1 | tee -a logs/YYYY-MM-DD.log
 - `rate-check/_common.py`, `rate-check/galleria.py`, `rate-check/inventory.py` — ✅ Phase 1 구현 (갤러리아 + 재고 비교 자동화). Step 1 참조.
 - `rate-check/hmall.py`, `rate-check/lotte.py`, `rate-check/run.py` — Phase 2 TODO. 임시로 `rate-check/_tmp/hmall_all.py` + `lotte_all.py` 패턴 또는 가이드 직접 수행.
 - `cart/check10.py` — ✅ 구현됨
-- `buy/run.py` — 현대Hmall 직접 진입. Phase 3-A 완성 (cart 담기 ✓, checkout 7자리 추출 ✓). Step 4/5는 `--checkout` 플래그로 분리. Phase 3-B(폰 자동화) 미구현 → Step 5 후 사용자 수동 결제. **OK캐시백 통과 X (현대는 OKCB 제휴 X)**
-- `buy/sulwhasoo.py` — 갤러리아/롯데 buy + OK캐시백 진입 코드 있음 (galleria_login/clear_cart/add_combo/checkout, lotte_*). PM workflow 통합 X, 작동 검증 X
-- **OK캐시백 자동 로그인** — TODO. 현재 sulwhasoo.py 미로그인 시 raise. okcashbag.json id/pw 자동 로그인 추가 필요
-- 롯데 OK캐시백 조건부 분기 — TODO. `#eventBanner` 적립 있으면 직접, 없으면 OKCB
+- `buy/run.py` — 현대Hmall 직접 진입. Phase 3-A 완성 (cart 담기 ✓, checkout 7자리 추출 ✓). Step 4/5는 `--checkout` 플래그로 분리. Phase 3-B(폰 자동화) 미구현 → Step 5 후 사용자 수동 결제.
+- `buy/sulwhasoo.py` — 갤러리아/롯데 buy 직접 진입 코드 있음 (galleria_login/clear_cart/add_combo/checkout, lotte_*). PM workflow 통합 X, 작동 검증 X
 
 해당 모듈 미존재 시: 사용자에게 "<모듈명> 미구현 — 가이드대로 사용자가 수동 진행 후 다음 단계 호출 부탁" 안내하고 다음 step으로 넘어가지 말 것.
 
