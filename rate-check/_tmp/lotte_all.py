@@ -198,7 +198,11 @@ def compute(combo):
     소비자 = sum(PRICES[c]*q for c,q in combo)
     추증 = sum(ADD_GIFT[c]*q for c,q in combo)
     총샘플 = 추증 + GWP_6
-    적립 = sum(rewards.get(c,0)*q for c,q in combo)
+    # ★ 적립금: 조합 1개당 1회 적용 (사용자 5/14 지시).
+    # 옛 sum(reward × qty)는 잘못 — 결제는 한 번이라 이벤트 1회 발생.
+    # 조합 내 상품별 적립 후보 중 최대값 1회 (모두 동일 이벤트면 그 값 = max).
+    applicable = [rewards.get(c, 0) for c, _ in combo if rewards.get(c, 0) > 0]
+    적립 = max(applicable) if applicable else 0
     # 상품별 최종가
     final = 0
     for c,q in combo:
