@@ -48,7 +48,7 @@ for code in 'bcdefgh':
     block_dialogs()
 
     # 쿠폰받기 클릭 — 팝업/레이어 등장
-    # ★ 사용자 5/15 지시: body 전체 max % 수집 X (배너 "15% 할인" 같은 행사 표시 포함됨).
+    # ★ 사용자 5/15 지시: body 전체 max % 수집 X (배너 "N% 할인" 같은 행사 표시 포함됨).
     # 쿠폰받기 팝업 안의 **가장 위 (첫번째) 쿠폰** 만 본다 = 가장 높은 할인율의 다운로드 가능 쿠폰.
     js_click = """
     const all = Array.from(document.querySelectorAll('button, a, span, div'));
