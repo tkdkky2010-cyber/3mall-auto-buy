@@ -1,8 +1,8 @@
-"""Hmall stage — 11개 조합 × 카드별 결제페이지 진입해서 실제 즉시할인 금액 읽기.
+"""Hmall stage — 16개 조합 × 카드별 결제페이지 진입해서 실제 즉시할인 금액 읽기.
 
 신규 흐름 (구버전 '정가×0.9 수학 계산' 폐기):
   1. 임의 상품 1회 방문 → 카드 즉시할인 리스트 수집
-  2. 11조합 반복:
+  2. 16조합 반복:
      a. 장바구니 진입 → 조합 상품만 체크 + 수량 조정
      b. 구매하기 클릭 → 결제 페이지 진입
      c. 결제 페이지 카드 캐러셀 sections 파싱 → 카드별 즉시할인 금액 읽기
@@ -21,7 +21,7 @@ from selenium.webdriver.chrome.options import Options
 import gspread
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from _common import combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID, today_tab_name, gs_client
+from _common import combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID, today_tab_name, gs_client, COMBOS
 
 _CDP_PORT = os.environ.get("HMALL_CDP_PORT", "9222")
 opts = Options()
@@ -43,12 +43,7 @@ PRICE = {p[0]: p[3] for p in PRODUCTS}
 SLITM = {p[0]: p[2] for p in PRODUCTS}
 NAME = {p[0]: p[1] for p in PRODUCTS}
 
-# 11개 조합 — 본품 구성 (고정)
-COMBOS = [
-    [('g',2),('h',1)], [('d',2),('g',2)], [('d',4),('e',1)], [('e',2),('h',1)],
-    [('b',2),('d',2)], [('e',2),('f',2)], [('c',3),('h',1)], [('c',3),('d',2)],
-    [('c',1),('f',4)], [('c',2),('f',3)], [('f',5)],
-]
+# 조합 = _common.COMBOS 16개 (DRY, 중복 정의 X)
 
 # === 당일 추가증정가치/GWP — sheet에서 직접 읽기 (캐시 X) ===
 _gc = gs_client()
@@ -388,7 +383,7 @@ def measure_combo(combo):
     return read_checkout_card_prices()
 
 # ==========================================================
-# 3. 11조합 전부 측정
+# 3. 16조합 전부 측정
 # ==========================================================
 results = []
 for idx, combo in enumerate(COMBOS, start=1):
@@ -435,7 +430,7 @@ sh = gc.open_by_key('1fxB0UvLRy2iQfonCWn5U5mWnXbzSdn6l4e2XuQluhwo')
 from datetime import datetime
 ws = sh.worksheet(datetime.now().strftime('%-m.%-d'))
 
-START = 44  # 사용자 layout: Galleria 1~41 다음 + 빈 2행 + Hmall 44~
+START = 49  # 사용자 layout: Galleria 1~48 다음 + Hmall 49~70 (RULES.md §13)
 data = []
 data.append([f"━━━━ 2단계: 현대Hmall 공급률 분석 (결제페이지 실측) ━━━━"])
 data.append([])
@@ -444,7 +439,7 @@ data.append([f"카드즉시할인: {card_summary}"])
 data.append([f"※ 결제 페이지 캐러셀에서 카드별 실제 즉시할인 금액 읽음 (히든 추가쿠폰 반영)"])
 data.append([])
 
-# 조합 요약 (조합번호 1~11 순) — 우측 카드정보 블록
+# 조합 요약 (조합번호 1~16 순) — 우측 카드정보 블록
 headers = ['조합번호', '조합', '소비자가', '추가증정', 'GWP가치', '총샘플가치']
 for c in cards_seen:
     headers += [f"{c['name']}즉시할인후", f"{c['name']}최종(페이백)", f"{c['name']}순구매가", f"{c['name']}공급률"]
@@ -471,5 +466,5 @@ chart_l = [["Hmall"]]
 for r in results:
     c0_rate = r['cards'][0]['rate'] if r['cards'] else 0
     chart_l.append([round(c0_rate, 4)])
-ws.update(values=chart_l, range_name="L1:L12", value_input_option='USER_ENTERED')
-print("L1:L12 (Hmall 비교 차트 컬럼) 입력")
+ws.update(values=chart_l, range_name="L1:L17", value_input_option='USER_ENTERED')
+print("L1:L17 (Hmall 비교 차트 컬럼) 입력")

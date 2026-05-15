@@ -1,4 +1,4 @@
-"""롯데홈쇼핑 stage — 7개 상품 쿠폰% + 카드할인 + 11개 조합 공급률 계산 + 시트 이어쓰기.
+"""롯데홈쇼핑 stage — 7개 상품 쿠폰% + 카드할인 + 16개 조합 공급률 계산 + 시트 이어쓰기.
 
 흐름:
 - 쿠폰%: 상품 페이지 쿠폰받기 클릭 → 팝업 안의 가장 위 (다운로드 가능 최대) 쿠폰만 읽음 (배너 "할인" X)
@@ -14,7 +14,7 @@ from selenium.webdriver.chrome.options import Options
 import gspread
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from _common import combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID, today_tab_name, gs_client
+from _common import combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID, today_tab_name, gs_client, COMBOS
 
 import os as _os
 _LOTTE_PORT = _os.environ.get("RATE_CHECK_CDP_PORT", "9222")
@@ -169,7 +169,7 @@ try:
             #    상위 tier (예: 더 큰 구간 적립) 를 놓치는 경우가 있음.
             #    7개 상품이 전부 동일한 값 → 단일 이벤트 검출 가능성 高.
             #    이런 경우 실제 적립 이벤트 페이지에서 최대 구간 확인 후
-            #    시트 G69:G79 / I69:I79 / J69:J79 / M2:M12 수동 패치 필요.
+            #    시트 (롯데 영역 START=73 기준) G80:G95 / I80:I95 / J80:J95 / M2:M17 수동 패치 필요.
             uniq_vals = set(rewards.values())
             if len(uniq_vals) == 1 and 0 not in uniq_vals:
                 print(f"⚠️ 적립금 7개 상품 동일 ({uniq_vals.pop():,}원) — 상위 tier 누락 가능. "
@@ -191,12 +191,8 @@ PAYBACK = {
 
 print(f"\n적용 카드: {CARD_NAME} {CARD_PCT}% (페이백 {PAYBACK*100:.1f}%)")
 
-# 11개 조합
-COMBOS = [
-    [('g',2),('h',1)], [('d',2),('g',2)], [('d',4),('e',1)], [('e',2),('h',1)],
-    [('b',2),('d',2)], [('e',2),('f',2)], [('c',3),('h',1)], [('c',3),('d',2)],
-    [('c',1),('f',4)], [('c',2),('f',3)], [('f',5)],
-]
+# 조합 = _common.COMBOS 16개 (DRY, 중복 정의 X)
+
 # 당일 추가증정가치/GWP — sheet에서 직접 읽기 (캐시 X, sheet가 SoT)
 _gc_lotte = gs_client()
 _sh_lotte = _gc_lotte.open_by_key(RATE_SHEET_ID)
@@ -243,7 +239,7 @@ gc = gs_client()
 sh = gc.open_by_key(RATE_SHEET_ID)
 ws = sh.worksheet(today_tab_name())
 
-START = 62  # 사용자 layout: Hmall 44~60 다음 + 빈 1행 + Lotte 62~
+START = 73  # 사용자 layout: Hmall 49~70 다음 + Lotte 73~95 (RULES.md §13)
 data = []
 data.append(["━━━━ 3단계: 롯데홈쇼핑 공급률 분석 ━━━━"])
 data.append([])
@@ -275,10 +271,10 @@ print(f"\n롯데 섹션 입력: {rng}")
 chart_m = [["롯데"]]
 for r in rows:
     chart_m.append([round(r['공급률'], 4)])
-ws.update(values=chart_m, range_name="M1:M12", value_input_option='USER_ENTERED')
-print("M1:M12 (롯데 비교 차트 컬럼) 입력")
+ws.update(values=chart_m, range_name="M1:M17", value_input_option='USER_ENTERED')
+print("M1:M17 (롯데 비교 차트 컬럼) 입력")
 
-# 조건부 서식: K2:M12 행별 최저값 셀 → 연두색 배경 (3사 중 가장 좋은 deal 강조)
+# 조건부 서식: K2:M17 행별 최저값 셀 → 연두색 배경 (3사 중 가장 좋은 deal 강조)
 # 이미 같은 규칙이 있으면 중복 추가 — Sheets는 허용. 깨끗하게 하려면 미리 제거 가능.
 try:
     sh.batch_update({
@@ -288,7 +284,7 @@ try:
                     "ranges": [{
                         "sheetId": ws.id,
                         "startRowIndex": 1,    # 0-indexed row 2
-                        "endRowIndex": 12,     # row 12 (exclusive 13)
+                        "endRowIndex": 17,     # row 17 (exclusive 18) — 16조합
                         "startColumnIndex": 10,  # K (0-indexed)
                         "endColumnIndex": 13,    # N (exclusive)
                     }],
@@ -306,6 +302,6 @@ try:
             }
         }]
     })
-    print("조건부 서식 추가 — K2:M12 행별 최저 공급률 셀 연두색")
+    print("조건부 서식 추가 — K2:M17 행별 최저 공급률 셀 연두색")
 except Exception as e:
     print(f"⚠️ 조건부 서식 실패: {e}")

@@ -10,7 +10,7 @@ Dry-run (디폴트):
 자동 새 버전 추가:
     python3 rate-check/inventory.py --apply
     → 차이 발견 시 가이드 섹션 14-1 절차로 새 버전 (b→c→d→...) 추가:
-       - 조합별입고수량 시트에 11개 행 추가
+       - 조합별입고수량 시트에 16개 행 추가
        - MAP A열에 라벨 추가
        - IN A+B열에 라벨+조합명 추가
 
@@ -63,7 +63,7 @@ def composition_to_combo_codes(comp: dict, gwp_sets_per_combo: int = 6) -> dict[
     같은 코드끼리 합산.
 
     gwp_sets_per_combo: 가이드는 조합별 본품가>700K → 6세트, 400K~700K → 3세트.
-    실제로 11조합 모두 700K+ 이므로 디폴트 6.
+    실제로 16조합 모두 700K+ 이므로 디폴트 6 (단 9번 리치×3 = 810k 도 700K+).
     """
     products = comp["products"]
     gwp_set = comp["gwp"]["set"]
@@ -107,11 +107,11 @@ def find_active_version(map_a_col: list[str]) -> str | None:
     for v in map_a_col:
         v = v.strip()
         m = re.fullmatch(r"(\d+)([a-z])", v)
-        if m and 1 <= int(m.group(1)) <= 11:
+        if m and 1 <= int(m.group(1)) <= 16:
             last_suffix = m.group(2)
         elif re.fullmatch(r"\d+", v):
             # 접미사 없는 행 — 월초
-            if last_suffix is None and 1 <= int(v) <= 11:
+            if last_suffix is None and 1 <= int(v) <= 16:
                 last_suffix = ""
     return last_suffix
 
@@ -130,7 +130,7 @@ def read_combo_quantities(rows: list[list[str]], suffix: str) -> dict[int, dict[
     """조합별입고수량 시트의 raw rows → {조합번호: {코드: 수량}}.
 
     suffix == "" → 접미사 없는 행 (월초)
-    suffix == "d" → 1d~11d 행
+    suffix == "d" → 1d~16d 행 (16조합 확장 2026-05-16, 과거 11조합 버전 행도 매칭됨)
     """
     out: dict[int, dict[str, int]] = defaultdict(dict)
     pattern = re.compile(rf"^(\d+){re.escape(suffix)}$")
@@ -142,7 +142,7 @@ def read_combo_quantities(rows: list[list[str]], suffix: str) -> dict[int, dict[
         if not m:
             continue
         idx = int(m.group(1))
-        if not (1 <= idx <= 11):
+        if not (1 <= idx <= 16):
             continue
         code = row[1].strip()
         try:
@@ -173,7 +173,7 @@ def diff_combos(today: dict[int, dict[str, int]],
     반환: {조합번호: [(코드, expected, actual_qty), ...]}
     """
     out: dict[int, list] = {}
-    for idx in range(1, 12):
+    for idx in range(1, len(C.COMBOS) + 1):
         e = today.get(idx, {})
         a = actual.get(idx, {})
         diffs = []
@@ -200,12 +200,12 @@ def combo_label(idx: int) -> str:
 
 def append_combo_rows(ws, today_combos: dict[int, dict[str, int]],
                      suffix: str, start_row: int) -> str:
-    """조합별입고수량 시트에 새 버전 11조합 행 추가.
+    """조합별입고수량 시트에 새 버전 N조합 행 추가 (N = len(C.COMBOS)).
 
     각 코드별로 한 행. A=라벨, B=코드, C=상품명(빈), D=수량.
     """
     grid: list[list] = []
-    for idx in range(1, 12):
+    for idx in range(1, len(C.COMBOS) + 1):
         for code in sorted(today_combos.get(idx, {})):
             qty = today_combos[idx][code]
             label = f"{idx}{suffix}"
@@ -218,24 +218,25 @@ def append_combo_rows(ws, today_combos: dict[int, dict[str, int]],
 
 
 def append_map_in_labels(map_ws, in_ws, suffix: str) -> tuple[str, str]:
-    """MAP·IN 시트 A열에 1{suffix}~11{suffix} 라벨 추가.
+    """MAP·IN 시트 A열에 1{suffix}~N{suffix} 라벨 추가 (N = len(C.COMBOS)).
 
-    각 시트의 A열 마지막 사용 행 다음부터 11행 추가.
+    각 시트의 A열 마지막 사용 행 다음부터 N행 추가.
     MAP은 A열만, IN은 A+B열 (B는 조합명).
     """
+    n = len(C.COMBOS)
     # MAP
     map_a = [r[0] if r else "" for r in map_ws.get_all_values()]
     map_start = find_last_data_row([[v] for v in map_a]) + 1
-    map_grid = [[f"{idx}{suffix}"] for idx in range(1, 12)]
-    map_rng = f"A{map_start}:A{map_start + 10}"
+    map_grid = [[f"{idx}{suffix}"] for idx in range(1, n + 1)]
+    map_rng = f"A{map_start}:A{map_start + n - 1}"
     map_ws.update(values=map_grid, range_name=map_rng, value_input_option="USER_ENTERED")
 
     # IN
     in_rows = in_ws.get_all_values()
     in_a = [r[0] if r else "" for r in in_rows]
     in_start = find_last_data_row([[v] for v in in_a]) + 1
-    in_grid = [[f"{idx}{suffix}", combo_label(idx)] for idx in range(1, 12)]
-    in_rng = f"A{in_start}:B{in_start + 10}"
+    in_grid = [[f"{idx}{suffix}", combo_label(idx)] for idx in range(1, n + 1)]
+    in_rng = f"A{in_start}:B{in_start + n - 1}"
     in_ws.update(values=in_grid, range_name=in_rng, value_input_option="USER_ENTERED")
 
     return map_rng, in_rng
@@ -271,7 +272,7 @@ def main(argv=None):
     suffix = find_active_version(map_a_col)
     print(f"  MAP 활성 버전 접미사: {suffix!r} (' ' = 월초 접미사 없음)")
     if suffix is None:
-        print("  ⚠️ MAP A열에 1~11번 행 없음 — 월초 리셋 필요할 수 있음")
+        print("  ⚠️ MAP A열에 1~16번 행 없음 — 월초 리셋 필요할 수 있음")
         return 1
 
     # 3) 활성 버전 행 읽기
