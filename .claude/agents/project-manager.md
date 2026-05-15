@@ -85,7 +85,7 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    - 차이 있으면 dry-run 출력 → 사용자 confirm 후 `--apply`로 새 버전 생성 (가이드 섹션 14-1 절차)
 
 4. **2단계 현대Hmall** (Phase 2 — 스크립트 미완성)
-   - 임시: `rate-check/_tmp/hmall_all.py` 패턴 참고하여 `hmall_config.json` 첫 계정 로그인 → 카드 즉시할인 1회 확인 → 7상품 페이지에서 정가×0.9 검증 → 카드별 최종구매가 수학 계산 → "{M.DD}" 탭 행 65~ 이어쓰기
+   - 임시: `rate-check/_tmp/hmall_all.py` 패턴 참고하여 `hmall_config.json` 첫 계정 로그인 → 카드 즉시할인 후보 1회 확인 → **11조합 × 카드별 결제 페이지 진입해서 캐러셀 즉시할인 금액 실측** → 페이백 적용 → "{M.DD}" 탭 행 65~ 이어쓰기. 추증/GWP는 `_common.load_today_composition()` 으로 갤러리아 결과 재사용 (하드코딩 X)
    - 향후: `python3 rate-check/hmall.py`로 자동화 예정
 
 5. **3단계 롯데홈쇼핑** (Phase 2 — 스크립트 미완성)

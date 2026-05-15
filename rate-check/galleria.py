@@ -128,8 +128,8 @@ def scrape_product(driver, code: str, goods_no: str, *, max_retry: int = 1) -> d
 # ============================================================
 SET_COMBINE_RULES = [
     # (요구되는 raw 키워드 set, 결합 결과 (정식이름, 가격, s코드))
-    ({"자음생수", "자음생유액"}, ("자음생수25ml자음생유액25ml", 4_100, "s07")),
-    ({"자음수", "자음유액"}, ("자음수15ml자음유액15ml", 2_100, "s04")),
+    ({"자음생수", "자음생유액"}, ("자음생수25ml자음생유액25ml", 4_900, "s07")),
+    ({"자음수", "자음유액"}, ("자음수15ml자음유액15ml", 3_300, "s04")),
 ]
 
 # 번들 라인 패턴 — "X종 GWP", "X종 포함", "구성품" 등
@@ -308,8 +308,8 @@ def emit_gwp_pending(date: str, image_path: Path) -> int:
 # gspread 입력 — 갤러리아 섹션 (행 1~60)
 # ============================================================
 def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
-                           combos: list[dict], ranked: list[dict], tab: str) -> str:
-    rows: list[list] = [[""] for _ in range(60)]
+                           combos: list[dict], tab: str) -> str:
+    rows: list[list] = [[""] for _ in range(45)]
 
     def setrow(idx, *vals):
         rows[idx] = list(vals)
@@ -349,24 +349,23 @@ def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
     if new_alerts:
         setrow(17 + max_samples, "⚠️ 신규품목 (단가미정)", *new_alerts)
 
-    # 조합 순위표 (헤더 29, 데이터 30~)
-    setrow(28, "[70~72만원 조합 (11개) — 갤러리아몰 공급률]")
-    setrow(29, "순위", "조합", "소비자가", "추가증정", "GWP가치", "총샘플가치", "최종구매가", "순구매가", "공급률")
-    for i, r in enumerate(ranked):
-        setrow(30 + i,
-               r["rank"], r["name"],
-               f"{r['소비자가']:,}", f"{r['추가증정']:,}", f"{r['gwp_value']:,}",
-               f"{r['총샘플']:,}", f"{r['최종구매가']:,}", f"{r['순구매가']:,}",
-               f"{r['공급률']:.4f}")
-
-    # 공급률 요약 도표 (헤더 45, 데이터 46~)
-    setrow(42, "[조합별 공급률 분석 - 네이버구매할인 적용]")
-    setrow(45, "순위", "조합", "소비자가", "총샘플가치", "네이버최종구매가", "순구매가", "공급률")
-    for i, r in enumerate(ranked):
-        setrow(46 + i,
-               r["rank"], r["name"],
-               r["소비자가"], r["총샘플"], r["최종구매가"], r["순구매가"],
-               round(r["공급률"], 4))
+    # 11개 조합 공급률 요약 (헤더 29, 데이터 30~) — 조합번호 1~11 순
+    # A~G열: 조합 요약 / I~K열: 상품별 쿠폰율 (b~h, 첫 7행)
+    setrow(28, "[11개 조합 공급률 요약 - 갤러리아몰]", "", "", "", "", "", "",
+           "", "[상품별 쿠폰율]")
+    setrow(29, "조합번호", "조합", "소비자가", "총샘플가치", "네이버최종구매가", "순구매가", "공급률",
+           "", "상품", "기본할인%", "쿠폰%")
+    for i, r in enumerate(combos):
+        row_data = [r["idx"], r["name"], r["소비자가"], r["총샘플"],
+                    r["최종구매가"], r["순구매가"], round(r["공급률"], 4)]
+        if i < len(C.PRODUCT_CODES):
+            code = C.PRODUCT_CODES[i]
+            p = products[code]
+            row_data += ["",
+                         f"{code} {C.PRODUCTS[code]['name']}",
+                         f"{p.basic_discount_pct:.0f}%",
+                         f"{p.coupon_pct:.0f}%"]
+        setrow(30 + i, *row_data)
 
     return C.write_grid(ws, 1, rows)
 
@@ -444,16 +443,14 @@ def main(argv=None):
         print(f"\n  --only {args.only} → 11조합 계산/시트 입력 생략")
         return 0
 
-    # 11개 조합 계산
+    # 11개 조합 계산 (조합번호 1~11 순)
     rows_list = [C.galleria_combo(i + 1, c, products, gwp) for i, c in enumerate(C.COMBOS)]
-    C.rank_by_rate(rows_list)
-    ranked = sorted(rows_list, key=lambda r: r["공급률"])
 
     # 표 출력
     print()
-    print(f"  {'idx':>3} {'조합':40s} {'소비자가':>10s} {'추증':>8s} {'GWP':>8s} {'총샘플':>8s} {'최종':>10s} {'순':>10s} {'공급률':>7s} {'순위':>3s}")
+    print(f"  {'idx':>3} {'조합':40s} {'소비자가':>10s} {'추증':>8s} {'GWP':>8s} {'총샘플':>8s} {'최종':>10s} {'순':>10s} {'공급률':>7s}")
     for r in rows_list:
-        print(f"  {r['idx']:>3d} {r['name'][:40]:40s} {r['소비자가']:>10,d} {r['추가증정']:>8,d} {r['gwp_value']:>8,d} {r['총샘플']:>8,d} {r['최종구매가']:>10,d} {r['순구매가']:>10,d} {r['공급률']:>6.4f} {r['rank']:>3d}")
+        print(f"  {r['idx']:>3d} {r['name'][:40]:40s} {r['소비자가']:>10,d} {r['추가증정']:>8,d} {r['gwp_value']:>8,d} {r['총샘플']:>8,d} {r['최종구매가']:>10,d} {r['순구매가']:>10,d} {r['공급률']:>6.4f}")
 
     # today_composition_{date}.json 저장 (inventory.py 가 사용)
     composition_path = C.TMP_DIR / f"today_composition_{today}.json"
@@ -483,7 +480,7 @@ def main(argv=None):
         "combos": [{"idx": r["idx"], "name": r["name"],
                     "소비자가": r["소비자가"], "총샘플": r["총샘플"],
                     "최종구매가": r["최종구매가"], "순구매가": r["순구매가"],
-                    "공급률": round(r["공급률"], 4), "rank": r["rank"]}
+                    "공급률": round(r["공급률"], 4)}
                    for r in rows_list],
     }
     composition_path.parent.mkdir(parents=True, exist_ok=True)
@@ -501,7 +498,7 @@ def main(argv=None):
     ws = C.get_or_create_tab(sh, tab, leftmost=True)
     # 갤러리아 영역(행 1~60)만 비우고 쓰기 — 65~ Hmall, 100~ 롯데는 보존
     ws.batch_clear(["A1:Z60"])
-    rng = write_galleria_section(ws, products, gwp, rows_list, ranked, tab)
+    rng = write_galleria_section(ws, products, gwp, rows_list, tab)
     print(f"  → {rng}")
     print(f"  URL: https://docs.google.com/spreadsheets/d/{C.RATE_SHEET_ID}/edit#gid={ws.id}")
     return 0

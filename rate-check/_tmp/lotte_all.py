@@ -10,7 +10,7 @@ from selenium.webdriver.chrome.options import Options
 import gspread
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from _common import combo_label_ko
+from _common import combo_label_ko, load_today_composition
 
 opts = Options()
 opts.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
@@ -122,8 +122,12 @@ COMBOS = [
     [('b',2),('d',2)], [('e',2),('f',2)], [('c',3),('h',1)], [('c',3),('d',2)],
     [('c',1),('f',4)], [('c',2),('f',3)], [('f',5)],
 ]
-ADD_GIFT = {'b':16700,'c':8300,'d':15100,'e':16700,'f':15800,'g':18800,'h':22500}
-GWP_6 = 82_800
+# 당일 추가증정가치/GWP — galleria 출력 JSON에서 로드 (하드코딩 X, 당일 계산 원칙)
+_comp = load_today_composition()
+ADD_GIFT = {c: _comp["products"][c]["add_gift_value"] for c in "bcdefgh"}
+GWP_6 = _comp["gwp"]["6set_value"]
+print(f"당일 추증가치: {ADD_GIFT}")
+print(f"당일 GWP 6세트: {GWP_6:,}원")
 
 def compute(combo):
     소비자 = sum(PRICES[c]*q for c,q in combo)
@@ -146,15 +150,12 @@ for i, combo in enumerate(COMBOS, start=1):
     r = compute(combo)
     r['idx'] = i; r['combo'] = combo
     rows.append(r)
-rows_sorted = sorted(rows, key=lambda r: r['공급률'])
-for rk, r in enumerate(rows_sorted, start=1):
-    r['rank'] = rk
 
-print(f"\n{'idx':3s} {'조합':22s} {'소비자':>8s} {'쿠폰합':>7s} {'카드후':>8s} {'적립':>5s} {'순':>8s} {'공급률':>7s} {'순위':>3s}")
+print(f"\n{'idx':3s} {'조합':22s} {'소비자':>8s} {'쿠폰합':>7s} {'카드후':>8s} {'적립':>5s} {'순':>8s} {'공급률':>7s}")
 for r in rows:
     cn = combo_label_ko(r['combo'])
     # rough coupon avg display
-    print(f"{r['idx']:3d} {cn:22s} {r['소비자가']:>8,d} {'':>7s} {r['최종']:>8,d} {r['적립']:>5,d} {r['순']:>8,d} {r['공급률']:>6.4f} {r['rank']:>3d}")
+    print(f"{r['idx']:3d} {cn:22s} {r['소비자가']:>8,d} {'':>7s} {r['최종']:>8,d} {r['적립']:>5,d} {r['순']:>8,d} {r['공급률']:>6.4f}")
 
 # === gspread 이어쓰기: 행 100~ ===
 gc = gspread.service_account(filename='/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/gen-lang-client-0553550811-4b553902b0d0.json')
@@ -170,10 +171,16 @@ data.append([f"상품별 쿠폰: {coupon_str}"])
 data.append([f"카드 청구할인: {CARD_NAME} {CARD_PCT}% (페이백 {round(PAYBACK*100,1)}%)"])
 data.append([f"적립금(상품별 max): {rewards}"])
 data.append([])
-data.append(['순위','조합','소비자가','추증','GWP','총샘플','적립','최종구매가','순구매가','공급률'])
-for r in rows_sorted:
+data.append(['조합번호','조합','소비자가','추증','GWP','총샘플','적립','최종구매가','순구매가','공급률',
+             '', '상품', '쿠폰%'])
+for i, r in enumerate(rows):
     cn = combo_label_ko(r['combo'])
-    data.append([r['rank'], cn, r['소비자가'], r['추증'], GWP_6, r['총샘플'], r['적립'], r['최종'], r['순'], round(r['공급률'],4)])
+    row = [r['idx'], cn, r['소비자가'], r['추증'], GWP_6, r['총샘플'], r['적립'], r['최종'], r['순'], round(r['공급률'],4)]
+    if i < 7:
+        code = 'bcdefgh'[i]
+        cp = coupons.get(code) or 0
+        row += ['', code, f"{cp}%"]
+    data.append(row)
 
 maxc = max(len(r) for r in data)
 for r in data:

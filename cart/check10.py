@@ -58,6 +58,101 @@ EVERYDAY_PAYBACK_CARDS = [
 ]
 
 
+def derive_alias_result(base: dict, prod: dict) -> dict:
+    """alias 상품(같은 URL, 다른 옵션)을 base의 benefit_ratio 로 derive.
+
+    핵심:
+    1. base의 benefit_ratio = base.benefit_unit_price / base.unit_list_price (대표옵션 우수가/정가)
+    2. alias.unit_list_price (옵션의 1개당 정가) × benefit_ratio = alias 1개당 혜택가
+    3. 5만원 임계 미달이면 qty 자동 증가 (카드 즉시할인 5만원 이상에만 적용)
+    4. H = 혜택가 × qty × (1 - 즉시할인%) — base 카드 슬라이드 재사용
+    5. I = (H × 페이백계수) - 적립금(H 기준) — _compute_reward로 산출
+
+    prod 에 unit_list_price 가 없으면 (=옵션가 미상) → 옛 동작(clone) 폴백 + 경고.
+    """
+    base_pay = base.get("payment") or {}
+    unit_list = prod.get("unit_list_price")
+    base_list_total = base_pay.get("list_price")
+    base_qty = base_pay.get("qty") or 1
+    base_benefit = base_pay.get("benefit_unit_price")
+
+    # ★ unit_list_price 미지정이면 base.options 에서 option_keyword 로 자동 lookup
+    if not unit_list and prod.get("option_keyword"):
+        opts = base_pay.get("options") or []
+        kw = prod["option_keyword"]
+        matched = next((o for o in opts if kw in (o.get("name") or "")), None)
+        if matched:
+            unit_list = matched["list_price"]
+            print(f"     ⓘ #{prod['id']} 옵션 자동매칭: '{matched['name'][:35]}' [선택 {matched.get('idx')}] = {unit_list:,}원")
+
+    if not unit_list or not base_list_total or not base_benefit:
+        # 폴백: 옛 동작 (clone) — 경고 출력
+        print(f"     ⚠️ alias #{prod['id']} unit_list_price 못찾음 (옵션 키워드 '{prod.get('option_keyword')}' 매칭 실패) → clone 폴백")
+        cloned = dict(base)
+        cloned["id"] = prod["id"]
+        cloned["name"] = prod["name"]
+        cloned["alias_of"] = prod.get("alias_of")
+        return cloned
+
+    # benefit_ratio = 대표옵션 우수가 / 대표옵션 정가
+    base_unit_list_price = base_list_total / base_qty
+    benefit_ratio = base_benefit / base_unit_list_price
+    alias_benefit_unit = round(unit_list * benefit_ratio)
+
+    # 5만원 임계 자동 qty 증가
+    qty = 1
+    while alias_benefit_unit * qty < 50000:
+        qty += 1
+        if qty > 99:
+            break
+    member = alias_benefit_unit * qty
+
+    # 카드 슬라이드는 base 결과 재사용 (같은 URL이라 같은 카드 즉시할인 적용)
+    card_slides = base_pay.get("card_slides") or []
+    pick_slide = next((s for s in card_slides if "카카오" in (s.get("text") or "")), None)
+    if not pick_slide:
+        with_pct = [s for s in card_slides if s.get("percent")]
+        if with_pct:
+            pick_slide = max(with_pct, key=lambda s: s.get("percent") or 0)
+
+    payment = {
+        "qty": qty,
+        "list_price": int(unit_list * qty),
+        "benefit_unit_price": alias_benefit_unit,
+        "member_price": member,
+        "card_slides": card_slides,
+        "kakao_price": None,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": None,
+        "paybacks": {},
+        "error": None,
+    }
+
+    if pick_slide and pick_slide.get("percent") and member > 0:
+        imm_pct = pick_slide["percent"] / 100
+        slide_text = pick_slide.get("text") or ""
+        pb_pct = 0
+        for name, pct in EVERYDAY_PAYBACK_CARDS:
+            short = name.replace("카드", "")
+            if name in slide_text or short in slide_text:
+                pb_pct = pct
+                break
+        imm_price = round(member * (1 - imm_pct))
+        after_payback = round(imm_price * (1 - pb_pct))
+        rw = _compute_reward(imm_price, base.get("tiers") or [], base.get("simple_ranges") or [])
+        payment["kakao_price"] = imm_price
+        payment["kakao_reward_pt"] = rw
+        payment["kakao_final_cost"] = after_payback - rw
+
+    out = dict(base)
+    out["id"] = prod["id"]
+    out["name"] = prod["name"]
+    out["alias_of"] = prod.get("alias_of")
+    out["url"] = ITEM_URL_FMT.format(slitmCd=prod["slitmCd"], extra=prod.get("url_extra", ""))
+    out["payment"] = payment
+    return out
+
+
 def _compute_reward(price: int | None, tiers: list[dict], simple_ranges: list[dict] | None = None) -> int:
     """price 가 어느 구간에 도달하는지로 reward 결정.
     - tier-based: applicable tier 중 max reward
@@ -82,7 +177,7 @@ PRODUCTS = [
     {"id": 2,  "name": "하루견과 초록색 100봉",                "slitmCd": "2151046312", "url_extra": "&sectId=3059445"},
     {"id": 3,  "name": "하루견과 갈색 100봉",                 "slitmCd": "2225431602", "url_extra": "&sectId=3059445"},
     {"id": 4,  "name": "곡물도감 곡물서리태",                  "slitmCd": "2227834416", "url_extra": "&sectId=3059445"},
-    {"id": 5,  "name": "말차 (4와 동일 URL)",                  "slitmCd": "2227834416", "url_extra": "&sectId=3059445", "alias_of": 4},
+    {"id": 5,  "name": "말차 (4와 동일 URL, 옵션 다름)",        "slitmCd": "2227834416", "url_extra": "&sectId=3059445", "alias_of": 4,  "option_keyword": "말차", "unit_list_price": 99_900},  # codegen 5/15 확정 [선택 2] = 곡물도감 말차 서리태...
     {"id": 6,  "name": "레놉티",                             "slitmCd": "2244138695", "url_extra": "&sectId=3059445"},
     {"id": 7,  "name": "락토핏",                             "slitmCd": "2151878435", "url_extra": ""},
     {"id": 8,  "name": "이디야 디카페인",                      "slitmCd": "2244409628", "url_extra": "&sectId=3059445"},
@@ -90,8 +185,10 @@ PRODUCTS = [
     {"id": 10, "name": "이경제 더힘찬녹용 30포",                "slitmCd": "2240802022", "url_extra": "&ordpreview=true"},
     {"id": 11, "name": "라메종드미엘 프랑스 라벤더 천연꿀 8병",   "slitmCd": "2246845189", "url_extra": "&sectId=3059445"},
     {"id": 12, "name": "갱년기 다이어트 리얼퀸 3병",            "slitmCd": "2202276847", "url_extra": "&sectId=3059445"},
-    {"id": 13, "name": "GRN 핑크 초록이 (12와 동일)",           "slitmCd": "2202276847", "url_extra": "",                "alias_of": 12},
-    {"id": 14, "name": "GRN 곰돌이 (12와 동일)",                "slitmCd": "2202276847", "url_extra": "&sectId=3059445", "alias_of": 12},
+    # codegen 5/15 확정: [선택 2]="[GRN] 벨리곰 콜라보 분홍이 초록이 SET"=26,900 / [선택 3]="GRN 흡수빠른 쾌변다이어트"=17,800
+    # 사용자 5/15 확정: #13 핑크초록이 = #14 곰돌이 = 둘 다 [선택 2] 벨리곰 = 26,900 (sectId만 다름 — 캠페인 추적용)
+    {"id": 13, "name": "GRN 핑크 초록이 (12와 동일 URL, [선택 2] 벨리곰)", "slitmCd": "2202276847", "url_extra": "",                "alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": 26900},
+    {"id": 14, "name": "GRN 곰돌이 (12와 동일 URL, [선택 2] 벨리곰)",      "slitmCd": "2202276847", "url_extra": "&sectId=3059445", "alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": None},  # auto-lookup → 26,900
     {"id": 15, "name": "셀게이트 글루타치온 30p",               "slitmCd": "2244515588", "url_extra": ""},
     {"id": 16, "name": "루솔",                               "slitmCd": "2225275921", "url_extra": ""},
     {"id": 17, "name": "데이즈온 원데이 알파 18개",             "slitmCd": "2247036059", "url_extra": "&sectId=3059445"},
@@ -420,28 +517,73 @@ def _click_coupon(page: Page) -> None:
         pass
 
 
-def _execute_buy_now(page: Page, qty: int) -> bool:
-    """구매하기 → 옵션[선택 1] → qty + → 바로구매 → /order 페이지 도달 확인."""
+def _execute_buy_now(page: Page, qty: int, option_keyword: str | None = None) -> tuple[bool, list[dict]]:
+    """구매하기 → (옵션 모두 스크랩) → 옵션 선택 → qty + → 바로구매 → /order 페이지 도달 확인.
+
+    Returns (success, options).
+    options: [{idx, name, list_price}] — 옵션 패널의 모든 선택지 (alias unit_list_price 자동 보충용)
+    option_keyword: 지정 시 해당 키워드 포함 옵션 클릭. None이면 [선택 1] (대표).
+    """
     try:
         page.locator("button.btn-purchase").first.click()
         page.wait_for_timeout(1500)
     except Exception:
-        return False
+        return False, []
+
+    # ★ 옵션 패널 등장 → 모든 옵션 (idx/name/price) 스크랩 (codegen 확인: <a> with [선택 N] prefix + ...,...원 끝)
     try:
-        opt = page.locator("span.choice-num.title").filter(has_text="[선택 1]").first
+        options = page.evaluate("""() => {
+            const out = [];
+            const links = document.querySelectorAll('a');
+            for (const a of links) {
+                const text = (a.textContent || '').trim().replace(/\\s+/g, ' ');
+                const m = text.match(/\\[선택\\s*(\\d+)\\][^\\d]*?([\\d,]+)\\s*원/);
+                if (m) {
+                    const name = text.replace(/\\[선택\\s*\\d+\\]/, '').replace(/[\\d,]+\\s*원.*$/, '').trim();
+                    out.push({ idx: parseInt(m[1]), name: name, list_price: parseInt(m[2].replace(/,/g, '')) });
+                }
+            }
+            // 중복 제거 (같은 idx는 첫 출현만)
+            const seen = new Set();
+            return out.filter(o => { if (seen.has(o.idx)) return false; seen.add(o.idx); return true; });
+        }""") or []
+    except Exception:
+        options = []
+
+    # 옵션 클릭 — keyword 우선, 없으면 [선택 1]
+    try:
+        if option_keyword:
+            opt = page.locator("a").filter(has_text=option_keyword).first
+        else:
+            opt = page.locator("a").filter(has_text=re.compile(r"\[선택\s*1\]")).first
         if opt.count() > 0:
             opt.click()
             page.wait_for_timeout(700)
+        elif options and not option_keyword:
+            # fallback: span.choice-num.title (옛 DOM 잔존 가능성)
+            sp = page.locator("span.choice-num.title").filter(has_text="[선택 1]").first
+            if sp.count() > 0:
+                sp.click()
+                page.wait_for_timeout(700)
     except Exception:
         pass
+
     if qty > 1:
         try:
-            plus = page.locator("button.btn-plus").first
+            # codegen 확인: 팝업 + 버튼은 텍스트 "증가"
+            plus = page.get_by_role("button", name="증가").first
             for _ in range(qty - 1):
                 plus.click()
                 page.wait_for_timeout(180)
         except Exception:
-            pass
+            # fallback: 옛 클래스 button.btn-plus
+            try:
+                plus = page.locator("button.btn-plus").first
+                for _ in range(qty - 1):
+                    plus.click()
+                    page.wait_for_timeout(180)
+            except Exception:
+                pass
     clicked = page.evaluate("""
         () => {
             const buyNow = Array.from(document.querySelectorAll('button'))
@@ -451,13 +593,13 @@ def _execute_buy_now(page: Page, qty: int) -> bool:
         }
     """)
     if not clicked:
-        return False
+        return False, options
     try:
         page.wait_for_load_state("domcontentloaded", timeout=20000)
     except Exception:
         pass
     page.wait_for_timeout(3500)
-    return "/order" in (page.url or "")
+    return ("/order" in (page.url or "")), options
 
 
 def _extract_order_page(page: Page) -> dict:
@@ -686,7 +828,10 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
         out["benefit_unit_price"] = benefit_unit  # 1개 기준 혜택가
 
         _click_coupon(page)
-        if not _execute_buy_now(page, qty):
+        # base는 [선택 1] 클릭, alias는 자기 option_keyword 사용
+        ok, options = _execute_buy_now(page, qty, option_keyword=prod.get("option_keyword"))
+        out["options"] = options  # alias derive 시 unit_list_price 자동 lookup용
+        if not ok:
             out["error"] = "바로구매 실패"
             return out
 
@@ -712,10 +857,11 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
             continue
         break
 
-    # ── I열/J열 (즉시할인가 / 실비) — 수식 기반 ──
-    # I = 우수가 × (1 - 금일 즉시할인%)
+    # ── H열/I열 (즉시할인가 / 실비) — 수식 기반 ──
+    # H = 우수가 × (1 - 금일 즉시할인%)
     # 즉시할인% 결정: card_slides 중 카카오페이 우선 → 없으면 max % 슬라이드
-    # J = I × (1 - 카드페이백%) - 적립금(I 가격 기준)
+    # I = H × (1 - 카드페이백%) - 적립금(H 가격 기준)
+    #   ★ 적립금은 H(즉시할인가) 기준 — 페이백은 별도 환급이라 결제 시점 금액은 H
     member = out.get("member_price") or 0
     pick_slide = kakao_slide
     if not pick_slide:
@@ -732,14 +878,14 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
             if name in slide_text or short in slide_text:
                 pb_pct = pct
                 break
-        # I = 우수가 × (1 - 즉시할인%)
+        # H = 우수가 × (1 - 즉시할인%)
         imm_price = round(member * (1 - imm_pct))
-        # J = round(I × (1 - 페이백%)) - 적립(at J가 아닌 I 가격 기준 = 결제금액 기준)
+        # I = round(H × (1 - 페이백%)) - 적립금(H 가격 기준)
         after_payback = round(imm_price * (1 - pb_pct))
-        rw = _compute_reward(after_payback, tiers, simple_ranges)
-        out["kakao_price"] = imm_price        # I열 — "즉시할인가" 라벨
+        rw = _compute_reward(imm_price, tiers, simple_ranges)  # ★ H 기준 (페이백 적용 전)
+        out["kakao_price"] = imm_price        # H열 — "즉시할인가"
         out["kakao_reward_pt"] = rw
-        out["kakao_final_cost"] = after_payback - rw   # J열 — "실비" 라벨
+        out["kakao_final_cost"] = after_payback - rw   # I열 — "실비"
 
     # 페이백 5개 카드 — 카드할인 슬라이드에 등장한 경우에만 적용
     # (예: 어느 날 슬라이드에 '롯데 7%즉시할인' 가 뜨면 → 즉시할인가 × 0.98 - 적립)
@@ -753,7 +899,7 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
             short = name.replace("카드", "")
             if name in text or short in text:
                 after = round(imm * (1 - pct))
-                rw = _compute_reward(after, tiers, simple_ranges)
+                rw = _compute_reward(imm, tiers, simple_ranges)  # ★ H(즉시할인가) 기준
                 out["paybacks"][name] = {
                     "immediate_price": imm,
                     "payback_pct": pct * 100,
@@ -979,7 +1125,7 @@ def _run(context, acc) -> int:
         return 1
     print(f"[OK] 로그인")
 
-    # 중복 URL은 한 번만 체크 (alias_of 처리)
+    # 중복 URL은 base 한 번만 페이지 방문, alias는 base의 benefit_ratio + 자기 옵션 unit_list_price로 derive
     cache: dict[str, dict] = {}
     results: list[dict] = []
     products_to_run = PRODUCTS[:1] if os.environ.get("DEBUG_ORDER") else PRODUCTS
@@ -987,12 +1133,15 @@ def _run(context, acc) -> int:
         if prod.get("alias_of"):
             base = next((r for r in results if r["id"] == prod["alias_of"]), None)
             if base:
-                cloned = dict(base)
-                cloned["id"] = prod["id"]
-                cloned["name"] = prod["name"]
-                cloned["alias_of"] = prod["alias_of"]
-                results.append(cloned)
-                print(f"  #{prod['id']:>3} (alias of #{prod['alias_of']}) 건너뜀, 동일 결과 적용")
+                derived = derive_alias_result(base, prod)
+                results.append(derived)
+                p = derived.get("payment") or {}
+                tag = "✓" if derived.get("ten_percent") else "✗"
+                print(f"  #{prod['id']:>3} (alias of #{prod['alias_of']}) derive: "
+                      f"unit_list={prod.get('unit_list_price') or '?'} "
+                      f"benefit_unit={p.get('benefit_unit_price') or '?'} "
+                      f"qty={p.get('qty') or '?'} "
+                      f"H={p.get('kakao_price') or '?'} I={p.get('kakao_final_cost') or '?'} {tag}")
                 continue
 
         print(f"  #{prod['id']:>3} {prod['name'][:30]:30s} 검사 중...", flush=True)
