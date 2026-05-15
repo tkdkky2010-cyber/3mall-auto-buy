@@ -312,7 +312,8 @@ def emit_gwp_pending(date: str, image_path: Path) -> int:
 # ============================================================
 def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
                            combos: list[dict], tab: str) -> str:
-    rows: list[list] = [[""] for _ in range(45)]
+    # ★ galleria 영역 = 행 1~43. 44~ Hmall, 62~ 롯데 침범 금지.
+    rows: list[list] = [[""] for _ in range(43)]
 
     def setrow(idx, *vals):
         rows[idx] = list(vals)
@@ -485,8 +486,9 @@ def main(argv=None):
     gc = C.gs_client()
     sh = gc.open_by_key(C.RATE_SHEET_ID)
     ws = C.get_or_create_tab(sh, tab, leftmost=True)
-    # 갤러리아 영역(행 1~60)만 비우고 쓰기 — 65~ Hmall, 100~ 롯데는 보존
-    ws.batch_clear(["A1:Z60"])
+    # 갤러리아 영역(행 1~43)만 비우고 쓰기 — 44~ Hmall, 62~ 롯데는 보존.
+    # ★ 시트 layout은 RULES.md §13 참고: galleria 1~45 / hmall 44~60 / lotte 62~79.
+    ws.batch_clear(["A1:I43"])
     rng = write_galleria_section(ws, products, gwp, rows_list, tab)
     print(f"  → {rng}")
     print(f"  URL: https://docs.google.com/spreadsheets/d/{C.RATE_SHEET_ID}/edit#gid={ws.id}")

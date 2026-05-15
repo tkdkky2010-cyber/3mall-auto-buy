@@ -1,10 +1,14 @@
-"""Hmall 공급률 분석 — 11조합 실제 체크아웃 페이지 가격 기반 (2026-05-15 신규).
+"""Hmall 공급률 분석 — 11조합 실제 체크아웃 페이지 가격 기반.
 
-기존 _tmp/hmall_all.py (정가 × 0.9 × 카드% 수식)는 폐기.
-새 흐름: 조합별로 실제 cart→checkout 진입 → 카드할인 캐러셀에서
+⚠️ 상태: 미사용 (active script는 rate-check/_tmp/hmall_all.py).
+   본 파일은 향후 통합용 초안. 실행 전 _tmp/hmall_all.py 와 기능 비교/병합 필요.
+
+흐름: 조합별로 실제 cart→checkout 진입 → 카드할인 캐러셀에서
 가장 높은 할인율 카드의 미리보기 가격을 구매가격으로 사용. 페이백 카드면 계수 곱.
 
 결제하기 절대 클릭 X — rate check 전용.
+
+레이아웃 (RULES.md §13): A44:M60 — galleria 1~43, lotte 62~79 와 분리.
 
 사용:
     python3 rate-check/hmall.py             # 11조합 전체 (5~10분)
@@ -200,11 +204,11 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
 
 
 def write_sheet(results: list[dict], tab: str):
-    """시트 "{M.DD}" 탭 행 65~ 입력."""
+    """시트 "{M.DD}" 탭 행 44~ 입력 (RULES.md §13 layout)."""
     gc = C.gs_client()
     sh = gc.open_by_key(C.RATE_SHEET_ID)
     ws = C.get_or_create_tab(sh, tab, leftmost=True)
-    ws.batch_clear(["A65:M84"])
+    ws.batch_clear(["A44:M60"])
 
     rows = [
         ["━━━━ 2단계: 현대Hmall 공급률 분석 (체크아웃 페이지 캐러셀 가격) ━━━━"],
@@ -225,8 +229,8 @@ def write_sheet(results: list[dict], tab: str):
             r["card_brand"], f"{r['card_pct']}%", f"{r['payback_pct']*100:.1f}%",
             r["preview_price"], r["구매가격"], r["순구매가"], r["공급률"],
         ])
-    C.write_grid(ws, 65, rows)
-    print(f"  → 시트 입력: A65:M{65+len(rows)-1}")
+    C.write_grid(ws, 44, rows)
+    print(f"  → 시트 입력: A44:M{44+len(rows)-1}")
 
 
 def main(argv=None):

@@ -85,12 +85,14 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    - 차이 있으면 dry-run 출력 → 사용자 confirm 후 `--apply`로 새 버전 생성 (가이드 섹션 14-1 절차)
 
 4. **2단계 현대Hmall** (Phase 2 — 스크립트 미완성)
-   - 임시: `rate-check/_tmp/hmall_all.py` 패턴 참고하여 `hmall_config.json` 첫 계정 로그인 → 카드 즉시할인 후보 1회 확인 → **11조합 × 카드별 결제 페이지 진입해서 캐러셀 즉시할인 금액 실측** → 페이백 적용 → "{M.DD}" 탭 행 65~ 이어쓰기. 추증/GWP는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet에서 직접 읽음 (캐시 X — sheet가 SoT)
-   - 향후: `python3 rate-check/hmall.py`로 자동화 예정
+   - 임시: `rate-check/_tmp/hmall_all.py` 패턴 참고하여 `hmall_config.json` 첫 계정 로그인 → 카드 즉시할인 후보 1회 확인 → **11조합 × 카드별 결제 페이지 진입해서 캐러셀 즉시할인 금액 실측** → 페이백 적용 → "{M.DD}" 탭 행 44~ 이어쓰기 (RULES.md §13 layout). 추증/GWP는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet에서 직접 읽음 (캐시 X — sheet가 SoT)
+   - 향후: `python3 rate-check/hmall.py`로 자동화 예정 (현재 초안만 있음, 미사용)
 
 5. **3단계 롯데홈쇼핑** (Phase 2 — 스크립트 미완성)
-   - 임시: `rate-check/_tmp/lotte_all.py` + `rate-check/_check_lotte_reward.py all` 호출
-   - **알려진 이슈** (회고 #6/#7): 페이백 5종 카드 검출 누락 가능, 7% 28만원 한도 미반영. 결과 검토 시 주의.
+   - 임시: `rate-check/_tmp/lotte_all.py` + `rate-check/_check_lotte_reward.py all` 호출 (행 62~ 입력)
+   - **알려진 이슈**:
+     - 적립금 정규식 (`_check_lotte_reward.py`) 이 단일 tier만 잡고 상위 tier 누락 가능. 7개 상품이 전부 동일한 값으로 나오면 의심 → 이벤트 페이지에서 최대 구간 직접 확인, 시트 G69:J79 + M2:M12 수동 패치 (RULES.md §7)
+     - 페이백 5종 카드 검출 누락 가능, 청구할인 한도 미반영 — 결과 검토 시 주의
    - 향후: `python3 rate-check/lotte.py`로 자동화 예정
 
 사용자에게 한 줄 요약 보고("Step 1 완료: 11개 조합 공급률 {min}~{max}, 신규 품목 N개") 후 Step 2로.

@@ -165,6 +165,15 @@ try:
             for code in 'bcdefgh':
                 rewards[code] = rd.get(code, {}).get('total_max', 0)
             print(f"적립금 (subprocess): {rewards}")
+            # ★ 알려진 한계: _check_lotte_reward.py 정규식이 단일 tier만 잡고
+            #    상위 tier (예: 더 큰 구간 적립) 를 놓치는 경우가 있음.
+            #    7개 상품이 전부 동일한 값 → 단일 이벤트 검출 가능성 高.
+            #    이런 경우 실제 적립 이벤트 페이지에서 최대 구간 확인 후
+            #    시트 G69:G79 / I69:I79 / J69:J79 / M2:M12 수동 패치 필요.
+            uniq_vals = set(rewards.values())
+            if len(uniq_vals) == 1 and 0 not in uniq_vals:
+                print(f"⚠️ 적립금 7개 상품 동일 ({uniq_vals.pop():,}원) — 상위 tier 누락 가능. "
+                      f"이벤트 페이지 직접 확인 권장 (RULES.md §7 참고).")
         else:
             print("⚠️ _check_lotte_reward stdout JSON_DUMP 못 찾음 — 적립금 0으로 처리")
     else:
@@ -229,7 +238,7 @@ for r in rows:
     # rough coupon avg display
     print(f"{r['idx']:3d} {cn:22s} {r['소비자가']:>8,d} {'':>7s} {r['최종']:>8,d} {r['적립']:>5,d} {r['순']:>8,d} {r['공급률']:>6.4f}")
 
-# === gspread 이어쓰기: 행 100~ ===
+# === gspread 이어쓰기: 행 62~ (RULES.md §13 layout) ===
 gc = gs_client()
 sh = gc.open_by_key(RATE_SHEET_ID)
 ws = sh.worksheet(today_tab_name())
