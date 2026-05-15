@@ -1,7 +1,11 @@
 """롯데홈쇼핑 stage — 7개 상품 쿠폰% + 카드할인 + 11개 조합 공급률 계산 + 시트 이어쓰기.
 
-적립 데이터는 _check_lotte_reward.py 출력 _lotte_reward_dump.json 사용 (별도 실행).
-이 스크립트는 쿠폰%/카드만 자동, 적립은 0으로 초기화 후 사용자 확인.
+흐름:
+- 쿠폰%: 상품 페이지 쿠폰받기 클릭 → 팝업 안의 가장 위 (다운로드 가능 최대) 쿠폰만 읽음 (배너 "할인" X)
+- 카드 청구할인: 상품 페이지 "청구할인" 텍스트 추출
+- 적립금: _check_lotte_reward.py를 subprocess로 호출 → stdout JSON_DUMP 파싱 (캐시 파일 X)
+- 추증/GWP: galleria가 sheet에 쓴 결과를 load_galleria_composition_from_sheet(ws)로 직접 읽음 (캐시 X)
+- 적립금은 조합당 1회 적용 (sum × qty 잘못 — 결제 1회 = 이벤트 1회)
 """
 import json, sys, time, re
 from pathlib import Path
