@@ -94,17 +94,31 @@ for code in 'bcdefgh':
 print(f"\n쿠폰: {coupons}")
 print(f"카드: {card_info}")
 
-# 적립 확인 — _lotte_reward_dump.json 활용 (있다면)
-import os
-reward_path = '/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/rate-check/_lotte_reward_dump.json'
+# 적립 확인 — _check_lotte_reward.py 를 subprocess로 호출 + stdout JSON 파싱.
+# ★ 결과파일(_lotte_reward_dump.json) 절대 사용 X — sheet가 SoT.
+import os, subprocess
 rewards = {code: 0 for code in 'bcdefgh'}
-if os.path.exists(reward_path):
-    rd = json.load(open(reward_path))
-    for code in 'bcdefgh':
-        rewards[code] = rd.get(code, {}).get('total_max', 0)
-    print(f"적립금 (dump): {rewards}")
-else:
-    print("적립금 dump 없음 — 0으로 처리. _check_lotte_reward.py 실행 권장.")
+try:
+    reward_script = '/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/rate-check/_check_lotte_reward.py'
+    if os.path.exists(reward_script):
+        proc = subprocess.run(
+            ['python3', reward_script, 'all'],
+            capture_output=True, text=True, timeout=300,
+        )
+        out = proc.stdout
+        # JSON_DUMP_BEGIN ... JSON_DUMP_END 사이 한 줄 파싱
+        if 'JSON_DUMP_BEGIN' in out and 'JSON_DUMP_END' in out:
+            jstr = out.split('JSON_DUMP_BEGIN')[1].split('JSON_DUMP_END')[0].strip().strip('=').strip()
+            rd = json.loads(jstr)
+            for code in 'bcdefgh':
+                rewards[code] = rd.get(code, {}).get('total_max', 0)
+            print(f"적립금 (subprocess): {rewards}")
+        else:
+            print("⚠️ _check_lotte_reward stdout JSON_DUMP 못 찾음 — 적립금 0으로 처리")
+    else:
+        print(f"⚠️ {reward_script} 없음 — 적립금 0으로 처리")
+except Exception as e:
+    print(f"⚠️ 적립금 subprocess 실패 ({e}) — 0으로 처리")
 
 # 카드 결정 (단일 카드 가정)
 CARD_NAME = (card_info.get('cards') or ['미확인'])[0] if card_info else '미확인'

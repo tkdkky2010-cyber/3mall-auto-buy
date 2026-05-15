@@ -10,12 +10,17 @@
 > **이 룰은 모든 단계(갤러리아 / 현대Hmall / 롯데 / inventory)에 공통 적용. 위반 시 stale 캐시로 잘못된 결과 입력되는 버그 발생.**
 
 1. **공급률 체크 결과는 절대 로컬 파일/JSON으로 저장하지 않는다.** 모든 결과는 Google Sheets("{M.DD}" 통합 탭)에만 기록.
-2. **재실행 시 이전 캐시 파일(`today_composition_*.json`, `hmall_results.json` 등) 절대 읽지 않는다.** — 옛 단가표 / 옛 쿠폰율로 계산된 stale 데이터 따라쓰기 금지.
+2. **재실행 시 이전 캐시 파일(`today_composition_*.json`, `hmall_results.json`, `_lotte_reward_dump.json` 등) 절대 읽지 않는다.** — 옛 단가표 / 옛 쿠폰율로 계산된 stale 데이터 따라쓰기 금지. **이 파일들은 애초에 생성도 하지 않는다** (코드 차원에서 봉쇄).
 3. **galleria.py / hmall.py / lotte.py / inventory.py 모두 sheet에서 직접 읽고 sheet에만 쓴다.**
    - hmall/lotte는 `_common.load_galleria_composition_from_sheet(ws)`로 추증가치/GWP 읽기
    - inventory는 `_common.load_galleria_samples_from_sheet(ws)` + `load_galleria_gwp_from_sheet(ws)` 로 per-sample composition 읽기
 4. **매 실행마다 모든 데이터를 fresh 스크랩한다** — 어제값 / 오늘 새벽값 사용 X. 쿠폰율은 매일 변경, 추증 구성도 변경 가능.
 5. `_common.load_today_composition()` 함수는 **삭제됨** (옛 캐시 reader). 사용 시도 시 ImportError.
+6. **Step 1 진행 후 `_tmp/` 디렉토리에 새 결과파일이 남아있으면 안 된다.** 허용되는 잔존 파일: 사용자가 작성한 `gwp_{date}.json` (입력 config) 만. 그 외 일체의 result/dump 파일 X.
+   - galleria.py: today_composition.json write 삭제됨 + gwp_*.jpg는 JSON 로드 후 자동 정리
+   - hmall_all.py: hmall_results.json write 삭제됨
+   - _check_lotte_reward.py: _lotte_reward_dump.json write 삭제됨 (stdout JSON 출력만)
+   - lotte_all.py: 적립금은 _check_lotte_reward.py를 subprocess로 호출해 stdout JSON 파싱 (파일 우회)
 
 ---
 

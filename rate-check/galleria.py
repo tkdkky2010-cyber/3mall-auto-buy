@@ -427,6 +427,13 @@ def main(argv=None):
         print(f"  GWP 구성 로드: {gwp_json_path}")
         gwp = load_gwp_config(gwp_json_path)
         print(f"      1세트 = {gwp.set_value:,}원, 6세트 = {gwp.set_value * 6:,}원")
+        # ★ JSON 로드 성공 시 다운로드된 jpg 더 이상 불필요 → 정리 (결과파일 X)
+        if gwp_image_path.exists():
+            try:
+                gwp_image_path.unlink()
+                print(f"      gwp 이미지 정리: {gwp_image_path.name}")
+            except Exception:
+                pass
     else:
         if gwp_image_src:
             print(f"  GWP 이미지 다운로드 → {gwp_image_path}")
