@@ -12,9 +12,12 @@ import gspread
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from _common import combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID, today_tab_name, gs_client
 
+import os as _os
+_LOTTE_PORT = _os.environ.get("RATE_CHECK_CDP_PORT", "9222")
 opts = Options()
-opts.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
+opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{_LOTTE_PORT}")
 driver = webdriver.Chrome(options=opts)
+print(f"CDP attach: 127.0.0.1:{_LOTTE_PORT}")
 
 IDS = json.load(open('/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/hsmaster/config/sulwhasoo-ids.json'))['ids']
 PRICES = {'b':229000,'c':150000,'d':125000,'e':215000,'f':140000,'g':225000,'h':270000}
@@ -40,9 +43,10 @@ for code in 'bcdefgh':
         driver.execute_script(f"window.scrollTo(0, {y})"); time.sleep(0.3)
     block_dialogs()
 
-    # 쿠폰받기 클릭 → 가장 큰 쿠폰% 확인
-    js_click_and_read = """
-    // 쿠폰받기 버튼 클릭
+    # 쿠폰받기 클릭 — 팝업/레이어 등장
+    # ★ 사용자 5/15 지시: body 전체 max % 수집 X (배너 "15% 할인" 같은 행사 표시 포함됨).
+    # 쿠폰받기 팝업 안의 **가장 위 (첫번째) 쿠폰** 만 본다 = 가장 높은 할인율의 다운로드 가능 쿠폰.
+    js_click = """
     const all = Array.from(document.querySelectorAll('button, a, span, div'));
     let clicked = false;
     for (const el of all) {
@@ -51,21 +55,65 @@ for code in 'bcdefgh':
     }
     return {clicked};
     """
-    r = driver.execute_script(js_click_and_read)
+    r = driver.execute_script(js_click)
     time.sleep(1.8)
     block_dialogs()
 
-    # 팝업/리스트에서 쿠폰 %
+    # 쿠폰 팝업/레이어 안의 첫 쿠폰 %
     js_read_coupon = """
-    // 페이지 전체 body에서 "N% 할인" 또는 N% 쿠폰 패턴 수집
-    const body = document.body.innerText;
-    const matches = body.match(/(\\d{1,2})\\s*%\\s*(?:할인|쿠폰|즉시)/g) || [];
-    const nums = matches.map(m => parseInt(m.match(/\\d+/)[0])).filter(n => n >= 5 && n <= 30);
-    return {matches: matches.slice(0,20), max: nums.length ? Math.max(...nums) : null};
+    // 1순위: 쿠폰 팝업 컨테이너 후보 (modal/layer/popup 클래스 또는 z-index 높은 것)
+    const popupSelectors = [
+      '[class*="coupon"][class*="popup"]', '[class*="coupon"][class*="modal"]',
+      '[class*="coupon"][class*="layer"]', '[id*="coupon"][id*="popup"]',
+      '[id*="coupon"][id*="layer"]', '.layer_pop', '.popup_layer', '.modal-coupon',
+      // 일반 모달
+      '[role="dialog"]', '[class*="modal"]:not([class*="hidden"])', '[class*="layer"]:not([style*="display:none"])'
+    ];
+    let popup = null;
+    for (const sel of popupSelectors) {
+      const els = document.querySelectorAll(sel);
+      for (const el of els) {
+        if (el.offsetParent === null) continue; // hidden
+        const t = (el.innerText || '').trim();
+        if (t.length > 10 && t.includes('쿠폰') && /\\d+\\s*%/.test(t)) {
+          popup = el; break;
+        }
+      }
+      if (popup) break;
+    }
+
+    // 팝업 못찾으면: 페이지 전체에서 "쿠폰" 단어 근처 % 만 추출 (배너 "할인" 텍스트 제외)
+    let scope = popup ? (popup.innerText || '') : '';
+    if (!scope) {
+      const body = document.body.innerText || '';
+      // "쿠폰" 단어 앞뒤 30자 내의 N% 만 수집
+      const couponMatches = body.match(/[^\\n]{0,30}쿠폰[^\\n]{0,30}/g) || [];
+      scope = couponMatches.join('\\n');
+    }
+
+    // 가장 위 (먼저 등장하는) % 추출 — max 아님, 첫 항목
+    const lines = scope.split('\\n').map(s => s.trim()).filter(s => s);
+    const couponLines = lines.filter(l => l.includes('쿠폰') && /\\d+\\s*%/.test(l));
+    let firstPct = null;
+    if (couponLines.length > 0) {
+      const m = couponLines[0].match(/(\\d{1,2})\\s*%/);
+      if (m) firstPct = parseInt(m[1]);
+    }
+    // fallback: scope 첫 % 패턴
+    if (firstPct === null) {
+      const m = scope.match(/(\\d{1,2})\\s*%/);
+      if (m) firstPct = parseInt(m[1]);
+    }
+
+    return {
+      popup_found: !!popup,
+      coupon_lines: couponLines.slice(0, 5),
+      first_pct: firstPct,
+    };
     """
     rd = driver.execute_script(js_read_coupon)
-    coupons[code] = rd.get('max')
-    print(f"  쿠폰: max {rd.get('max')}%, samples={rd['matches'][:5]}")
+    coupons[code] = rd.get('first_pct')
+    print(f"  쿠폰: 첫 항목 {rd.get('first_pct')}% (popup={rd.get('popup_found')}, lines={rd.get('coupon_lines', [])[:3]})")
 
     # 첫 상품(b)에서만 카드 청구할인 확인
     if code == 'b' and card_info is None:
@@ -175,9 +223,9 @@ for r in rows:
     print(f"{r['idx']:3d} {cn:22s} {r['소비자가']:>8,d} {'':>7s} {r['최종']:>8,d} {r['적립']:>5,d} {r['순']:>8,d} {r['공급률']:>6.4f}")
 
 # === gspread 이어쓰기: 행 100~ ===
-gc = gspread.service_account(filename='/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/gen-lang-client-0553550811-4b553902b0d0.json')
-sh = gc.open_by_key('1fxB0UvLRy2iQfonCWn5U5mWnXbzSdn6l4e2XuQluhwo')
-ws = sh.worksheet('5.14')
+gc = gs_client()
+sh = gc.open_by_key(RATE_SHEET_ID)
+ws = sh.worksheet(today_tab_name())
 
 START = 100
 data = []

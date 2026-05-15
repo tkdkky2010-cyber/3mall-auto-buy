@@ -20,7 +20,8 @@ SULWHASOO_IDS = ROOT / "hsmaster" / "config" / "sulwhasoo-ids.json"
 HMALL_CONFIG = ROOT / "hmall_config.json"
 TMP_DIR = ROOT / "rate-check" / "_tmp"
 
-CDP_PORT = 9222
+import os as _os
+CDP_PORT = int(_os.environ.get("RATE_CHECK_CDP_PORT", "9222"))
 
 # ============================================================
 # 본품 (b~h) — 코드, 이름, 소비자가 (가이드 섹션 3 고정)
@@ -139,7 +140,7 @@ CARD_PAYBACK: dict[str, float] = {
 # ============================================================
 # 갤러리아 네이버구매할인 상수 (섹션 6)
 # ============================================================
-GALLERIA_NAVER_MULT = 0.948  # 0.978 (네이버 2.2%) - 0.030 (추가 3%)
+GALLERIA_NAVER_MULT = 0.978  # 네이버 구매할인 2.2% 만 (추가 3% 제거 — 사용자 5/14 지시)
 
 # ============================================================
 # GWP tier (섹션 5 / 9-3)
@@ -227,7 +228,7 @@ class GwpDay:
 
 
 # ============================================================
-# 갤러리아 계산 (네이버 ×0.948, 카드 없음)
+# 갤러리아 계산 (네이버 ×0.978, 카드 없음)
 # ============================================================
 def galleria_combo(idx: int, combo: list[tuple[str, int]],
                    products: dict[str, ProductDay], gwp: GwpDay) -> dict:
@@ -244,7 +245,7 @@ def galleria_combo(idx: int, combo: list[tuple[str, int]],
         gwp_value = 0
         gwp_tier = "미적용"
     총샘플 = 추가증정 + gwp_value
-    # 최종구매가 = sum(단가 × 수량 × (1 - 기본%) × (1 - 쿠폰%) × 0.948)
+    # 최종구매가 = sum(단가 × 수량 × (1 - 기본%) × (1 - 쿠폰%) × 0.978)
     final = 0.0
     for c, q in combo:
         pd = products[c]
