@@ -1,6 +1,7 @@
 """재고관리 시트 비교 + 자동 새 버전 추가.
 
-galleria.py 가 만든 today_composition_{date}.json 을 읽고 재고관리 시트와 비교.
+galleria.py가 공급률 시트(통합 탭)에 쓴 데이터를 sheet에서 직접 읽어 재고관리 시트와 비교.
+**캐시 JSON 파일 절대 사용 X** — sheet가 SoT, 매 실행 fresh.
 
 Dry-run (디폴트):
     python3 rate-check/inventory.py
@@ -34,13 +35,22 @@ sys.path.insert(0, str(Path(__file__).parent))
 import _common as C
 
 
-def load_composition(date: str) -> dict:
-    path = C.TMP_DIR / f"today_composition_{date}.json"
-    if not path.exists():
-        raise FileNotFoundError(
-            f"composition 없음: {path}\n  먼저 'python3 rate-check/galleria.py' 실행 필요"
-        )
-    return json.loads(path.read_text(encoding="utf-8"))
+def load_composition_from_sheet() -> dict:
+    """공급률 시트(통합 탭)에서 당일 composition 읽기 — 캐시 JSON 절대 사용 X.
+
+    galleria가 sheet에 쓴 결과를 직접 파싱. galleria 미실행이면 ValueError.
+    """
+    gc = C.gs_client()
+    sh = gc.open_by_key(C.RATE_SHEET_ID)
+    ws = sh.worksheet(C.today_tab_name())
+    products_samples = C.load_galleria_samples_from_sheet(ws)
+    gwp_set = C.load_galleria_gwp_from_sheet(ws)
+    if not gwp_set:
+        raise ValueError("galleria sheet에서 GWP set 못찾음 — galleria 먼저 실행 필요")
+    return {
+        "products": {c: {"add_gifts": products_samples.get(c, [])} for c in "bcdefgh"},
+        "gwp": {"set": gwp_set},
+    }
 
 
 # ============================================================
@@ -236,20 +246,19 @@ def append_map_in_labels(map_ws, in_ws, suffix: str) -> tuple[str, str]:
 # ============================================================
 def main(argv=None):
     p = argparse.ArgumentParser()
-    p.add_argument("--date", help="composition 날짜 (기본: today, YYYY-MM-DD)")
     p.add_argument("--apply", action="store_true",
                    help="차이 발견 시 새 버전 자동 추가 (디폴트: dry-run)")
     p.add_argument("--gwp-sets", type=int, default=6,
                    help="조합당 GWP 세트 수 (기본 6, 400K~700K 조합 있으면 3)")
     args = p.parse_args(argv)
 
-    date = args.date or datetime.now().strftime("%Y-%m-%d")
+    date = datetime.now().strftime("%Y-%m-%d")
     print(f"▶ 재고관리 비교 ({date}) — {'APPLY' if args.apply else 'DRY-RUN'}")
 
-    # 1) 당일 구성 로드
-    comp = load_composition(date)
+    # 1) 당일 구성 로드 — sheet에서 직접 (캐시 X)
+    comp = load_composition_from_sheet()
     today_combos = composition_to_combo_codes(comp, args.gwp_sets)
-    print(f"  당일 구성 로드: {len(today_combos)} 조합, GWP {args.gwp_sets}세트/조합")
+    print(f"  당일 구성 로드 (sheet): {len(today_combos)} 조합, GWP {args.gwp_sets}세트/조합")
 
     # 2) 시트 접속 + 활성 버전 찾기
     gc = C.gs_client()

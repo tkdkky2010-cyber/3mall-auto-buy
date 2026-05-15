@@ -20,7 +20,8 @@ SULWHASOO_IDS = ROOT / "hsmaster" / "config" / "sulwhasoo-ids.json"
 HMALL_CONFIG = ROOT / "hmall_config.json"
 TMP_DIR = ROOT / "rate-check" / "_tmp"
 
-CDP_PORT = 9222
+import os as _os
+CDP_PORT = int(_os.environ.get("RATE_CHECK_CDP_PORT", "9222"))
 
 # ============================================================
 # 본품 (b~h) — 코드, 이름, 소비자가 (가이드 섹션 3 고정)
@@ -78,31 +79,33 @@ COMBOS: list[list[tuple[str, int]]] = [
 # s코드 None == 재고 매핑 미정 (계산엔 영향 없음, inventory 비교에서만 의미)
 # ============================================================
 SAMPLE_TABLE: list[tuple[str, int, str | None]] = [
-    ("자음생캡슐세럼 8ml", 4_000, "s10"),
-    ("윤조에센스 6세대 8ml", 1_600, "s01"),
+    ("자음생캡슐세럼 8ml", 3_800, "s10"),
+    ("자음생캡슐세럼 15ml", 11_500, None),
+    ("윤조에센스 6세대 8ml", 2_000, "s01"),
     ("윤조에센스 6세대 15ml", 4_200, "s02"),
     ("윤조마스크", 1_600, "s03"),
-    ("자음수15ml자음유액15ml", 2_100, "s04"),
-    ("탄력크림 5ml", 1_000, "s05"),
-    ("탄력크림 15ml", 4_000, "s06"),
-    ("자음생수25ml자음생유액25ml", 4_100, "s07"),
-    ("자음생캡슐세럼 5ml", 2_000, "s09"),
-    ("자음생리치크림 5ml", 2_700, "s11"),
+    ("자음수15ml자음유액15ml", 3_300, "s04"),
+    ("탄력크림 5ml", 1_100, "s05"),
+    ("탄력크림 15ml", 3_400, "s06"),
+    ("자음생수25ml자음생유액25ml", 4_900, "s07"),
+    ("자음생캡슐세럼 5ml", 3_000, "s09"),
+    ("자음생리치크림 5ml", 3_000, "s11"),
     ("자음생리치크림 10ml", 8_000, "s12"),
-    ("자음생크림 5ml", 2_200, "s13"),
-    ("자음생아이크림 3ml", 1_900, "s14"),
-    ("자음생브라이트닝세럼 8ml", 4_200, "s18"),
-    ("자음생브라이트닝앰플 5g", 3_500, "s20"),
-    ("자음생마스크", 3_400, "s17"),
-    ("순행클렌징폼 50ml", 2_200, "s22"),
-    ("순행클렌징오일 50ml", 2_200, "s23"),
+    ("자음생크림 5ml", 2_100, "s13"),
+    ("자음생아이크림 3ml", 2_000, "s14"),
+    ("자음생브라이트닝세럼 8ml", 4_500, "s18"),
+    ("자음생브라이트닝앰플 5g", 3_000, "s20"),
+    ("자음생마스크", 3_300, "s17"),
+    ("순행클렌징폼 50ml", 2_100, "s22"),
+    ("순행클렌징오일 50ml", 2_100, "s23"),
     ("자음생아이크림 4ml", 2_000, "s15"),
-    ("옥용팩 35ml", 1_900, "s24"),
-    ("여윤팩 35ml", 1_900, "s25"),
+    ("자음생왕아이크림 5ml", 4_900, None),
+    ("옥용팩 35ml", 2_000, "s24"),
+    ("여윤팩 35ml", 2_000, "s25"),
     ("백삼팩 35ml", 2_500, "s26"),
-    ("윤조아이세럼 4ml", 2_000, "s31"),
-    ("상백톤업선크림 10ml", 1_500, "s28"),
-    ("상백선크림 10ml", 1_000, "s27"),
+    ("윤조아이세럼 4ml", 2_900, "s31"),
+    ("상백톤업선크림 10ml", 1_700, "s28"),
+    ("상백선크림 10ml", 1_200, "s27"),
     ("상백선플루이드 3ml", 400, "s29"),
     ("진생솝 25g", 1_500, "s30"),
     ("자음생클렌징폼 50g", 5_000, "s33"),
@@ -112,16 +115,15 @@ SAMPLE_TABLE: list[tuple[str, int, str | None]] = [
     ("자정수25ml자정유액25ml", 5_500, "s36"),
     ("자정앰플세럼 7ml", 4_500, "s37"),
     # SET 가격 규칙 (섹션 4) — 페이지에서 종종 SET 표기로 등장
-    ("자음수유액SET", 2_100, "s04"),
-    ("자음생수유액SET", 4_100, "s07"),
+    ("자음수유액SET", 3_300, "s04"),
+    ("자음생수유액SET", 4_900, "s07"),
     # 페이지 표기 변형 alias (단가표 정식이름과 단어순서/표기 다른 것)
-    ("자음생크림 리치 5ml", 2_700, "s11"),     # canonical: 자음생리치크림 5ml
+    ("자음생크림 리치 5ml", 3_000, "s11"),     # canonical: 자음생리치크림 5ml
     ("자음생크림 리치 10ml", 8_000, "s12"),    # canonical: 자음생리치크림 10ml
-    ("자음생크림리치 5ml", 2_700, "s11"),
+    ("자음생크림리치 5ml", 3_000, "s11"),
     ("자음생크림리치 10ml", 8_000, "s12"),
-    ("탄력크림EX 15ml", 4_000, "s06"),         # canonical: 탄력크림 15ml
-    ("탄력크림EX 5ml", 1_000, "s05"),
-    ("자음생브라이트닝세럼 8ml (2026/02)", 4_200, "s19"),
+    ("탄력크림EX 15ml", 3_400, "s06"),         # canonical: 탄력크림 15ml
+    ("탄력크림EX 5ml", 1_100, "s05"),
 ]
 
 # ============================================================
@@ -138,7 +140,7 @@ CARD_PAYBACK: dict[str, float] = {
 # ============================================================
 # 갤러리아 네이버구매할인 상수 (섹션 6)
 # ============================================================
-GALLERIA_NAVER_MULT = 0.948  # 0.978 (네이버 2.2%) - 0.030 (추가 3%)
+GALLERIA_NAVER_MULT = 0.978  # 네이버 구매할인 2.2% 만 (추가 3% 제거 — 사용자 5/14 지시)
 
 # ============================================================
 # GWP tier (섹션 5 / 9-3)
@@ -226,7 +228,7 @@ class GwpDay:
 
 
 # ============================================================
-# 갤러리아 계산 (네이버 ×0.948, 카드 없음)
+# 갤러리아 계산 (네이버 ×0.978, 카드 없음)
 # ============================================================
 def galleria_combo(idx: int, combo: list[tuple[str, int]],
                    products: dict[str, ProductDay], gwp: GwpDay) -> dict:
@@ -243,7 +245,7 @@ def galleria_combo(idx: int, combo: list[tuple[str, int]],
         gwp_value = 0
         gwp_tier = "미적용"
     총샘플 = 추가증정 + gwp_value
-    # 최종구매가 = sum(단가 × 수량 × (1 - 기본%) × (1 - 쿠폰%) × 0.948)
+    # 최종구매가 = sum(단가 × 수량 × (1 - 기본%) × (1 - 쿠폰%) × 0.978)
     final = 0.0
     for c, q in combo:
         pd = products[c]
@@ -261,19 +263,118 @@ def galleria_combo(idx: int, combo: list[tuple[str, int]],
     }
 
 
-def rank_by_rate(rows: list[dict]) -> list[dict]:
-    """공급률 오름차순으로 'rank' 채워서 같은 list 반환."""
-    for r in rows:
-        r["rank"] = 0
-    sorted_rows = sorted(rows, key=lambda r: r["공급률"])
-    for rk, r in enumerate(sorted_rows, start=1):
-        r["rank"] = rk
-    return rows
-
-
 # ============================================================
 # gspread helper
 # ============================================================
+def _parse_won(text) -> int:
+    """'16,600원' → 16600. None/빈문자열 → 0."""
+    if not text:
+        return 0
+    digits = re.sub(r"[^\d]", "", str(text))
+    return int(digits) if digits else 0
+
+
+def load_galleria_composition_from_sheet(ws) -> dict:
+    """galleria가 시트(통합 탭)에 쓴 결과를 직접 읽는다 — **캐시 JSON 절대 사용 X**.
+
+    SoT 원칙: 모든 결과는 Google Sheets에만 보존. 로컬 파일/캐시는 stale 위험으로 금지.
+    매 실행마다 sheet에서 fresh 읽기 — 재실행 시 옛 캐시 따라 쓰는 버그 방지.
+
+    Returns: {"add_gift_value": {b: int, ...}, "gwp_1set": int, "gwp_6set": int}
+    galleria가 미실행이면 ValueError.
+    """
+    # 1) 추가증정가치 행 — "추가증정가치" 라벨 검색 (row 17~30 안에 있음, max_samples에 따라 가변)
+    block = ws.get("A15:H30")
+    add_gift_value = {}
+    for row in block:
+        if row and row[0].strip().startswith("추가증정가치"):
+            for i, code in enumerate("bcdefgh", start=1):
+                cell = row[i] if i < len(row) else ""
+                add_gift_value[code] = _parse_won(cell)
+            break
+    if not add_gift_value or len(add_gift_value) < 7:
+        raise ValueError("'추가증정가치' 행 sheet에서 못찾음 — galleria 먼저 실행 필요")
+
+    # 2) GWP 1세트/6세트 — "1세트 합계" / "6세트 합계" 라벨 검색 (row 6~15)
+    gwp_block = ws.get("A6:C15")
+    gwp_1set = gwp_6set = 0
+    for row in gwp_block:
+        if not row:
+            continue
+        label = row[0].strip()
+        val = _parse_won(row[2] if len(row) > 2 else "")
+        if label.startswith("1세트 합계"):
+            gwp_1set = val
+        elif label.startswith("6세트 합계"):
+            gwp_6set = val
+    if not gwp_6set:
+        raise ValueError("'6세트 합계' sheet에서 못찾음 — galleria 먼저 실행 필요")
+
+    return {"add_gift_value": add_gift_value, "gwp_1set": gwp_1set, "gwp_6set": gwp_6set}
+
+
+def load_galleria_samples_from_sheet(ws) -> dict:
+    """galleria sheet에서 per-product per-sample composition 파싱 (inventory.py 용).
+
+    각 cell 텍스트 형식: '{name} x{qty} ({price}원)'. s코드는 SAMPLE_TABLE lookup.
+    Returns: {code: [{name, qty, price, code}, ...]}
+    캐시 X — sheet가 SoT.
+    """
+    block = ws.get("A15:H30")
+    products = {c: [] for c in "bcdefgh"}
+    for row in block[1:]:  # row 0 = 헤더
+        if not row:
+            continue
+        label = row[0].strip()
+        if label.startswith("추가증정가치"):
+            break
+        if not label.startswith("샘플"):
+            continue
+        for c_idx, code in enumerate("bcdefgh", start=1):
+            cell = row[c_idx] if c_idx < len(row) else ""
+            if not cell.strip():
+                continue
+            m = re.match(r"(.+?)\s*x(\d+)\s*\(([\d,]+)원\)", cell.strip())
+            if m:
+                name = m.group(1).strip()
+                hit = lookup_sample(name)
+                products[code].append({
+                    "name": name,
+                    "qty": int(m.group(2)),
+                    "price": int(m.group(3).replace(",", "")),
+                    "code": hit[2] if hit else None,
+                })
+    return products
+
+
+def load_galleria_gwp_from_sheet(ws) -> list[dict]:
+    """galleria sheet의 GWP 1세트 샘플 리스트 파싱 (inventory.py 용).
+
+    Sheet row 7~11 (변동 가능): col A=name, col B='x{qty}', col C='{price}원'
+    Returns: [{name, qty, price, code}, ...]
+    """
+    block = ws.get("A7:C13")
+    set_items = []
+    for row in block:
+        if not row or not row[0].strip():
+            continue
+        label = row[0].strip()
+        if label.startswith("1세트 합계") or label.startswith("6세트 합계"):
+            break
+        qty_match = re.match(r"x(\d+)", row[1].strip() if len(row) > 1 else "")
+        if not qty_match:
+            continue
+        price = _parse_won(row[2] if len(row) > 2 else "")
+        hit = lookup_sample(label)
+        set_items.append({
+            "name": label,
+            "qty": int(qty_match.group(1)),
+            "price": price,
+            "code": hit[2] if hit else None,
+        })
+    return set_items
+
+
 def gs_client() -> gspread.Client:
     return gspread.service_account(filename=str(SERVICE_ACCOUNT))
 

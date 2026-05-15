@@ -11,8 +11,8 @@ GWP resume 패턴:
 - 같은 명령 재실행 → 자동으로 _tmp/gwp_{date}.json 로드 (또는 --gwp-config 명시)
 
 산출물:
-- gspread "{M.DD}" 탭의 갤러리아 섹션 (행 1~60)
-- rate-check/_tmp/today_composition_{date}.json (inventory.py가 사용)
+- gspread "{M.DD}" 탭의 갤러리아 섹션 (행 1~45) — **유일한 결과 저장소**
+- ★ 로컬 캐시/JSON 파일 절대 생성 X — 재실행 시 옛 캐시 따라쓰는 버그 방지 (sheet가 SoT)
 """
 from __future__ import annotations
 import argparse
@@ -50,30 +50,32 @@ def attach_chrome() -> webdriver.Chrome:
 # ============================================================
 EXTRACT_JS = r"""
 const out = {};
-// 페이지 전체 텍스트
 const fullText = document.body.innerText;
 out.length = fullText.length;
+
+// ★ 쿠폰 추출 — button.down em 안의 텍스트에서만 (page-wide regex 절대 X):
+//   <button class="down" onclick="...couponListLayer..."><em>[카테고리] 쿠폰명 N%</em></button>
+//   이 button 안의 <em> 텍스트에서만 추출. Q&A 영역 / 배너 텍스트 / 기타 영역 모두 사용 X.
+out.coupon_text = null;
+const couponBtns = document.querySelectorAll('button.down em, button[onclick*="couponListLayer"] em');
+for (const em of couponBtns) {
+    const t = (em.textContent || '').trim();
+    if (t.includes('쿠폰') && /\d+\s*%/.test(t)) {
+        out.coupon_text = t;  // "[카테고리] 쿠폰명 N%" 형태
+        break;
+    }
+}
+
+// 기본할인 — GOODS.info 가격 비교로 산출 (sale_price 대비 cust_sale_price)
+out.goods_data = (typeof GOODS !== 'undefined' && GOODS.info && GOODS.info.price) ? {
+    sale_price: GOODS.info.price.sale_price || null,
+    cust_sale_price: GOODS.info.price.cust_sale_price || null,
+} : null;
 
 // 1) "[추가 증정]" 또는 "[추가증정]" 다음에 나오는 텍스트 ~600자
 const addPattern = /\[\s*추가\s*증정\s*\][^\[]*/g;
 const addMatches = fullText.match(addPattern) || [];
 out.add_blocks = addMatches.map(s => s.substring(0, 600));
-
-// 2) 페이지 텍스트에서 N% 패턴 추출 (쿠폰 + 기본할인 후보)
-const pctPattern = /(\d{1,2})\s*%/g;
-const pcts = [];
-let m;
-while ((m = pctPattern.exec(fullText)) !== null) {
-    const n = parseInt(m[1]);
-    if (n >= 5 && n <= 30) pcts.push(n);
-}
-out.percent_candidates = pcts;
-
-// 3) "기본할인" / "할인율" 패턴 — 라인 단위
-const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
-out.discount_lines = lines.filter(l =>
-    (l.includes('기본할인') || l.includes('할인율') || l.includes('쿠폰')) && /\d+\s*%/.test(l)
-).slice(0, 30);
 
 // 4) GWP 이미지 (src에 galleria_md/gwp 포함, naturalHeight >= 100)
 const imgs = Array.from(document.querySelectorAll('img'));
@@ -128,8 +130,8 @@ def scrape_product(driver, code: str, goods_no: str, *, max_retry: int = 1) -> d
 # ============================================================
 SET_COMBINE_RULES = [
     # (요구되는 raw 키워드 set, 결합 결과 (정식이름, 가격, s코드))
-    ({"자음생수", "자음생유액"}, ("자음생수25ml자음생유액25ml", 4_100, "s07")),
-    ({"자음수", "자음유액"}, ("자음수15ml자음유액15ml", 2_100, "s04")),
+    ({"자음생수", "자음생유액"}, ("자음생수25ml자음생유액25ml", 4_900, "s07")),
+    ({"자음수", "자음유액"}, ("자음수15ml자음유액15ml", 3_300, "s04")),
 ]
 
 # 번들 라인 패턴 — "X종 GWP", "X종 포함", "구성품" 등
@@ -225,28 +227,29 @@ def parse_add_gifts(blocks: list[str]) -> tuple[list[C.Sample], list[str]]:
 
 
 def parse_basic_and_coupon(raw: dict) -> tuple[float, float]:
-    """할인 라인에서 기본할인% + 쿠폰% 추출.
+    """기본할인% + 쿠폰% 추출.
 
-    1차: '기본할인' / '할인율' 라인에서 N% (기본 fallback 10)
-    2차: '쿠폰' 라인에서 가장 큰 N%
+    ★ 사용자 5/15 확정 룰:
+    - 쿠폰: <button class="down"><em>[화장] 더블쿠폰 N%</em></button> 의 em 텍스트에서만.
+      페이지 전체 regex / Q&A 영역 / 배너 / GOODS.info 모두 사용 X.
+    - 기본할인: GOODS.info.price.sale_price 대비 cust_sale_price 비율로 산출.
     """
-    lines = raw.get("discount_lines", [])
-    basic = 10.0
+    # 쿠폰 — coupon_text 에서 N% 추출 (button.down em)
     coupon = 0.0
-    for l in lines:
-        m = re.search(r"(\d+)\s*%", l)
-        if not m:
-            continue
-        pct = int(m.group(1))
-        if "쿠폰" in l:
-            coupon = max(coupon, float(pct))
-        elif "기본할인" in l or "기본 할인" in l:
-            basic = float(pct)
-    if coupon == 0.0:
-        # fallback: percent_candidates 중 5~30% 범위 가장 큰 값 (단, basic 제외)
-        cands = [p for p in raw.get("percent_candidates", []) if p != int(basic)]
-        if cands:
-            coupon = float(max(cands))
+    ctext = raw.get("coupon_text") or ""
+    m = re.search(r"(\d+)\s*%", ctext)
+    if m:
+        coupon = float(m.group(1))
+
+    # 기본할인 — GOODS.info 가격 비교
+    gd = raw.get("goods_data") or {}
+    sale = gd.get("sale_price")
+    cust = gd.get("cust_sale_price")
+    if sale and cust and sale > 0:
+        basic = round((1 - cust / sale) * 100, 1)
+    else:
+        basic = 10.0
+
     return basic, coupon
 
 
@@ -308,8 +311,9 @@ def emit_gwp_pending(date: str, image_path: Path) -> int:
 # gspread 입력 — 갤러리아 섹션 (행 1~60)
 # ============================================================
 def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
-                           combos: list[dict], ranked: list[dict], tab: str) -> str:
-    rows: list[list] = [[""] for _ in range(60)]
+                           combos: list[dict], tab: str) -> str:
+    # ★ galleria 영역 = 행 1~43. 44~ Hmall, 62~ 롯데 침범 금지.
+    rows: list[list] = [[""] for _ in range(43)]
 
     def setrow(idx, *vals):
         rows[idx] = list(vals)
@@ -349,26 +353,35 @@ def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
     if new_alerts:
         setrow(17 + max_samples, "⚠️ 신규품목 (단가미정)", *new_alerts)
 
-    # 조합 순위표 (헤더 29, 데이터 30~)
-    setrow(28, "[70~72만원 조합 (11개) — 갤러리아몰 공급률]")
-    setrow(29, "순위", "조합", "소비자가", "추가증정", "GWP가치", "총샘플가치", "최종구매가", "순구매가", "공급률")
-    for i, r in enumerate(ranked):
-        setrow(30 + i,
-               r["rank"], r["name"],
-               f"{r['소비자가']:,}", f"{r['추가증정']:,}", f"{r['gwp_value']:,}",
-               f"{r['총샘플']:,}", f"{r['최종구매가']:,}", f"{r['순구매가']:,}",
-               f"{r['공급률']:.4f}")
+    # 11개 조합 공급률 요약 (헤더 29, 데이터 30~) — 조합번호 1~11 순
+    # A~G열: 조합 요약 / I~K열: 상품별 쿠폰율 (b~h, 첫 7행)
+    setrow(28, "[11개 조합 공급률 요약 - 갤러리아몰]", "", "", "", "", "", "",
+           "", "[상품별 쿠폰율]")
+    setrow(29, "조합번호", "조합", "소비자가", "총샘플가치", "네이버최종구매가", "순구매가", "공급률",
+           "", "상품", "기본할인%", "쿠폰%")
+    for i, r in enumerate(combos):
+        row_data = [r["idx"], r["name"], r["소비자가"], r["총샘플"],
+                    r["최종구매가"], r["순구매가"], round(r["공급률"], 4)]
+        if i < len(C.PRODUCT_CODES):
+            code = C.PRODUCT_CODES[i]
+            p = products[code]
+            row_data += ["",
+                         f"{code} {C.PRODUCTS[code]['name']}",
+                         f"{p.basic_discount_pct:.0f}%",
+                         f"{p.coupon_pct:.0f}%"]
+        setrow(30 + i, *row_data)
 
-    # 공급률 요약 도표 (헤더 45, 데이터 46~)
-    setrow(42, "[조합별 공급률 분석 - 네이버구매할인 적용]")
-    setrow(45, "순위", "조합", "소비자가", "총샘플가치", "네이버최종구매가", "순구매가", "공급률")
-    for i, r in enumerate(ranked):
-        setrow(46 + i,
-               r["rank"], r["name"],
-               r["소비자가"], r["총샘플"], r["최종구매가"], r["순구매가"],
-               round(r["공급률"], 4))
+    rng = C.write_grid(ws, 1, rows)
 
-    return C.write_grid(ws, 1, rows)
+    # ★ J~M 비교 차트 (3사 공급률 비교 영역) — 갤러리아 컬럼만 채움
+    # 사용자 layout: J1="조합", K1="갤러리아몰", L1="Hmall", M1="롯데"
+    # 행 2~12: 조합번호 1~11 + 각 몰 공급률 (hmall/lotte는 자기 스크립트에서 채움)
+    chart_data = [["조합", "갤러리아몰"]]
+    for r in combos:
+        chart_data.append([r["idx"], round(r["공급률"], 4)])
+    ws.update(values=chart_data, range_name="J1:K12", value_input_option="USER_ENTERED")
+
+    return rng
 
 
 # ============================================================
@@ -428,6 +441,13 @@ def main(argv=None):
         print(f"  GWP 구성 로드: {gwp_json_path}")
         gwp = load_gwp_config(gwp_json_path)
         print(f"      1세트 = {gwp.set_value:,}원, 6세트 = {gwp.set_value * 6:,}원")
+        # ★ JSON 로드 성공 시 다운로드된 jpg 더 이상 불필요 → 정리 (결과파일 X)
+        if gwp_image_path.exists():
+            try:
+                gwp_image_path.unlink()
+                print(f"      gwp 이미지 정리: {gwp_image_path.name}")
+            except Exception:
+                pass
     else:
         if gwp_image_src:
             print(f"  GWP 이미지 다운로드 → {gwp_image_path}")
@@ -444,51 +464,18 @@ def main(argv=None):
         print(f"\n  --only {args.only} → 11조합 계산/시트 입력 생략")
         return 0
 
-    # 11개 조합 계산
+    # 11개 조합 계산 (조합번호 1~11 순)
     rows_list = [C.galleria_combo(i + 1, c, products, gwp) for i, c in enumerate(C.COMBOS)]
-    C.rank_by_rate(rows_list)
-    ranked = sorted(rows_list, key=lambda r: r["공급률"])
 
     # 표 출력
     print()
-    print(f"  {'idx':>3} {'조합':40s} {'소비자가':>10s} {'추증':>8s} {'GWP':>8s} {'총샘플':>8s} {'최종':>10s} {'순':>10s} {'공급률':>7s} {'순위':>3s}")
+    print(f"  {'idx':>3} {'조합':40s} {'소비자가':>10s} {'추증':>8s} {'GWP':>8s} {'총샘플':>8s} {'최종':>10s} {'순':>10s} {'공급률':>7s}")
     for r in rows_list:
-        print(f"  {r['idx']:>3d} {r['name'][:40]:40s} {r['소비자가']:>10,d} {r['추가증정']:>8,d} {r['gwp_value']:>8,d} {r['총샘플']:>8,d} {r['최종구매가']:>10,d} {r['순구매가']:>10,d} {r['공급률']:>6.4f} {r['rank']:>3d}")
+        print(f"  {r['idx']:>3d} {r['name'][:40]:40s} {r['소비자가']:>10,d} {r['추가증정']:>8,d} {r['gwp_value']:>8,d} {r['총샘플']:>8,d} {r['최종구매가']:>10,d} {r['순구매가']:>10,d} {r['공급률']:>6.4f}")
 
-    # today_composition_{date}.json 저장 (inventory.py 가 사용)
-    composition_path = C.TMP_DIR / f"today_composition_{today}.json"
-    composition = {
-        "date": today,
-        "tab": tab,
-        "products": {
-            c: {
-                "basic_discount_pct": products[c].basic_discount_pct,
-                "coupon_pct": products[c].coupon_pct,
-                "add_gifts": [
-                    {"name": s.name, "qty": s.qty, "price": s.price, "code": s.code}
-                    for s in products[c].add_gifts
-                ],
-                "add_gift_value": products[c].add_gift_value,
-                "new_items": products[c].new_items,
-            }
-            for c in C.PRODUCT_CODES if c in products
-        },
-        "gwp": {
-            "period": gwp.period,
-            "set": [{"name": s.name, "qty": s.qty, "price": s.price, "code": s.code}
-                    for s in gwp.set_items],
-            "1set_value": gwp.set_value,
-            "6set_value": gwp.set_value * 6,
-        },
-        "combos": [{"idx": r["idx"], "name": r["name"],
-                    "소비자가": r["소비자가"], "총샘플": r["총샘플"],
-                    "최종구매가": r["최종구매가"], "순구매가": r["순구매가"],
-                    "공급률": round(r["공급률"], 4), "rank": r["rank"]}
-                   for r in rows_list],
-    }
-    composition_path.parent.mkdir(parents=True, exist_ok=True)
-    composition_path.write_text(json.dumps(composition, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n  composition 저장: {composition_path}")
+    # ★ today_composition.json 등 로컬 캐시 파일 생성 X — sheet가 SoT.
+    # hmall/lotte/inventory는 _common.load_galleria_composition_from_sheet(ws) /
+    # load_galleria_samples_from_sheet(ws) 로 직접 sheet에서 읽는다.
 
     # 시트 입력
     if args.skip_sheet:
@@ -499,9 +486,10 @@ def main(argv=None):
     gc = C.gs_client()
     sh = gc.open_by_key(C.RATE_SHEET_ID)
     ws = C.get_or_create_tab(sh, tab, leftmost=True)
-    # 갤러리아 영역(행 1~60)만 비우고 쓰기 — 65~ Hmall, 100~ 롯데는 보존
-    ws.batch_clear(["A1:Z60"])
-    rng = write_galleria_section(ws, products, gwp, rows_list, ranked, tab)
+    # 갤러리아 영역(행 1~43)만 비우고 쓰기 — 44~ Hmall, 62~ 롯데는 보존.
+    # ★ 시트 layout은 RULES.md §13 참고: galleria 1~45 / hmall 44~60 / lotte 62~79.
+    ws.batch_clear(["A1:I43"])
+    rng = write_galleria_section(ws, products, gwp, rows_list, tab)
     print(f"  → {rng}")
     print(f"  URL: https://docs.google.com/spreadsheets/d/{C.RATE_SHEET_ID}/edit#gid={ws.id}")
     return 0
