@@ -54,12 +54,24 @@ const out = {};
 const fullText = document.body.innerText;
 out.length = fullText.length;
 
+// ★ 0순위: 페이지 GOODS 객체에서 구조화된 쿠폰/가격 데이터 (가장 정확)
+// pc_dblcpn_dc_rate = 더블쿠폰 할인율 (예: 14.0)
+// pc_dblcpn_promo_nm = "[화장] 더블쿠폰 14%"
+// sale_price = 정가, cust_sale_price = 기본할인 후 가격
+// 이 source 가 body text Q&A 영역의 옛 고객 질문 텍스트 ("20% 쿠폰")보다 신뢰성 ↑
+out.goods_data = (typeof GOODS !== 'undefined' && GOODS.info) ? {
+    pc_dblcpn_dc_rate: GOODS.info.pc_dblcpn_dc_rate || null,
+    pc_dblcpn_promo_nm: GOODS.info.pc_dblcpn_promo_nm || null,
+    sale_price: GOODS.info.price ? GOODS.info.price.sale_price : null,
+    cust_sale_price: GOODS.info.price ? GOODS.info.price.cust_sale_price : null,
+} : null;
+
 // 1) "[추가 증정]" 또는 "[추가증정]" 다음에 나오는 텍스트 ~600자
 const addPattern = /\[\s*추가\s*증정\s*\][^\[]*/g;
 const addMatches = fullText.match(addPattern) || [];
 out.add_blocks = addMatches.map(s => s.substring(0, 600));
 
-// 2) 페이지 텍스트에서 N% 패턴 추출 (쿠폰 + 기본할인 후보)
+// 2) 페이지 텍스트에서 N% 패턴 추출 (쿠폰 + 기본할인 후보) — fallback 용
 const pctPattern = /(\d{1,2})\s*%/g;
 const pcts = [];
 let m;
@@ -69,7 +81,8 @@ while ((m = pctPattern.exec(fullText)) !== null) {
 }
 out.percent_candidates = pcts;
 
-// 3) "기본할인" / "할인율" 패턴 — 라인 단위
+// 3) "기본할인" / "할인율" 패턴 — 라인 단위 (fallback)
+// ⚠️ Q&A 영역 텍스트 "(질문)20%쿠폰내용" 같은 게 잡힐 수 있어 신뢰성 ↓ → goods_data 우선
 const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
 out.discount_lines = lines.filter(l =>
     (l.includes('기본할인') || l.includes('할인율') || l.includes('쿠폰')) && /\d+\s*%/.test(l)
@@ -225,25 +238,41 @@ def parse_add_gifts(blocks: list[str]) -> tuple[list[C.Sample], list[str]]:
 
 
 def parse_basic_and_coupon(raw: dict) -> tuple[float, float]:
-    """할인 라인에서 기본할인% + 쿠폰% 추출.
+    """기본할인% + 쿠폰% 추출.
 
-    1차: '기본할인' / '할인율' 라인에서 N% (기본 fallback 10)
-    2차: '쿠폰' 라인에서 가장 큰 N%
+    ★ 0순위 (5/15 fix): 페이지 GOODS.info 구조화 데이터.
+       - 쿠폰%: pc_dblcpn_dc_rate (예: 14.0). 페이지의 진짜 source.
+       - 기본%: 1 - (cust_sale_price / sale_price) × 100. 옛 보다 정확.
+       Q&A 영역 옛 고객 질문 ("(질문)20%쿠폰내용") 같은 stale 텍스트에 영향 X.
+    Fallback: 옛 텍스트 기반 (discount_lines) — GOODS 데이터 없을 때만.
     """
+    # 0순위: GOODS.info (구조화 데이터)
+    gd = raw.get("goods_data") or {}
+    coupon_rate = gd.get("pc_dblcpn_dc_rate")
+    sale = gd.get("sale_price")
+    cust = gd.get("cust_sale_price")
+
+    coupon = float(coupon_rate) if coupon_rate is not None else 0.0
+    if sale and cust and sale > 0:
+        basic = round((1 - cust / sale) * 100, 1)
+    else:
+        basic = 10.0
+
+    if coupon > 0 and basic > 0:
+        return basic, coupon
+
+    # Fallback: 옛 텍스트 기반 (Q&A stale 위험 ↑)
     lines = raw.get("discount_lines", [])
-    basic = 10.0
-    coupon = 0.0
     for l in lines:
         m = re.search(r"(\d+)\s*%", l)
         if not m:
             continue
         pct = int(m.group(1))
-        if "쿠폰" in l:
-            coupon = max(coupon, float(pct))
-        elif "기본할인" in l or "기본 할인" in l:
+        if "쿠폰" in l and coupon == 0.0:
+            coupon = float(pct)  # 최대 X — 첫 매칭 (Q&A 질문 텍스트 안전 위해)
+        elif ("기본할인" in l or "기본 할인" in l) and basic == 10.0:
             basic = float(pct)
     if coupon == 0.0:
-        # fallback: percent_candidates 중 5~30% 범위 가장 큰 값 (단, basic 제외)
         cands = [p for p in raw.get("percent_candidates", []) if p != int(basic)]
         if cands:
             coupon = float(max(cands))
