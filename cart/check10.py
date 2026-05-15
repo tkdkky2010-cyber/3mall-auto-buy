@@ -32,6 +32,8 @@ except ImportError:
 
 ROOT = Path(__file__).parent
 PROJECT_ROOT = ROOT.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+from chrome_launcher import ensure_chrome  # noqa: E402
 load_dotenv(PROJECT_ROOT / "buy" / ".env")
 
 ACCOUNTS_FILE = Path(os.environ.get("HMALL_CONFIG_PATH") or (PROJECT_ROOT / "hmall_config.json"))
@@ -156,7 +158,7 @@ def derive_alias_result(base: dict, prod: dict) -> dict:
 def _compute_reward(price: int | None, tiers: list[dict], simple_ranges: list[dict] | None = None) -> int:
     """price 가 어느 구간에 도달하는지로 reward 결정.
     - tier-based: applicable tier 중 max reward
-    - simple_range (예: 5만원 ~ 1천만원 10% 적립): min ≤ price ≤ max 면 price × pct 추가
+    - simple_range (단순 N% 적립, min_won ≤ price ≤ max_won 범위): price × pct 추가
     """
     if not price:
         return 0
@@ -789,8 +791,8 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
     """상품 페이지 → 쿠폰받기 → 바로구매 → 결제 페이지에서 가격 정보 추출.
     우수가(member_price) < 5만원이면 카드할인 임계 미달 → qty 늘려 1회 재시도.
     적립 계산:
-      - tiers (구간별, 예: 50K/5K, 100K/10K, ...)
-      - simple_ranges (단순 N%, 예: 5만원 ~ 1천만원 10% 적립)
+      - tiers (구간별, min_won 임계마다 reward_pt 부여 — 적용 가능한 tier 중 max)
+      - simple_ranges (단순 N% 적립, min_won ≤ price ≤ max_won 범위)
     """
     url = ITEM_URL_FMT.format(slitmCd=prod["slitmCd"], extra=prod.get("url_extra", ""))
     out = {
@@ -1078,8 +1080,8 @@ def main() -> int:
     print(f"[INFO] 사용 계정 #{acc_idx} {acc['id']}")
     print(f"[INFO] PW backend: {PW_BACKEND}")
 
-    # CDP 9223 자동 launch — 없으면 launch-check10-chrome.sh 호출
-    _ensure_chrome()
+    # CDP 9223 자동 launch — chrome_launcher.ensure_chrome() (LAUNCHERS dict 기반)
+    ensure_chrome(int(CDP_PORT))
 
     with sync_playwright() as p:
         try:
@@ -1090,31 +1092,6 @@ def main() -> int:
             return 1
         context = browser.contexts[0] if browser.contexts else browser.new_context()
         return _run(context, acc)
-
-
-def _ensure_chrome() -> None:
-    """CDP 9223 안 떠있으면 launch-check10-chrome.sh 자동 호출."""
-    import subprocess
-    import urllib.error
-    import urllib.request
-
-    try:
-        urllib.request.urlopen(f"{CDP_ENDPOINT}/json/version", timeout=1.5)
-        return  # 이미 살아있음
-    except (urllib.error.URLError, OSError):
-        pass
-
-    launcher = PROJECT_ROOT / "launch-check10-chrome.sh"
-    if not launcher.exists():
-        print(f"[WARN] {launcher} 없음 — Chrome 수동 실행 필요")
-        return
-    print(f"[INFO] CDP {CDP_PORT} 안 떠있음 — {launcher.name} 자동 실행...")
-    try:
-        subprocess.run(["bash", str(launcher)], check=True, timeout=15)
-    except subprocess.CalledProcessError as e:
-        print(f"[WARN] launch script 실패 (exit {e.returncode})")
-    except subprocess.TimeoutExpired:
-        print(f"[WARN] launch script timeout (15s)")
 
 
 def _run(context, acc) -> int:
