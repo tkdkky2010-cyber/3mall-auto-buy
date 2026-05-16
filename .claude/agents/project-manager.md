@@ -26,9 +26,10 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
 
 | 검증 항목 | 검증 방법 | 미충족 시 안내 |
 |---|---|---|
-| Chrome CDP 9222 살아있음 | `curl -s http://127.0.0.1:9222/json/version` | "Chrome CDP 미실행 — `~/bin/launch-hmall-chrome.sh` (또는 `hsmaster/scripts/launch-hmall-chrome.sh`) 실행. 자세한 setup은 CHROME_SETUP.md" |
 | `hmall_config.json` 존재 | `ls hmall_config.json` | "hmall_config.json 누락 — 19계정 ID/PW 파일 배치 필요" |
 | `buy/.env` 존재 | `ls buy/.env` | "`cp buy/.env.example buy/.env` 후 PIN/카드명 채움 필요" |
+
+> Chrome CDP 9222 상태는 **Step 1 substep #0 (CDP pre-flight)** 가 자동 복구하므로 여기서 abort X.
 
 검증 통과 시: 사용자에게 "사전 조건 OK" 한 줄 보고 후 Step 1으로.
 
@@ -59,6 +60,26 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
 ### Step 1 — 3몰 공급률 체크
 
 수행 순서:
+0. **CDP 9222 pre-flight (자동 복구)** — galleria.py 실행 전 필수
+   ```bash
+   # (a) CDP 살아있는지 — 죽었으면 launch + 3초 대기
+   curl -sf -o /dev/null http://127.0.0.1:9222/json/version \
+     || { bash ~/bin/launch-hmall-chrome.sh; sleep 3; }
+
+   # (b) 탭 목록 비어있으면 hmall.com 새 탭 열기 + 2초 대기
+   [ "$(curl -s http://127.0.0.1:9222/json/list)" = "[]" ] \
+     && { curl -s -X PUT 'http://127.0.0.1:9222/json/new?https://www.hmall.com' >/dev/null; sleep 2; }
+
+   # (c) 최종 확인 — version + 탭 ≥1
+   curl -sf -o /dev/null http://127.0.0.1:9222/json/version \
+     && curl -s http://127.0.0.1:9222/json/list \
+        | python3 -c 'import sys,json; sys.exit(0 if json.load(sys.stdin) else 1)' \
+     || { echo "[FATAL] CDP 9222 복구 실패 — 수동 확인 필요"; exit 1; }
+   ```
+   - **이유**: Chrome 죽었거나 탭 0개일 때 selenium chromedriver attach 실패 (`unable to discover open pages`). 자동 복구로 사용자 개입 줄임.
+   - launch-hmall-chrome.sh 는 자체적으로 hmall.com 탭 열고 시작하므로 (a) 통과 후 (b) 도 자동 통과.
+   - (c) 가 fail 이면 abort (Chrome binary 누락 / 권한 문제 등).
+
 1. **날짜 확인** — `python3 -c "from datetime import datetime; print(datetime.now().day)"`. day == 1이면 가이드 `rate-check/Sulwhasoo_Supply_Rate.md` 섹션 14의 "월초 리셋 절차" 먼저.
 
 2. **1단계 갤러리아 — 스크립트** ✓ 자동화됨
