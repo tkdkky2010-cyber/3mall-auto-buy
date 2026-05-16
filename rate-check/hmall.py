@@ -1,7 +1,7 @@
-"""Hmall 공급률 분석 — 16조합 실제 체크아웃 페이지 가격 기반.
+"""Hmall 공급률 분석 — 16조합 실제 체크아웃 페이지 가격 기반 (active).
 
-⚠️ 상태: 미사용 (active script는 rate-check/_tmp/hmall_all.py).
-   본 파일은 향후 통합용 초안. 실행 전 _tmp/hmall_all.py 와 기능 비교/병합 필요.
+Step 1 substep #4 의 active script. buy/run.py 의 로그인 + cart 자동 fill 사용 →
+사용자 수동 cart 세팅 불필요. 완전 자동.
 
 흐름: 조합별로 실제 cart→checkout 진입 → 카드할인 캐러셀에서
 가장 높은 할인율 카드의 미리보기 가격을 구매가격으로 사용. 페이백 카드면 계수 곱.
@@ -231,6 +231,16 @@ def write_sheet(results: list[dict], tab: str):
         ])
     C.write_grid(ws, 49, rows)
     print(f"  → 시트 입력: A49:M{49+len(rows)-1}")
+
+    # J~M 비교 차트 — Hmall 컬럼 (L) 채움. K=galleria/M=lotte 는 각 스크립트가.
+    chart_l: list[list] = [["Hmall"]]
+    for r in sorted(results, key=lambda x: x["idx"]):
+        if r.get("error"):
+            chart_l.append([""])
+        else:
+            chart_l.append([round(r["공급률"], 4)])
+    ws.update(values=chart_l, range_name="L1:L17", value_input_option="USER_ENTERED")
+    print("  → L1:L17 (Hmall 비교 차트 컬럼) 입력")
 
 
 def main(argv=None):

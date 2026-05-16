@@ -105,9 +105,15 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    - 차이 없으면 "변경 없음 — 활성 버전 사용" 보고
    - 차이 있으면 dry-run 출력 → 결과 보고 후 즉시 `--apply` 자동 실행 (가이드 §14-1 — 변경 시 새 버전 즉시 생성, 사용자 confirm 단계 없음)
 
-4. **2단계 현대Hmall** (Phase 2 — 스크립트 미완성)
-   - 임시: `rate-check/_tmp/hmall_all.py` 패턴 참고하여 `hmall_config.json` 첫 계정 로그인 → 카드 즉시할인 후보 1회 확인 → **16조합 × 카드별 결제 페이지 진입해서 캐러셀 즉시할인 금액 실측** → 페이백 적용 → "{M.DD}" 탭 행 49~ 이어쓰기 (RULES.md §13 layout). 추증/GWP는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet에서 직접 읽음 (캐시 X — sheet가 SoT)
-   - 향후: `python3 rate-check/hmall.py`로 자동화 예정 (현재 초안만 있음, 미사용)
+4. **2단계 현대Hmall — 스크립트** ✓ 자동화됨
+   ```bash
+   python3 rate-check/hmall.py             # 16조합 전체 (8~15분)
+   python3 rate-check/hmall.py 11          # 11번 조합만 (테스트용)
+   python3 rate-check/hmall.py --dry-sheet # 시트 입력 skip
+   ```
+   - CDP 9222 attach → `buy/run.py` 의 login + cart 자동 fill → **16조합 × 카드별 결제 페이지 캐러셀 즉시할인 금액 실측** → 페이백 적용 → "{M.DD}" 탭 행 49~70 입력 (RULES.md §13 layout)
+   - 추증/GWP 는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet 에서 직접 읽음 (캐시 X — sheet 가 SoT)
+   - 사용자 수동 cart 세팅 불필요 — hmall.py 가 자동.
 
 5. **3단계 롯데홈쇼핑** (Phase 2 — 스크립트 미완성)
    - 임시: `rate-check/_tmp/lotte_all.py` + `rate-check/_check_lotte_reward.py all` 호출 (행 73~ 입력)
@@ -223,7 +229,7 @@ python3 buy/run.py --checkout 2>&1 | tee -a logs/YYYY-MM-DD.log
 ## 미구현 모듈 (현재 상태)
 
 - `rate-check/_common.py`, `rate-check/galleria.py`, `rate-check/inventory.py` — ✅ Phase 1 구현 (갤러리아 + 재고 비교 자동화). Step 1 참조.
-- `rate-check/hmall.py`, `rate-check/lotte.py`, `rate-check/run.py` — Phase 2 TODO. 임시로 `rate-check/_tmp/hmall_all.py` + `lotte_all.py` 패턴 또는 가이드 직접 수행.
+- `rate-check/hmall.py` — ✅ 자동화 완료 (2026-05-16 _tmp/hmall_all.py 폐기 + 승격). `rate-check/lotte.py` 는 미완성, 임시로 `rate-check/_tmp/lotte_all.py` 사용. `rate-check/run.py` 는 미구현.
 - `cart/check10.py` — ✅ 구현됨
 - `buy/run.py` — 현대Hmall 직접 진입. Phase 3-A 완성 (cart 담기 ✓, checkout 7자리 추출 ✓). Step 4/5는 `--checkout` 플래그로 분리. Phase 3-B(폰 자동화) 미구현 → Step 5 후 사용자 수동 결제.
 - `buy/sulwhasoo.py` — 갤러리아/롯데 buy 직접 진입 코드 있음 (galleria_login/clear_cart/add_combo/checkout, lotte_*). PM workflow 통합 X, 작동 검증 X

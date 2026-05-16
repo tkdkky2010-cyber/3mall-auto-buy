@@ -18,7 +18,7 @@
 5. `_common.load_today_composition()` 함수는 **삭제됨** (옛 캐시 reader). 사용 시도 시 ImportError.
 6. **Step 1 진행 후 `_tmp/` 디렉토리에 새 결과파일이 남아있으면 안 된다.** 허용되는 잔존 파일: 사용자가 작성한 `gwp_{date}.json` (입력 config) 만. 그 외 일체의 result/dump 파일 X.
    - galleria.py: today_composition.json write 삭제됨 + gwp_*.jpg는 JSON 로드 후 자동 정리
-   - hmall_all.py: hmall_results.json write 삭제됨
+   - hmall.py: hmall_results.json write 삭제됨 (2026-05-16 _tmp/hmall_all.py 폐기)
    - _check_lotte_reward.py: _lotte_reward_dump.json write 삭제됨 (stdout JSON 출력만)
    - lotte_all.py: 적립금은 _check_lotte_reward.py를 subprocess로 호출해 stdout JSON 파싱 (파일 우회)
 

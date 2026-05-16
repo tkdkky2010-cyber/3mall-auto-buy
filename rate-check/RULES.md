@@ -279,7 +279,7 @@ evaluator 발견 시 사용자 confirm 받고 fix. 자동 fix 금지 (root cause
 
 → 각 mall 스크립트의 `START` 변수:
 - galleria.py: row 1부터 (write_grid start_row=1, batch_clear A1:I48)
-- _tmp/hmall_all.py: `START = 49`
+- hmall.py: `START = 49` (write_grid start_row=49)
 - _tmp/lotte_all.py: `START = 73`
 
 ### 13-2. 3사 공급률 비교 차트 — J1:M17
@@ -294,7 +294,7 @@ evaluator 발견 시 사용자 confirm 받고 fix. 자동 fix 금지 (root cause
 
 → 각 mall 스크립트가 자기 컬럼만 채움:
 - galleria.py: J1:K17 (조합번호 + 갤러리아 공급률)
-- _tmp/hmall_all.py: L1:L17 (Hmall 공급률)
+- hmall.py: L1:L17 (Hmall 공급률)
 - _tmp/lotte_all.py: M1:M17 (롯데 공급률) + 조건부 서식 추가
 
 ### 13-3. 조건부 서식 — K2:M17 행별 최저값 강조
