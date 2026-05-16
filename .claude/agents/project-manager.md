@@ -115,12 +115,15 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    - 추증/GWP 는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet 에서 직접 읽음 (캐시 X — sheet 가 SoT)
    - 사용자 수동 cart 세팅 불필요 — hmall.py 가 자동.
 
-5. **3단계 롯데홈쇼핑** (Phase 2 — 스크립트 미완성)
-   - 임시: `rate-check/_tmp/lotte_all.py` + `rate-check/_check_lotte_reward.py all` 호출 (행 73~ 입력)
+5. **3단계 롯데홈쇼핑 — 스크립트** ✓ 자동화됨
+   ```bash
+   python3 rate-check/lotte.py             # 16조합 전체
+   ```
+   - `_check_lotte_reward.py all` 을 subprocess 로 호출해 적립금 fresh fetch → 16조합 공급률 계산 → 시트 행 73~95 + M1:M17 + K2:M17 조건부 서식 입력 (RULES.md §13)
+   - 추증/GWP 는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet 에서 직접 읽음 (캐시 X — sheet 가 SoT)
    - **알려진 이슈**:
      - 적립금 정규식 (`_check_lotte_reward.py`) 이 단일 tier만 잡고 상위 tier 누락 가능. 7개 상품이 전부 동일한 값으로 나오면 의심 → 이벤트 페이지에서 최대 구간 직접 확인, 시트 G80:J95 + M2:M17 수동 패치 (RULES.md §7)
      - 페이백 5종 카드 검출 누락 가능, 청구할인 한도 미반영 — 결과 검토 시 주의
-   - 향후: `python3 rate-check/lotte.py`로 자동화 예정
 
 6. **4단계 cart_plan.py — 스크립트** ✓ 자동화됨
    ```bash
@@ -229,7 +232,9 @@ python3 buy/run.py --checkout 2>&1 | tee -a logs/YYYY-MM-DD.log
 ## 미구현 모듈 (현재 상태)
 
 - `rate-check/_common.py`, `rate-check/galleria.py`, `rate-check/inventory.py` — ✅ Phase 1 구현 (갤러리아 + 재고 비교 자동화). Step 1 참조.
-- `rate-check/hmall.py` — ✅ 자동화 완료 (2026-05-16 _tmp/hmall_all.py 폐기 + 승격). `rate-check/lotte.py` 는 미완성, 임시로 `rate-check/_tmp/lotte_all.py` 사용. `rate-check/run.py` 는 미구현.
+- `rate-check/hmall.py` — ✅ 자동화 완료 (2026-05-16 _tmp/hmall_all.py 폐기 + 승격).
+- `rate-check/lotte.py` — ✅ 자동화 완료 (2026-05-17 _tmp/lotte_all.py 폐기 + 승격).
+- `rate-check/run.py` — 미구현 (현재 사용자가 각 mall 스크립트 sequential 호출).
 - `cart/check10.py` — ✅ 구현됨
 - `buy/run.py` — 현대Hmall 직접 진입. Phase 3-A 완성 (cart 담기 ✓, checkout 7자리 추출 ✓). Step 4/5는 `--checkout` 플래그로 분리. Phase 3-B(폰 자동화) 미구현 → Step 5 후 사용자 수동 결제.
 - `buy/sulwhasoo.py` — 갤러리아/롯데 buy 직접 진입 코드 있음 (galleria_login/clear_cart/add_combo/checkout, lotte_*). PM workflow 통합 X, 작동 검증 X

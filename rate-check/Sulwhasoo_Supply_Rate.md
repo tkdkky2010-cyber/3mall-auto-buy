@@ -20,7 +20,7 @@
    - galleria.py: today_composition.json write 삭제됨 + gwp_*.jpg는 JSON 로드 후 자동 정리
    - hmall.py: hmall_results.json write 삭제됨 (2026-05-16 _tmp/hmall_all.py 폐기)
    - _check_lotte_reward.py: _lotte_reward_dump.json write 삭제됨 (stdout JSON 출력만)
-   - lotte_all.py: 적립금은 _check_lotte_reward.py를 subprocess로 호출해 stdout JSON 파싱 (파일 우회)
+   - lotte.py: 적립금은 _check_lotte_reward.py를 subprocess로 호출해 stdout JSON 파싱 (파일 우회, 2026-05-17 _tmp/lotte_all.py 폐기)
 
 ---
 
@@ -1477,7 +1477,7 @@ XX카드(신용카드/L.PAY) 7% (5만원 이상 결제 시)
 > **현행 layout 은 RULES.md §13 참조.** 통합 탭 "{M.DD}" 안에서 갤러리아 1~48 / Hmall 49~70 / 롯데 73~95 + 카트플랜 O1:R19.
 > 카드 페이백 비율 매핑은 `_common.CARD_PAYBACK` (catalog 상수, 매일 fresh 아님).
 
-롯데 섹션 (행 73~95) 내부 구조 (lotte_all.py START=73 기준):
+롯데 섹션 (행 73~95) 내부 구조 (lotte.py START=73 기준):
 | 절대 행 | 내용 |
 |--------|------|
 | 73 | 제목 "━━━━ 3단계: 롯데홈쇼핑 공급률 분석 ━━━━" |

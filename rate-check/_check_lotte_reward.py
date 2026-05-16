@@ -172,7 +172,7 @@ try:
             print(f"     · {c.get('title')} — max {c['verification'].get('max_pt')}")
 
     # ★ _lotte_reward_dump.json 등 결과파일 절대 X — sheet가 SoT.
-    # lotte_all.py는 본 스크립트를 import해서 in-process로 호출 (또는 stdout 파싱).
+    # lotte.py는 본 스크립트를 subprocess로 호출하고 stdout JSON_DUMP 를 파싱.
     # 일관성: stdout에 한 줄 JSON 출력 (다른 프로세스가 읽을 수 있게)
     print("\n=== JSON_DUMP_BEGIN ===")
     print(json.dumps(all_results, ensure_ascii=False))

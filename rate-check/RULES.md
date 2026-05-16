@@ -280,7 +280,7 @@ evaluator 발견 시 사용자 confirm 받고 fix. 자동 fix 금지 (root cause
 → 각 mall 스크립트의 `START` 변수:
 - galleria.py: row 1부터 (write_grid start_row=1, batch_clear A1:I48)
 - hmall.py: `START = 49` (write_grid start_row=49)
-- _tmp/lotte_all.py: `START = 73`
+- lotte.py: `START = 73`
 
 ### 13-2. 3사 공급률 비교 차트 — J1:M17
 오른쪽 상단에 배치 (Galleria 섹션과 같은 행 영역 1~17, 갤러리아 데이터 안 닿는 J~M열).
@@ -295,7 +295,7 @@ evaluator 발견 시 사용자 confirm 받고 fix. 자동 fix 금지 (root cause
 → 각 mall 스크립트가 자기 컬럼만 채움:
 - galleria.py: J1:K17 (조합번호 + 갤러리아 공급률)
 - hmall.py: L1:L17 (Hmall 공급률)
-- _tmp/lotte_all.py: M1:M17 (롯데 공급률) + 조건부 서식 추가
+- lotte.py: M1:M17 (롯데 공급률) + 조건부 서식 추가
 
 ### 13-3. 조건부 서식 — K2:M17 행별 최저값 강조
 - **범위**: K2:M17 (3사 × 16조합)
@@ -303,7 +303,7 @@ evaluator 발견 시 사용자 confirm 받고 fix. 자동 fix 금지 (root cause
 - **포맷**: 연두색 배경 (RGB ~ 0.72, 0.92, 0.72)
 - **의미**: 각 조합에서 3사 중 가장 좋은 (낮은) 공급률 강조 — 한눈에 베스트 몰 식별
 
-→ lotte_all.py 끝에서 `sh.batch_update` 로 `addConditionalFormatRule` 호출. 중복 추가되어도 동작은 동일하지만, 정기적으로 sh의 기존 rule 정리 권장.
+→ lotte.py 끝에서 `sh.batch_update` 로 `addConditionalFormatRule` 호출. 중복 추가되어도 동작은 동일하지만, 정기적으로 sh의 기존 rule 정리 권장.
 
 ### 13-4. 카트플랜 출력 — O1:R19
 cart_plan.py 가 작성. 자동 채널 선택 + N개 분배 결과 (Step 1 끝 자동 실행).

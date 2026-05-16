@@ -1,4 +1,6 @@
-"""롯데홈쇼핑 stage — 7개 상품 쿠폰% + 카드할인 + 16개 조합 공급률 계산 + 시트 이어쓰기.
+"""롯데홈쇼핑 공급률 분석 — 7개 상품 쿠폰% + 카드할인 + 16개 조합 (active).
+
+Step 1 substep #5 의 active script. 2026-05-17 _tmp/lotte_all.py 에서 승격 (rate-check/lotte.py).
 
 흐름:
 - 쿠폰%: 상품 페이지 쿠폰받기 클릭 → 팝업 안의 가장 위 (다운로드 가능 최대) 쿠폰만 읽음 (배너 "할인" X)
@@ -13,7 +15,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import gspread
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID, today_tab_name, gs_client, COMBOS
 
 import os as _os
