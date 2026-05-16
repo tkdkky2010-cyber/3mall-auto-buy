@@ -103,7 +103,7 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    - galleria가 sheet에 쓴 결과를 직접 sheet에서 읽음 (캐시 JSON 사용 X — sheet가 SoT)
    - MAP 활성 버전 자동 감지 → 1:1 비교
    - 차이 없으면 "변경 없음 — 활성 버전 사용" 보고
-   - 차이 있으면 dry-run 출력 → 사용자 confirm 후 `--apply`로 새 버전 생성 (가이드 섹션 14-1 절차)
+   - 차이 있으면 dry-run 출력 → 결과 보고 후 즉시 `--apply` 자동 실행 (가이드 §14-1 — 변경 시 새 버전 즉시 생성, 사용자 confirm 단계 없음)
 
 4. **2단계 현대Hmall** (Phase 2 — 스크립트 미완성)
    - 임시: `rate-check/_tmp/hmall_all.py` 패턴 참고하여 `hmall_config.json` 첫 계정 로그인 → 카드 즉시할인 후보 1회 확인 → **16조합 × 카드별 결제 페이지 진입해서 캐러셀 즉시할인 금액 실측** → 페이백 적용 → "{M.DD}" 탭 행 49~ 이어쓰기 (RULES.md §13 layout). 추증/GWP는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet에서 직접 읽음 (캐시 X — sheet가 SoT)
