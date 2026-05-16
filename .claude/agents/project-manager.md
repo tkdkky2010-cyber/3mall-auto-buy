@@ -200,7 +200,7 @@ python3 buy/run.py --checkout 2>&1 | tee -a logs/YYYY-MM-DD.log
 - log는 append 모드 (`tee -a`)
 - 시간 ~5-10분 소요
 
-**3몰 적용 범위 (모두 직접 진입 — OK캐시백 dead)**:
+**3몰 적용 범위 (모두 몰 홈 직접 진입, 우회 진입 X)**:
 - ✅ **현대Hmall** — `buy/run.py` 직접 hmall.com 진입 (Step 4 cart ✓, Step 5 checkout Phase 3-A 7자리 추출 ✓). Phase 3-B 폰 자동화 대기.
 - ⚠️ **갤러리아** — `buy/sulwhasoo.py:galleria_*` 코드 있음 (login + cart + checkout + 네이버페이). 갤러리아 홈 직접 진입. PM 통합 X, 작동 검증 X.
 - ⚠️ **롯데홈쇼핑** — `buy/sulwhasoo.py:lotte_*` 코드 있음 (login + cart + checkout + L포인트). 롯데 홈 직접 진입. PM 통합 X, 작동 검증 X.
