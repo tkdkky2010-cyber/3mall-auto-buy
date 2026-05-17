@@ -122,7 +122,9 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    - `_check_lotte_reward.py all` 을 subprocess 로 호출해 적립금 fresh fetch → 20조합 공급률 계산 → 시트 행 81~107 + M1:M21 + K2:M21 조건부 서식 입력 (RULES.md §13)
    - 추증/GWP 는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet 에서 직접 읽음 (캐시 X — sheet 가 SoT)
    - **알려진 이슈**:
-     - 적립금 정규식 (`_check_lotte_reward.py`) 이 단일 tier만 잡고 상위 tier 누락 가능. 7개 상품이 전부 동일한 값으로 나오면 의심 → 이벤트 페이지에서 최대 구간 직접 확인, 시트 G88:J107 + M2:M21 수동 패치 (RULES.md §7)
+     - 적립금: multi-tier fix 적용됨 (commit 98b26f2, 2026-05-17). `_check_lotte_reward.py` 가 임계값/적립금을 독립 matchAll → 페어링 → tier 리스트 반환. lotte.py 가 조합 결제금액과 비교해 적용 가능한 max tier 1회 선택.
+     - **정상 패턴 (false alarm 금지)**: 롯데 이벤트는 결제금액 기반이라 7상품이 동일한 tier 리스트 (예: `[{50000:7500},{150000:15000}]`) 갖는 게 정상. 동일 ≠ 의심.
+     - **진짜 의심 케이스 (이때만 보고)**: ① `tiers` 값이 빈 리스트 (이벤트 페이지 진입 실패) ② tier 1개뿐인데 페이지엔 여러 구간 보임 (regex 누락) ③ threshold 비현실적 (예: 1원). → 이벤트 페이지 직접 확인 + 시트 G88:J107 + M2:M21 수동 패치 (RULES.md §7)
      - 페이백 5종 카드 검출 누락 가능, 청구할인 한도 미반영 — 결과 검토 시 주의
 
 6. **4단계 cart_plan.py — 스크립트** ✓ 자동화됨
