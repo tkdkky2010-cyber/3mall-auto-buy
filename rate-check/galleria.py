@@ -308,12 +308,13 @@ def emit_gwp_pending(date: str, image_path: Path) -> int:
 
 
 # ============================================================
-# gspread 입력 — 갤러리아 섹션 (행 1~60)
+# gspread 입력 — 갤러리아 섹션 (행 1~C.GALLERIA_DATA_END_ROW)
 # ============================================================
 def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
                            combos: list[dict], tab: str) -> str:
-    # ★ galleria 영역 = 행 1~48. 49~ Hmall, 73~ 롯데 침범 금지 (RULES §13).
-    rows: list[list] = [[""] for _ in range(48)]
+    # ★ galleria 영역 = 행 1~C.GALLERIA_DATA_END_ROW.
+    # C.HMALL_HEADER_ROW~ Hmall, C.LOTTE_HEADER_ROW~ 롯데 침범 금지 (RULES §13).
+    rows: list[list] = [[""] for _ in range(C.GALLERIA_DATA_END_ROW)]
 
     def setrow(idx, *vals):
         rows[idx] = list(vals)
@@ -353,9 +354,9 @@ def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
     if new_alerts:
         setrow(17 + max_samples, "⚠️ 신규품목 (단가미정)", *new_alerts)
 
-    # 16개 조합 공급률 요약 (헤더 29, 데이터 30~) — 조합번호 1~16 순
+    # 20개 조합 공급률 요약 (타이틀 28→행29, 헤더 29→행30, 데이터 30~49→행31~50)
     # A~G열: 조합 요약 / I~K열: 상품별 쿠폰율 (b~h, 첫 7행)
-    setrow(28, "[16개 조합 공급률 요약 - 갤러리아몰]", "", "", "", "", "", "",
+    setrow(28, f"[{len(C.COMBOS)}개 조합 공급률 요약 - 갤러리아몰]", "", "", "", "", "", "",
            "", "[상품별 쿠폰율]")
     setrow(29, "조합번호", "조합", "소비자가", "총샘플가치", "네이버최종구매가", "순구매가", "공급률",
            "", "상품", "기본할인%", "쿠폰%")
@@ -375,11 +376,12 @@ def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
 
     # ★ J~M 비교 차트 (3사 공급률 비교 영역) — 갤러리아 컬럼만 채움
     # 사용자 layout: J1="조합", K1="갤러리아몰", L1="Hmall", M1="롯데"
-    # 행 2~17: 조합번호 1~16 + 각 몰 공급률 (hmall/lotte는 자기 스크립트에서 채움)
+    # 행 2~(1+N): 조합번호 1~N + 각 몰 공급률 (hmall/lotte는 자기 스크립트에서 채움)
     chart_data = [["조합", "갤러리아몰"]]
     for r in combos:
         chart_data.append([r["idx"], round(r["공급률"], 4)])
-    ws.update(values=chart_data, range_name="J1:K17", value_input_option="USER_ENTERED")
+    chart_end = 1 + len(C.COMBOS)
+    ws.update(values=chart_data, range_name=f"J1:K{chart_end}", value_input_option="USER_ENTERED")
 
     return rng
 
@@ -459,12 +461,12 @@ def main(argv=None):
             print(f"  ⚠️ GWP 이미지 fast-path 못 찾음 — 페이지 스크린샷 필요할 수 있음")
         return emit_gwp_pending(today, gwp_image_path)
 
-    # --only 디버그 모드면 16조합 계산 스킵
+    # --only 디버그 모드면 20조합 계산 스킵
     if args.only:
-        print(f"\n  --only {args.only} → 16조합 계산/시트 입력 생략")
+        print(f"\n  --only {args.only} → 20조합 계산/시트 입력 생략")
         return 0
 
-    # 16개 조합 계산 (조합번호 1~16 순)
+    # 20개 조합 계산 (조합번호 1~20 순)
     rows_list = [C.galleria_combo(i + 1, c, products, gwp) for i, c in enumerate(C.COMBOS)]
 
     # 표 출력
@@ -486,9 +488,10 @@ def main(argv=None):
     gc = C.gs_client()
     sh = gc.open_by_key(C.RATE_SHEET_ID)
     ws = C.get_or_create_tab(sh, tab, leftmost=True)
-    # 갤러리아 영역(행 1~48)만 비우고 쓰기 — 49~ Hmall, 73~ 롯데는 보존.
-    # ★ 시트 layout은 RULES.md §13 참고: galleria 1~48 / hmall 49~70 / lotte 73~95.
-    ws.batch_clear(["A1:I48"])
+    # 갤러리아 영역(행 1~C.GALLERIA_DATA_END_ROW)만 비우고 쓰기.
+    # Hmall(C.HMALL_HEADER_ROW~), 롯데(C.LOTTE_HEADER_ROW~)는 보존.
+    # ★ 시트 layout은 RULES.md §13 + _common.py 상수 참고.
+    ws.batch_clear([f"A1:I{C.GALLERIA_DATA_END_ROW}"])
     rng = write_galleria_section(ws, products, gwp, rows_list, tab)
     print(f"  → {rng}")
     print(f"  URL: https://docs.google.com/spreadsheets/d/{C.RATE_SHEET_ID}/edit#gid={ws.id}")

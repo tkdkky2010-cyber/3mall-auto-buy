@@ -10,7 +10,7 @@ Dry-run (디폴트):
 자동 새 버전 추가:
     python3 rate-check/inventory.py --apply
     → 차이 발견 시 가이드 섹션 14-1 절차로 새 버전 (b→c→d→...) 추가:
-       - 조합별입고수량 시트에 16개 행 추가
+       - 조합별입고수량 시트에 20개 행 추가
        - MAP A열에 라벨 추가
        - IN A+B열에 라벨+조합명 추가
 
@@ -63,7 +63,7 @@ def composition_to_combo_codes(comp: dict, gwp_sets_per_combo: int = 6) -> dict[
     같은 코드끼리 합산.
 
     gwp_sets_per_combo: 가이드는 조합별 본품가>700K → 6세트, 400K~700K → 3세트.
-    실제로 16조합 모두 700K+ 이므로 디폴트 6 (단 9번 리치×3 = 810k 도 700K+).
+    실제로 20조합 모두 700K+ 가정 (Layer 1 TOP 20 정의 기준) — 디폴트 6.
     """
     products = comp["products"]
     gwp_set = comp["gwp"]["set"]
@@ -272,7 +272,7 @@ def main(argv=None):
     suffix = find_active_version(map_a_col)
     print(f"  MAP 활성 버전 접미사: {suffix!r} (' ' = 월초 접미사 없음)")
     if suffix is None:
-        print("  ⚠️ MAP A열에 1~16번 행 없음 — 월초 리셋 필요할 수 있음")
+        print(f"  ⚠️ MAP A열에 1~{len(C.COMBOS)}번 행 없음 — 월초 리셋 필요할 수 있음")
         return 1
 
     # 3) 활성 버전 행 읽기

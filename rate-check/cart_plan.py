@@ -11,7 +11,7 @@ LP 미사용 (scipy 의존 X). 표준 라이브러리만.
 채널별 디폴트 N: galleria=36, hmall=36, lotte=7
 
 데이터 소스 (캐시 X, sheet가 SoT, RULES §1-3):
-- 공급률: rate 시트 오늘 탭 K2:M17 (galleria/hmall/lotte × 16조합)
+- 공급률: rate 시트 오늘 탭 K2:M{1+N} (galleria/hmall/lotte × N조합, N=len(COMBOS))
 - 재고:   INVENTORY 시트 '재고현황' 탭 D6:D12 (b~h)
 
 출력:
@@ -33,8 +33,9 @@ OVERSTOCK_THRESHOLD = 50
 
 
 def read_supply_rates(ws) -> list[list[float | None]]:
-    """K2:M17 → 16 × 3 (galleria, hmall, lotte). 빈셀 = None."""
-    rows = ws.get("K2:M17")
+    """K2:M{1+N} → N × 3 (galleria, hmall, lotte). 빈셀 = None. N = len(C.COMBOS)."""
+    n = len(C.COMBOS)
+    rows = ws.get(f"K2:M{1 + n}")
     out: list[list[float | None]] = []
     for r in rows:
         row: list[float | None] = []
@@ -45,9 +46,9 @@ def read_supply_rates(ws) -> list[list[float | None]]:
             except (ValueError, TypeError):
                 row.append(None)
         out.append(row)
-    while len(out) < 16:
+    while len(out) < n:
         out.append([None, None, None])
-    return out[:16]
+    return out[:n]
 
 
 def select_channel(rates: list[list[float | None]]) -> str:
@@ -175,7 +176,7 @@ def main(argv=None) -> int:
 
     cart = make_cart_plan(channel_rates, C.COMBOS, n, stocks)
     if not cart:
-        print("❌ 공급률 데이터 없음 — Step 1 K2:M17 비어있는지 확인")
+        print(f"❌ 공급률 데이터 없음 — Step 1 K2:M{1+len(C.COMBOS)} 비어있는지 확인")
         return 1
 
     plan_rows: list[dict] = []

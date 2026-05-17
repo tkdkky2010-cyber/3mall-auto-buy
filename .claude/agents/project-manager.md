@@ -86,7 +86,7 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    ```bash
    python3 rate-check/galleria.py
    ```
-   - CDP 9222 attach → 7상품 scrape → 16조합 계산 → 공급률 시트 "{M.DD}" 탭 행 1~48 입력 (RULES.md §13)
+   - CDP 9222 attach → 7상품 scrape → 20조합 계산 → 공급률 시트 "{M.DD}" 탭 행 1~50 입력 (RULES.md §13)
    - **GWP resume 패턴**: 첫 실행 시 `_tmp/gwp_{date}.jpg` 다운로드 + "▶ GWP_PENDING" 출력 + exit 2.
      PM이 이미지 직접 보고 (Read tool) `_tmp/gwp_{date}.json` 작성:
      ```json
@@ -107,22 +107,22 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
 
 4. **2단계 현대Hmall — 스크립트** ✓ 자동화됨
    ```bash
-   python3 rate-check/hmall.py             # 16조합 전체 (8~15분)
+   python3 rate-check/hmall.py             # 20조합 전체
    python3 rate-check/hmall.py 11          # 11번 조합만 (테스트용)
    python3 rate-check/hmall.py --dry-sheet # 시트 입력 skip
    ```
-   - CDP 9222 attach → `buy/run.py` 의 login + cart 자동 fill → **16조합 × 카드별 결제 페이지 캐러셀 즉시할인 금액 실측** → 페이백 적용 → "{M.DD}" 탭 행 49~70 입력 (RULES.md §13 layout)
+   - CDP 9222 attach → `buy/run.py` 의 login + cart 자동 fill → **20조합 × 카드별 결제 페이지 캐러셀 즉시할인 금액 실측** → 페이백 적용 → "{M.DD}" 탭 행 53~78 입력 (RULES.md §13 layout)
    - 추증/GWP 는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet 에서 직접 읽음 (캐시 X — sheet 가 SoT)
    - 사용자 수동 cart 세팅 불필요 — hmall.py 가 자동.
 
 5. **3단계 롯데홈쇼핑 — 스크립트** ✓ 자동화됨
    ```bash
-   python3 rate-check/lotte.py             # 16조합 전체
+   python3 rate-check/lotte.py             # 20조합 전체
    ```
-   - `_check_lotte_reward.py all` 을 subprocess 로 호출해 적립금 fresh fetch → 16조합 공급률 계산 → 시트 행 73~95 + M1:M17 + K2:M17 조건부 서식 입력 (RULES.md §13)
+   - `_check_lotte_reward.py all` 을 subprocess 로 호출해 적립금 fresh fetch → 20조합 공급률 계산 → 시트 행 81~107 + M1:M21 + K2:M21 조건부 서식 입력 (RULES.md §13)
    - 추증/GWP 는 `_common.load_galleria_composition_from_sheet(ws)` 로 sheet 에서 직접 읽음 (캐시 X — sheet 가 SoT)
    - **알려진 이슈**:
-     - 적립금 정규식 (`_check_lotte_reward.py`) 이 단일 tier만 잡고 상위 tier 누락 가능. 7개 상품이 전부 동일한 값으로 나오면 의심 → 이벤트 페이지에서 최대 구간 직접 확인, 시트 G80:J95 + M2:M17 수동 패치 (RULES.md §7)
+     - 적립금 정규식 (`_check_lotte_reward.py`) 이 단일 tier만 잡고 상위 tier 누락 가능. 7개 상품이 전부 동일한 값으로 나오면 의심 → 이벤트 페이지에서 최대 구간 직접 확인, 시트 G88:J107 + M2:M21 수동 패치 (RULES.md §7)
      - 페이백 5종 카드 검출 누락 가능, 청구할인 한도 미반영 — 결과 검토 시 주의
 
 6. **4단계 cart_plan.py — 스크립트** ✓ 자동화됨
@@ -131,14 +131,14 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    python3 rate-check/cart_plan.py --channel lotte       # override
    python3 rate-check/cart_plan.py --channel lotte --n 14  # 친구카드
    ```
-   - 1~3단계 완료 후 자동 실행. K2:M17 (3사 × 16조합 공급률) sheet fresh 읽기
+   - 1~3단계 완료 후 자동 실행. K2:M21 (3사 × 20조합 공급률) sheet fresh 읽기
    - 자동 채널 선택: 조합별 최저 공급률 몰 win count → 가장 많이 이긴 채널 (동률 시 평균 최저)
    - 채널별 디폴트 N: galleria=36, hmall=36, lotte=7 (`--n` override)
    - 재고: INVENTORY 시트 '재고현황' D6:D12 fresh 읽기 (>50 코드 포함 조합 스킵, 한 칸 밀림)
    - 분배: sort (공급률 오름차순) + round-robin N개
    - 출력: stdout `=== CART_PLAN_BEGIN === {JSON} === CART_PLAN_END ===` 마커 + 오늘 탭 O1:R{N+3} 카트 플랜 영역
 
-사용자에게 한 줄 요약 보고("Step 1 완료: 16개 조합 공급률 {min}~{max}, 신규 품목 N개, cart_plan: {channel} N={n}") 후 Step 2로.
+사용자에게 한 줄 요약 보고("Step 1 완료: 20개 조합 공급률 {min}~{max}, 신규 품목 N개, cart_plan: {channel} N={n}") 후 Step 2로.
 
 > **중요**: 1단계 갤러리아에서 확인한 추가증정·40/70만 GWP 구성은 **공급률 시트(통합 탭)에만 기록**된다. 2단계·3단계는 이 sheet를 직접 읽는다 (`_common.load_galleria_composition_from_sheet`). **로컬 캐시 JSON 절대 사용 X** — 재실행 시 stale 데이터 따라쓰기 방지.
 

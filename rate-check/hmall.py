@@ -1,4 +1,4 @@
-"""Hmall 공급률 분석 — 16조합 실제 체크아웃 페이지 가격 기반 (active).
+"""Hmall 공급률 분석 — 20조합 실제 체크아웃 페이지 가격 기반 (active).
 
 Step 1 substep #4 의 active script. buy/run.py 의 로그인 + cart 자동 fill 사용 →
 사용자 수동 cart 세팅 불필요. 완전 자동.
@@ -8,10 +8,11 @@ Step 1 substep #4 의 active script. buy/run.py 의 로그인 + cart 자동 fill
 
 결제하기 절대 클릭 X — rate check 전용.
 
-레이아웃 (RULES.md §13): A49:M70 — galleria 1~48, lotte 73~95 와 분리.
+레이아웃 (RULES.md §13): A{HMALL_HEADER_ROW}:M{HMALL_COMBO_END_ROW}
+                       — galleria 1~{GALLERIA_DATA_END_ROW}, lotte {LOTTE_HEADER_ROW}~ 와 분리.
 
 사용:
-    python3 rate-check/hmall.py             # 16조합 전체 (8~15분)
+    python3 rate-check/hmall.py             # 20조합 전체
     python3 rate-check/hmall.py 11          # 11번 조합만 (테스트용)
     python3 rate-check/hmall.py --dry-sheet # 시트 입력 skip
 """
@@ -204,11 +205,11 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
 
 
 def write_sheet(results: list[dict], tab: str):
-    """시트 "{M.DD}" 탭 행 49~ 입력 (RULES.md §13 layout)."""
+    """시트 "{M.DD}" 탭 Hmall 영역 입력 (RULES.md §13 layout)."""
     gc = C.gs_client()
     sh = gc.open_by_key(C.RATE_SHEET_ID)
     ws = C.get_or_create_tab(sh, tab, leftmost=True)
-    ws.batch_clear(["A49:M70"])
+    ws.batch_clear([f"A{C.HMALL_HEADER_ROW}:M{C.HMALL_COMBO_END_ROW}"])
 
     rows = [
         ["━━━━ 2단계: 현대Hmall 공급률 분석 (체크아웃 페이지 캐러셀 가격) ━━━━"],
@@ -229,8 +230,8 @@ def write_sheet(results: list[dict], tab: str):
             r["card_brand"], f"{r['card_pct']}%", f"{r['payback_pct']*100:.1f}%",
             r["preview_price"], r["구매가격"], r["순구매가"], r["공급률"],
         ])
-    C.write_grid(ws, 49, rows)
-    print(f"  → 시트 입력: A49:M{49+len(rows)-1}")
+    C.write_grid(ws, C.HMALL_HEADER_ROW, rows)
+    print(f"  → 시트 입력: A{C.HMALL_HEADER_ROW}:M{C.HMALL_HEADER_ROW + len(rows) - 1}")
 
     # J~M 비교 차트 — Hmall 컬럼 (L) 채움. K=galleria/M=lotte 는 각 스크립트가.
     chart_l: list[list] = [["Hmall"]]
@@ -239,8 +240,9 @@ def write_sheet(results: list[dict], tab: str):
             chart_l.append([""])
         else:
             chart_l.append([round(r["공급률"], 4)])
-    ws.update(values=chart_l, range_name="L1:L17", value_input_option="USER_ENTERED")
-    print("  → L1:L17 (Hmall 비교 차트 컬럼) 입력")
+    chart_end = 1 + len(C.COMBOS)
+    ws.update(values=chart_l, range_name=f"L1:L{chart_end}", value_input_option="USER_ENTERED")
+    print(f"  → L1:L{chart_end} (Hmall 비교 차트 컬럼) 입력")
 
 
 def main(argv=None):

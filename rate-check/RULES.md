@@ -48,7 +48,7 @@
 
 ## §2. 정렬 / 출력 순서
 
-- **모든 결과는 조합번호 1~16 순서로 시트 입력.** 공급률 오름차순·내림차순 정렬 절대 X.
+- **모든 결과는 조합번호 1~20 순서로 시트 입력.** 공급률 오름차순·내림차순 정렬 절대 X.
 - `sorted(rows, key=lambda r: r["공급률"])` 같은 코드 발견 시 즉시 제거.
 - 시트 컬럼 헤더에 "순위" 라는 단어가 있으면 잘못 — "조합번호" 로 표기.
 
@@ -249,7 +249,7 @@ Step 1 종료 후 `rate-check/_tmp/` 와 `rate-check/` 에 잔존해서는 안 �
 - [ ] 모든 daily 데이터는 fresh scrape (sheet 또는 element 에서 직접). 캐시 dependency 0.
 - [ ] 1상품 sample 로 cross-check (실제 페이지의 element 텍스트 vs 코드 출력)
 - [ ] 결과파일 잔존 0건 (사용자 input config 제외)
-- [ ] 시트 결과 row 순서 = 조합번호 1~16
+- [ ] 시트 결과 row 순서 = 조합번호 1~20
 
 ---
 
@@ -265,45 +265,46 @@ evaluator 발견 시 사용자 confirm 받고 fix. 자동 fix 금지 (root cause
 
 ---
 
-## §13. 시트 "{M.DD}" 탭 layout 구조 — 16조합 (2026-05-16 확정)
+## §13. 시트 "{M.DD}" 탭 layout 구조 — 20조합 (2026-05-17 갱신, 5/18~ 적용)
 
-**구조만 기술 — 셀 값(공급률, 가격 등)은 매일 다르므로 박지 않는다.**
+**구조만 기술 — 셀 값(공급률, 가격 등)은 매일 다르므로 박지 않는다.**  
+**행 번호는 `_common.py` 상수로 단일소스 (DRY) — 하드코드 금지.**
 
 ### 13-1. 행 영역 (vertical layout)
-- **행 1~46**: 갤러리아 섹션 (제목 / 할인정보 / GWP 구성 / 추증가치 / 공급률 요약)
-- **행 47~48**: 빈 (간격)
-- **행 49~70**: 현대Hmall 섹션 (제목 / 카드정보 / 16조합 공급률 요약, 22행)
-- **행 71~72**: 빈
-- **행 73~95**: 롯데 섹션 (제목 / 쿠폰/카드/적립 정보 / 16조합 공급률 요약 + 우측 쿠폰 블록, 23행)
-- **행 1~19, O~R열**: 카트플랜 출력 (cart_plan.py — galleria K~M 비교차트와 분리, J까지만 사용)
+- **행 1~50** (`GALLERIA_DATA_END_ROW`): 갤러리아 섹션 (제목 / 할인정보 / GWP / 추증가치 / 20조합 요약)
+- **행 51~52**: 빈 (간격)
+- **행 53~78** (`HMALL_HEADER_ROW`~`HMALL_COMBO_END_ROW`): 현대Hmall 섹션 (헤더 6행 + 20조합 = 26행)
+- **행 79~80**: 빈
+- **행 81~107** (`LOTTE_HEADER_ROW`~`LOTTE_COMBO_END_ROW`): 롯데 섹션 (헤더 7행 + 20조합 + 우측 쿠폰 블록 = 27행)
+- **행 1~N+3, O~R열**: 카트플랜 출력 (cart_plan.py — galleria K~M 비교차트와 분리, J까지만 사용)
 
-→ 각 mall 스크립트의 `START` 변수:
-- galleria.py: row 1부터 (write_grid start_row=1, batch_clear A1:I48)
-- hmall.py: `START = 49` (write_grid start_row=49)
-- lotte.py: `START = 73`
+→ 각 mall 스크립트의 `START` 변수 (모두 `_common.py` 상수 참조):
+- galleria.py: row 1부터 (`batch_clear A1:I{GALLERIA_DATA_END_ROW}`)
+- hmall.py: `C.HMALL_HEADER_ROW` (=53)
+- lotte.py: `C.LOTTE_HEADER_ROW` (=81)
 
-### 13-2. 3사 공급률 비교 차트 — J1:M17
-오른쪽 상단에 배치 (Galleria 섹션과 같은 행 영역 1~17, 갤러리아 데이터 안 닿는 J~M열).
+### 13-2. 3사 공급률 비교 차트 — `CHART_RANGE` = "J1:M21"
+오른쪽 상단에 배치 (행 1~21, 갤러리아 데이터 안 닿는 J~M열).
 
-| 열 | 행 1 (header) | 행 2~17 (조합 1~16) |
+| 열 | 행 1 (header) | 행 2~21 (조합 1~20) |
 |---|---|---|
-| J | "조합" | 조합번호 (1~16) |
+| J | "조합" | 조합번호 (1~20) |
 | K | "갤러리아몰" | 갤러리아 공급률 |
 | L | "Hmall" | Hmall 공급률 |
 | M | "롯데" | 롯데 공급률 |
 
-→ 각 mall 스크립트가 자기 컬럼만 채움:
-- galleria.py: J1:K17 (조합번호 + 갤러리아 공급률)
-- hmall.py: L1:L17 (Hmall 공급률)
-- lotte.py: M1:M17 (롯데 공급률) + 조건부 서식 추가
+→ 각 mall 스크립트가 자기 컬럼만 채움 (모두 `f"X1:X{1+len(C.COMBOS)}"` 동적 산정):
+- galleria.py: `J1:K{1+N}` (조합번호 + 갤러리아 공급률)
+- hmall.py: `L1:L{1+N}` (Hmall 공급률)
+- lotte.py: `M1:M{1+N}` (롯데 공급률) + 조건부 서식 추가
 
-### 13-3. 조건부 서식 — K2:M17 행별 최저값 강조
-- **범위**: K2:M17 (3사 × 16조합)
+### 13-3. 조건부 서식 — K2:M{1+N} 행별 최저값 강조
+- **범위**: K2:M21 (3사 × 20조합)
 - **조건**: 셀 값이 같은 행의 K~M 최솟값과 같으면 (CUSTOM_FORMULA)
 - **포맷**: 연두색 배경 (RGB ~ 0.72, 0.92, 0.72)
 - **의미**: 각 조합에서 3사 중 가장 좋은 (낮은) 공급률 강조 — 한눈에 베스트 몰 식별
 
-→ lotte.py 끝에서 `sh.batch_update` 로 `addConditionalFormatRule` 호출. 중복 추가되어도 동작은 동일하지만, 정기적으로 sh의 기존 rule 정리 권장.
+→ lotte.py 끝에서 `sh.batch_update` 로 `addConditionalFormatRule` 호출. 중복 추가되어도 동작은 동일하지만, 정기적으로 sh의 기존 rule 정리 권장. `endRowIndex = 1 + len(COMBOS)` 동적.
 
 ### 13-4. 카트플랜 출력 — O1:R19
 cart_plan.py 가 작성. 자동 채널 선택 + N개 분배 결과 (Step 1 끝 자동 실행).

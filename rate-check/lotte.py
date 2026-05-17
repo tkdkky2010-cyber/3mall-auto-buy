@@ -1,4 +1,4 @@
-"""롯데홈쇼핑 공급률 분석 — 7개 상품 쿠폰% + 카드할인 + 16개 조합 (active).
+"""롯데홈쇼핑 공급률 분석 — 7개 상품 쿠폰% + 카드할인 + 20개 조합 (active).
 
 Step 1 substep #5 의 active script. 2026-05-17 _tmp/lotte_all.py 에서 승격 (rate-check/lotte.py).
 
@@ -16,7 +16,11 @@ from selenium.webdriver.chrome.options import Options
 import gspread
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID, today_tab_name, gs_client, COMBOS
+from _common import (
+    combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID,
+    today_tab_name, gs_client, COMBOS,
+    LOTTE_HEADER_ROW, LOTTE_COMBO_END_ROW, CHART_RANGE,
+)
 
 import os as _os
 _LOTTE_PORT = _os.environ.get("RATE_CHECK_CDP_PORT", "9222")
@@ -203,7 +207,7 @@ PAYBACK = {
 
 print(f"\n적용 카드: {CARD_NAME} {CARD_PCT}% (페이백 {PAYBACK*100:.1f}%)")
 
-# 조합 = _common.COMBOS 16개 (DRY, 중복 정의 X)
+# 조합 = _common.COMBOS 20개 (DRY, 중복 정의 X)
 
 # 당일 추가증정가치/GWP — sheet에서 직접 읽기 (캐시 X, sheet가 SoT)
 _gc_lotte = gs_client()
@@ -250,12 +254,12 @@ for r in rows:
     # rough coupon avg display
     print(f"{r['idx']:3d} {cn:22s} {r['소비자가']:>8,d} {'':>7s} {r['최종']:>8,d} {r['적립']:>5,d} {r['순']:>8,d} {r['공급률']:>6.4f}")
 
-# === gspread 이어쓰기: 행 62~ (RULES.md §13 layout) ===
+# === gspread 이어쓰기: Lotte 영역 (RULES.md §13 layout) ===
 gc = gs_client()
 sh = gc.open_by_key(RATE_SHEET_ID)
 ws = sh.worksheet(today_tab_name())
 
-START = 73  # 사용자 layout: Hmall 49~70 다음 + Lotte 73~95 (RULES.md §13)
+START = LOTTE_HEADER_ROW  # Lotte 헤더 시작행 (_common.py 정의)
 data = []
 data.append(["━━━━ 3단계: 롯데홈쇼핑 공급률 분석 ━━━━"])
 data.append([])
@@ -287,10 +291,11 @@ print(f"\n롯데 섹션 입력: {rng}")
 chart_m = [["롯데"]]
 for r in rows:
     chart_m.append([round(r['공급률'], 4)])
-ws.update(values=chart_m, range_name="M1:M17", value_input_option='USER_ENTERED')
-print("M1:M17 (롯데 비교 차트 컬럼) 입력")
+chart_end = 1 + len(COMBOS)
+ws.update(values=chart_m, range_name=f"M1:M{chart_end}", value_input_option='USER_ENTERED')
+print(f"M1:M{chart_end} (롯데 비교 차트 컬럼) 입력")
 
-# 조건부 서식: K2:M17 행별 최저값 셀 → 연두색 배경 (3사 중 가장 좋은 deal 강조)
+# 조건부 서식: K2:M{N+1} 행별 최저값 셀 → 연두색 배경 (3사 중 가장 좋은 deal 강조)
 # 이미 같은 규칙이 있으면 중복 추가 — Sheets는 허용. 깨끗하게 하려면 미리 제거 가능.
 try:
     sh.batch_update({
@@ -300,7 +305,7 @@ try:
                     "ranges": [{
                         "sheetId": ws.id,
                         "startRowIndex": 1,    # 0-indexed row 2
-                        "endRowIndex": 17,     # row 17 (exclusive 18) — 16조합
+                        "endRowIndex": 1 + len(COMBOS),  # exclusive — N조합
                         "startColumnIndex": 10,  # K (0-indexed)
                         "endColumnIndex": 13,    # N (exclusive)
                     }],
@@ -318,6 +323,6 @@ try:
             }
         }]
     })
-    print("조건부 서식 추가 — K2:M17 행별 최저 공급률 셀 연두색")
+    print(f"조건부 서식 추가 — K2:M{1+len(COMBOS)} 행별 최저 공급률 셀 연두색")
 except Exception as e:
     print(f"⚠️ 조건부 서식 실패: {e}")
