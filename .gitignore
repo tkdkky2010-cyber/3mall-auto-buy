@@ -23,6 +23,11 @@ hsmaster/scripts/*.ts
 # 계정별 persistent browser profiles (cookies, session)
 profiles/
 
+# Phase 3-B 폰 자동화 — 캡처 이미지 (보안 키패드 / 결제 화면 / 카드비번 포함 가능)
+phone_auto/_tmp/
+phone_auto/__pycache__/
+card_pins.json
+
 # 로그·OS 노이즈
 *.log
 .DS_Store

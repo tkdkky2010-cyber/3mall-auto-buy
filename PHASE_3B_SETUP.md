@@ -31,10 +31,11 @@ Mac (전체 운영)
 | galleria 결제 | 컴터 (`buy/sulwhasoo.py galleria_checkout`) — 변경 X |
 | hmall 결제 | 컴터 (`buy/run.py --checkout`) — 변경 X |
 | 폰 OS | Android |
-| 화면 동기화 | 로지텍 웹캠 + OCR (ADB/scrcpy 안 씀 — lotte 앱 보안 검출 우회) |
+| **화면 동기화** | **hybrid — 농협 카드 = 웹캠 OCR (USB 디버그 OFF), 나머지 6 카드사 = scrcpy 미러 OCR (USB 디버그 ON)** |
 | 보안 키패드 비번 | OCR 으로 자릿수 위치 추출 → ESP32 클릭 |
 | 7계정 분배 | 7계정 × 1조합 각각 (적립 7회) |
 | 계정-조합 매핑 | cart_plan 추천 순서 (계정 1=고정조합, 2~7=cart_plan 추천 순) |
+| 카드사별 분기 | lotte.py 의 청구할인 카드 자동 감지 결과로 매일 결정. 농협이면 USB 디버그 OFF 필요 (사용자 1초 토글) |
 
 ---
 
@@ -109,10 +110,19 @@ pip install easyocr
 ## Phase 3-B 단계별 작업
 
 ### α: 인프라 검증 (~1시간)
-- [ ] ESP32 wifi 연결 + IP 확인 (`curl http://<ESP32_IP>/status`)
-- [ ] 폰에 ESP32 USB OTG 연결 → `/click {"x":540,"y":1200}` → 폰 화면 임의 좌표 클릭 동작 확인
-- [ ] 로지텍 웹캠 OpenCV 인식 → 1프레임 캡처 + PNG 저장
-- [ ] Tesseract OCR 한글 텍스트 추출 검증 (lotte 앱 로고 캡처 → "롯데" 추출)
+- [x] **로지텍 웹캠 OpenCV 인식** (2026-05-17 OK, cam index=1, 1920x1080)
+- [x] **opencv-python + easyocr 설치** (Tesseract 5.5.2 기존)
+- [x] **scrcpy 4.0 + adb 1.0.41 설치** (`brew install scrcpy android-platform-tools`)
+- [ ] **무선 ADB 페어링** (다음 세션): 폰 설정 → 개발자 옵션 → 무선 디버깅 → "페어링 코드로 기기 페어링" → IP:포트 + 6자리 코드 → `adb pair` + `adb connect`
+- [ ] **scrcpy 미러링 확인** (`scrcpy --max-size 800`)
+- [ ] **Mac 스크린샷 + EasyOCR — 키패드 정확도 검증** (scrcpy 창 캡처 → 숫자 위치 99% 추출 목표)
+- [ ] **ESP32 wifi 연결 + IP 확인** (`curl http://<ESP32_IP>/status`)
+- [ ] **폰에 ESP32 USB OTG 연결 → `/click` API → 폰 화면 임의 좌표 클릭 동작 확인**
+
+### α 곁가지 — 농협 카드 대비 (USB 디버그 OFF + 웹캠 OCR)
+- [ ] 폰 키패드 화면 (USB 디버그 OFF 상태) 웹캠 캡처
+- [ ] EasyOCR 으로 키패드 숫자 위치 추출 정확도 검증
+- [ ] ⚠️ 검증 시 폰 정 방향 + 키패드 영역 카메라 시야 중앙 + 충분한 조명
 
 ### β: lotte 앱 1화면 자동화
 - [ ] lotte 앱 메인 → 장바구니 진입 (좌표 + ESP32 click)
@@ -188,7 +198,30 @@ pip install easyocr
 ## 다음 세션 첫 명령
 
 ```
-"PHASE_3B_SETUP.md 읽고 Phase α 부터 시작해줘. ESP32 IP 는 <IP>"
+"PHASE_3B_SETUP.md 읽고 어제 진행 상황 이어서 — 무선 ADB 페어링부터 시작해줘"
 ```
 
-→ Claude Code 가 자동으로 α 인프라 검증부터 단계별 진행.
+폰 USB 디버그 켜져있는 상태에서:
+1. 폰 설정 → 개발자 옵션 → 무선 디버깅 → "페어링 코드로 기기 페어링" 탭
+2. 화면의 IP:포트 + 6자리 페어링 코드 알려주기
+3. Mac 에서 `adb pair <ip>:<port>` + 코드 입력 → `adb connect`
+4. `scrcpy --max-size 800` 으로 미러링 확인
+5. lotte 앱 진입 → 결제 단계 → 키패드 화면 캡처 → EasyOCR 검증
+
+---
+
+## 2026-05-17 진행 메모
+
+**완료**:
+- 환경 셋업: opencv-python, easyocr, scrcpy 4.0, adb 1.0.41
+- 로지텍 웹캠 인식 검증 (cam index=1)
+- 카메라 위치 미러 효과는 라이브 미리보기만 — raw OpenCV 캡처는 글자 정상 방향
+
+**결정 사항**:
+- **카드사별 hybrid 채택** (농협 = 웹캠, 나머지 6 = scrcpy)
+- 농협 외 USB 디버그 토글 부담 매일 1회 — 사용자 수동 (필요시 Tasker 자동화 검토)
+- scrcpy 사용을 위한 무선 ADB 페어링은 다음 세션에서 진행 (사용자가 폰 화면 정보 알려줘야)
+
+**보류**:
+- 웹캠 EasyOCR 키패드 정확도 검증 (폰 위치 + 조명 안정 후 재시도)
+- lotte 앱 ADB 감지 차단 여부 실제 검증 (KB 카드 등으로 결제 진입 시도)
