@@ -1,7 +1,13 @@
 """rate-check/cart_plan.py — Step 1 (3사 공급률 분석) 완료 후 자동 실행.
 
-자동 채널 선택 + N개 단순 분배 (sort + round-robin + 재고 50 스킵) + O1:R19 시트 입력.
+자동 채널 선택 + N개 단순 분배 (sort + round-robin + 재고 50 스킵) + 시트 입력.
 LP 미사용 (scipy 의존 X). 표준 라이브러리만.
+
+분배 로직 (make_cart_plan):
+- 공급률 오름차순 정렬 → 재고 OVERSTOCK (>50) 코드 포함 조합 스킵
+- N개 슬롯을 available 조합에 round-robin (slot % len(available))
+- **available < N 이면 같은 조합 2~3개씩 자동 누적** (N=14/36 친구 카드 케이스 핵심).
+  예: available=7, N=14 → 각 조합 2개씩 / available=10, N=36 → 평균 3.6개씩.
 
 사용:
     python3 rate-check/cart_plan.py                       # 자동 채널
@@ -15,8 +21,8 @@ LP 미사용 (scipy 의존 X). 표준 라이브러리만.
 - 재고:   INVENTORY 시트 '재고현황' 탭 D6:D12 (b~h)
 
 출력:
-- stdout: '=== CART_PLAN_BEGIN === {JSON} === CART_PLAN_END ===' 마커
-- 시트:   오늘 탭 O1:R{N+3} 카트 플랜 영역 (RULES §13-4)
+- stdout: '=== CART_PLAN_BEGIN === {JSON} === CART_PLAN_END ===' 마커 + product_totals
+- 시트:   오늘 탭 O1:U{end} — 카트플랜 (O~R) + b~h 제품별 총 수량 (O~U, 하단)
 """
 from __future__ import annotations
 import argparse
@@ -129,16 +135,26 @@ def write_sheet_section(
     total_pay: int,
     avg_rate: float,
     today_label: str,
+    product_totals: dict[str, int],
 ) -> str:
-    """O1:R{end} 카트플랜 섹션 1회 batch update. plan_rows는 조합번호 오름차순."""
+    """O1:U{end} 카트플랜 + b~h 총 수량 섹션 1회 batch update."""
     grid: list[list] = []
     grid.append(["카트 플랜", channel, f"N={n}", today_label])
     grid.append(["조합번호", "조합", "구매수", "공급률"])
     for r in plan_rows:
         grid.append([r["combo_idx"], r["label"], r["qty"], round(r["supply_rate"], 4)])
     grid.append([channel, total_qty, total_pay, round(avg_rate, 4)])
-    rng = f"O1:R{len(grid)}"
-    ws.update(values=grid, range_name=rng, value_input_option="USER_ENTERED")
+    # 하단: b~h 제품별 총 수량 (오늘 카트플랜대로 구매 시 받게 되는 본품 합계)
+    grid.append([])  # 빈 행 (분리)
+    grid.append(["[b~h 제품별 총 수량 (본)]"])
+    grid.append([f"{c} {C.SHORT_NAME[c]}" for c in "bcdefgh"])
+    grid.append([product_totals.get(c, 0) for c in "bcdefgh"])
+    # 행 너비 정규화 (mixed width → 최대 너비로 padding)
+    maxw = max(len(row) for row in grid)
+    norm = [row + [""] * (maxw - len(row)) for row in grid]
+    end_col = chr(ord("O") + maxw - 1)
+    rng = f"O1:{end_col}{len(norm)}"
+    ws.update(values=norm, range_name=rng, value_input_option="USER_ENTERED")
     return rng
 
 
@@ -183,6 +199,7 @@ def main(argv=None) -> int:
     total_pay = 0
     weighted_rate_sum = 0.0
     total_qty = 0
+    product_totals: dict[str, int] = {code: 0 for code in "bcdefgh"}
     for combo_no in sorted(cart):
         qty = cart[combo_no]
         rate = channel_rates[combo_no - 1] or 0.0
@@ -193,6 +210,9 @@ def main(argv=None) -> int:
         total_pay += pay_per_combo * qty
         weighted_rate_sum += rate * qty
         total_qty += qty
+        # b~h 제품 누적 (qty × 조합 내 개수)
+        for code, q in combo:
+            product_totals[code] += q * qty
         plan_rows.append({
             "combo_idx": combo_no,
             "qty": qty,
@@ -214,11 +234,14 @@ def main(argv=None) -> int:
         ],
         "total_pay": total_pay,
         "avg_supply_rate": round(avg_rate, 4),
+        "product_totals": product_totals,
     }, ensure_ascii=False))
     print("=== CART_PLAN_END ===")
+    print(f"\nb~h 제품별 총 수량: {product_totals}")
 
     rng = write_sheet_section(
         ws, channel, n, plan_rows, total_qty, total_pay, avg_rate, tab,
+        product_totals,
     )
     print(f"\n→ 시트 입력: {rng}")
     return 0
