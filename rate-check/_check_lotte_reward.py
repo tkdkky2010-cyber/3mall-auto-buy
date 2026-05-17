@@ -3,7 +3,9 @@
 1) #eventBanner li.swiper_slide 수집
 2) lotte_ignore_keywords.txt negative 매칭 → 1차 제외
 3) 남은 항목 data-url 진입 → '구간 적립표' 또는 '최대 N원 적립' 패턴 검증
-4) 검증된 항목만 채택 + max_pt fallback (tier_rows 의 max reward)
+4) 검증된 항목 채택. verification.tier_rows = [{min, reward}, ...] (오름차순).
+   max_pt = 단일 한도("최대 N원 적립") 또는 tier_rows 최대 reward (fallback).
+   ★ lotte.py 는 tier_rows 만 읽음 — max_pt 는 본 스크립트 내부 print 용.
 
 CLI: 코드 (b~h) 단일 or 'all'.
 """
@@ -163,17 +165,20 @@ def process_one(code: str) -> dict:
             print(f"     [ERR navigate] {e}")
             continue
         evt = verify_event_page()
-        # fallback: tier_rows 의 max reward 를 max_pt 로 (reward 는 이제 int)
+        # max_pt: 단일 한도 미검출 시 tier_rows 최대 reward 로 fallback (print/요약 용).
+        # ★ lotte.py 는 tier_rows 만 사용 — max_pt 는 본 스크립트 내부 표시 전용.
         if not evt.get("max_pt") and evt.get("tier_rows"):
             evt["max_pt"] = max(int(r["reward"]) for r in evt["tier_rows"])
-        print(f"     구간: {evt['tier_rows'][:5]}  max_pt: {evt.get('max_pt')}")
+        print(f"     tier_rows: {evt['tier_rows'][:5]}  (max_pt: {evt.get('max_pt')})")
         if evt["has_reward_structure"]:
             confirmed.append({**it, "verification": evt})
 
-    total_max = sum((c["verification"].get("max_pt") or 0) for c in confirmed)
-    print(f"  [{code}] 적립 이벤트 {len(confirmed)}건, 합산 최대 적립금: {total_max:,}원")
+    # 이벤트 1회 적용 (RULES §7-3) — 합산이 아니라 이벤트별 최대 reward 표시.
+    per_event_max = [(c["verification"].get("max_pt") or 0) for c in confirmed]
+    print(f"  [{code}] 적립 이벤트 {len(confirmed)}건, 이벤트별 max: {per_event_max}")
     return {"product": prod, "items": items, "ignored": ignored,
-            "candidates": candidates, "confirmed": confirmed, "total_max": total_max}
+            "candidates": candidates, "confirmed": confirmed,
+            "per_event_max": per_event_max}
 
 
 all_results = {}
@@ -185,9 +190,9 @@ try:
             print(f"  [FATAL {code}] {e}")
             all_results[code] = {"error": str(e)}
 
-    # 요약
+    # 요약 — tier 리스트 중심 (multi-tier fix 적용 후, RULES §7-2/§7-3)
     print(f"\n\n{'='*80}\n========= 최종 요약 =========")
-    print(f"{'code':4s} | {'상품':36s} | 적립이벤트 | 최대적립금")
+    print(f"{'code':4s} | {'상품':36s} | 적립이벤트 | tier 리스트")
     print("-" * 80)
     for code in codes:
         r = all_results.get(code) or {}
@@ -196,10 +201,11 @@ try:
             continue
         name = r.get("product", {}).get("name", "")[:34]
         confirmed = r.get("confirmed") or []
-        names = " / ".join(c.get("title", "") for c in confirmed) or "-"
-        print(f"{code:4s} | {name:36s} | {len(confirmed)}건 | {r.get('total_max', 0):,}원")
+        print(f"{code:4s} | {name:36s} | {len(confirmed)}건")
         for c in confirmed:
-            print(f"     · {c.get('title')} — max {c['verification'].get('max_pt')}")
+            tr = c["verification"].get("tier_rows") or []
+            tr_str = ", ".join(f"{t['min']:,}↑/{t['reward']:,}원" for t in tr) or "(tier 없음)"
+            print(f"     · {c.get('title')} — {tr_str}")
 
     # ★ _lotte_reward_dump.json 등 결과파일 절대 X — sheet가 SoT.
     # lotte.py는 본 스크립트를 subprocess로 호출하고 stdout JSON_DUMP 를 파싱.
