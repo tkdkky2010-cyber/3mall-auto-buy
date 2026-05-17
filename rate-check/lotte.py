@@ -150,8 +150,10 @@ print(f"카드: {card_info}")
 
 # 적립 확인 — _check_lotte_reward.py 를 subprocess로 호출 + stdout JSON 파싱.
 # ★ 결과파일(_lotte_reward_dump.json) 절대 사용 X — sheet가 SoT.
+# tiers[code] = [{'threshold': int, 'reward': int}, ...] — threshold 오름차순.
+# compute() 가 조합 결제금액 vs threshold 비교해서 max 1회 적립 (RULES §7-3).
 import os, subprocess
-rewards = {code: 0 for code in 'bcdefgh'}
+tiers: dict[str, list[dict]] = {code: [] for code in 'bcdefgh'}
 try:
     reward_script = '/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/rate-check/_check_lotte_reward.py'
     if os.path.exists(reward_script):
@@ -165,23 +167,31 @@ try:
             jstr = out.split('JSON_DUMP_BEGIN')[1].split('JSON_DUMP_END')[0].strip().strip('=').strip()
             rd = json.loads(jstr)
             for code in 'bcdefgh':
-                rewards[code] = rd.get(code, {}).get('total_max', 0)
-            print(f"적립금 (subprocess): {rewards}")
-            # ★ 알려진 한계: _check_lotte_reward.py 정규식이 단일 tier만 잡고
-            #    상위 tier (예: 더 큰 구간 적립) 를 놓치는 경우가 있음.
-            #    7개 상품이 전부 동일한 값 → 단일 이벤트 검출 가능성 高.
-            #    이런 경우 실제 적립 이벤트 페이지에서 최대 구간 확인 후
-            #    시트 (롯데 영역 START=73 기준) G80:G95 / I80:I95 / J80:J95 / M2:M17 수동 패치 필요.
-            uniq_vals = set(rewards.values())
-            if len(uniq_vals) == 1 and 0 not in uniq_vals:
-                print(f"⚠️ 적립금 7개 상품 동일 ({uniq_vals.pop():,}원) — 상위 tier 누락 가능. "
-                      f"이벤트 페이지 직접 확인 권장 (RULES.md §7 참고).")
+                code_tiers: list[dict] = []
+                for ev in rd.get(code, {}).get('confirmed', []) or []:
+                    for tr in ev.get('verification', {}).get('tier_rows', []) or []:
+                        try:
+                            t = int(str(tr.get('min', 0)).replace(',', ''))
+                            r = int(str(tr.get('reward', 0)).replace(',', ''))
+                        except (ValueError, TypeError):
+                            continue
+                        if t > 0 and r > 0:
+                            code_tiers.append({'threshold': t, 'reward': r})
+                # threshold 오름차순 정렬, 중복 제거
+                seen = set()
+                code_tiers.sort(key=lambda x: x['threshold'])
+                tiers[code] = [t for t in code_tiers
+                               if (t['threshold'], t['reward']) not in seen
+                               and not seen.add((t['threshold'], t['reward']))]
+            print("적립 tiers (subprocess):")
+            for c in 'bcdefgh':
+                print(f"  {c}: {tiers[c]}")
         else:
-            print("⚠️ _check_lotte_reward stdout JSON_DUMP 못 찾음 — 적립금 0으로 처리")
+            print("⚠️ _check_lotte_reward stdout JSON_DUMP 못 찾음 — tiers 빈 dict")
     else:
-        print(f"⚠️ {reward_script} 없음 — 적립금 0으로 처리")
+        print(f"⚠️ {reward_script} 없음 — tiers 빈 dict")
 except Exception as e:
-    print(f"⚠️ 적립금 subprocess 실패 ({e}) — 0으로 처리")
+    print(f"⚠️ 적립금 subprocess 실패 ({e}) — tiers 빈 dict")
 
 # 카드 결정 (단일 카드 가정)
 CARD_NAME = (card_info.get('cards') or ['미확인'])[0] if card_info else '미확인'
@@ -209,17 +219,21 @@ def compute(combo):
     소비자 = sum(PRICES[c]*q for c,q in combo)
     추증 = sum(ADD_GIFT[c]*q for c,q in combo)
     총샘플 = 추증 + GWP_6
-    # ★ 적립금: 조합 1개당 1회 적용. 결제 1회 = 이벤트 1회 발생 (sum/qty 곱셈 X).
-    # 조합 내 상품별 적립 후보 중 최대값 1회 (모두 동일 이벤트면 그 값 = max).
-    applicable = [rewards.get(c, 0) for c, _ in combo if rewards.get(c, 0) > 0]
-    적립 = max(applicable) if applicable else 0
-    # 상품별 최종가
+    # 1) 결제금액 (적립 적용 전) 먼저 계산
     final = 0
     for c,q in combo:
         cp = coupons.get(c) or 0
         item_final = PRICES[c] * q * 0.9 * (1 - cp/100) * (1 - CARD_PCT/100) * (1 - PAYBACK)
         final += item_final
     final = round(final)
+    # 2) ★ 적립금: 조합당 1회 적용 (RULES §7-3). 결제 1회 = 이벤트 1회 발생.
+    # 조합 상품별 tier 중 final >= threshold 인 것의 reward 모은 후 max 1개.
+    applicable = []
+    for c, _ in combo:
+        for t in tiers.get(c, []):
+            if final >= t['threshold']:
+                applicable.append(t['reward'])
+    적립 = max(applicable) if applicable else 0
     순 = final - 총샘플 - 적립
     rate = 순 / 소비자
     return {'소비자가':소비자,'추증':추증,'총샘플':총샘플,'적립':적립,'최종':final,'순':순,'공급률':rate}
@@ -248,7 +262,7 @@ data.append([])
 coupon_str = ", ".join(f"{c}={coupons[c]}%" for c in 'bcdefgh')
 data.append([f"상품별 쿠폰: {coupon_str}"])
 data.append([f"카드 청구할인: {CARD_NAME} {CARD_PCT}% (페이백 {round(PAYBACK*100,1)}%)"])
-data.append([f"적립금(상품별 max): {rewards}"])
+data.append([f"적립금 tiers: {', '.join(f'{c}={tiers[c]}' for c in 'bcdefgh' if tiers[c])}"])
 data.append([])
 data.append(['조합번호','조합','소비자가','추증','GWP','총샘플','적립','최종구매가','순구매가','공급률',
              '', '상품', '쿠폰%'])

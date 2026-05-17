@@ -64,17 +64,47 @@ def verify_event_page():
     return driver.execute_script(r"""
         const body = document.body ? document.body.innerText : '';
         const out = {tier_rows: [], max_pt: null};
-        const re1 = /([\d,]{3,})\s*원\s*이상[\s\S]{0,80}?([\d,]{2,})\s*(?:원|P)\s*적립/g;
+
+        // 모든 임계값 + 모든 적립금 각각 독립 매칭 후 순서대로 페어링.
+        // 단일 lazy regex `([N]원 이상 ...{0,80}? [N]원 적립)` 은 두 tier 사이
+        // 텍스트가 80자 넘으면 두번째를 놓침 (RULES.md §P8) → 두 패턴 분리로 fix.
+        const reThr = /([\d,]{3,})\s*원\s*이상/g;
+        const reRwd = /([\d,]{2,})\s*(?:원|P)\s*적립(?!금)/g;  // "N원 적립" — "적립금" 직후 제외
+        const reRwdAlt = /적립금\s*([\d,]{2,})\s*원/g;          // "적립금 N원" 변형 패턴
+
+        const thresholds = [];
         let m;
-        while ((m = re1.exec(body)) !== null) {
-            out.tier_rows.push({min: m[1], reward: m[2]});
-            if (out.tier_rows.length >= 20) break;
+        while ((m = reThr.exec(body)) !== null) {
+            const v = parseInt(m[1].replace(/,/g, ''));
+            if (v >= 1000) thresholds.push(v);
+            if (thresholds.length >= 20) break;
         }
+        const rewards = [];
+        while ((m = reRwd.exec(body)) !== null) {
+            const v = parseInt(m[1].replace(/,/g, ''));
+            if (v >= 100) rewards.push(v);
+            if (rewards.length >= 20) break;
+        }
+        while ((m = reRwdAlt.exec(body)) !== null) {
+            const v = parseInt(m[1].replace(/,/g, ''));
+            if (v >= 100 && !rewards.includes(v)) rewards.push(v);
+            if (rewards.length >= 20) break;
+        }
+
+        // 순서대로 zip — 두 list 길이가 같아야 정상. 다르면 작은 쪽 길이만큼만.
+        const n = Math.min(thresholds.length, rewards.length);
+        for (let i = 0; i < n; i++) {
+            out.tier_rows.push({min: thresholds[i], reward: rewards[i]});
+        }
+        // 임계값 오름차순 정렬 (페이지에 거꾸로 나올 가능성 방어)
+        out.tier_rows.sort((a, b) => a.min - b.min);
+
         const re2 = /최대\s*([\d,]+)\s*(?:원|P)\s*적립/g;
         const maxes = [];
         while ((m = re2.exec(body)) !== null) maxes.push(parseInt(m[1].replace(/,/g, '')));
         if (maxes.length) out.max_pt = Math.max(...maxes);
         out.has_reward_structure = out.tier_rows.length > 0 || out.max_pt !== null;
+        out.debug = {thr_count: thresholds.length, rwd_count: rewards.length};
         const h = document.querySelector('h1, h2, .ttl, .title');
         out.page_title = h ? h.textContent.trim().slice(0, 80) : '';
         out.url = location.href;
@@ -133,9 +163,9 @@ def process_one(code: str) -> dict:
             print(f"     [ERR navigate] {e}")
             continue
         evt = verify_event_page()
-        # fallback: tier_rows 의 max reward 를 max_pt 로
+        # fallback: tier_rows 의 max reward 를 max_pt 로 (reward 는 이제 int)
         if not evt.get("max_pt") and evt.get("tier_rows"):
-            evt["max_pt"] = max(int(r["reward"].replace(",", "")) for r in evt["tier_rows"])
+            evt["max_pt"] = max(int(r["reward"]) for r in evt["tier_rows"])
         print(f"     구간: {evt['tier_rows'][:5]}  max_pt: {evt.get('max_pt')}")
         if evt["has_reward_structure"]:
             confirmed.append({**it, "verification": evt})
