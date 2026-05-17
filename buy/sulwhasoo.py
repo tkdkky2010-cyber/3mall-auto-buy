@@ -37,6 +37,9 @@ GALLERIA_ACCOUNTS = PROJECT_ROOT / "galleria.json"
 CDP_PORT = os.environ.get("CDP_PORT", "9222")
 CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
 DRY_PAYMENT = os.environ.get("DRY_PAYMENT", "true").lower() == "true"
+# lotte 는 구매사은혜택 적립 받으려면 앱 결제 필수 → 컴터에선 cart-only.
+# galleria/hmall 은 컴터 결제 가능.
+LOTTE_CART_ONLY = os.environ.get("LOTTE_CART_ONLY", "true").lower() == "true"
 
 GALLERIA_HOME = "https://www.galleria.co.kr/main/initMain.action"
 LOTTE_HOME = "https://www.lotteimall.com/"
@@ -63,20 +66,11 @@ LOTTE_PRODUCTS = {
     "h": {"name": "자음생크림리치세트", "goods_no": "2719761746"},
 }
 
-# 11개 고정 조합 (가이드 섹션 7)
-COMBOS = {
-    1:  [("g", 2), ("h", 1)],
-    2:  [("d", 2), ("g", 2)],
-    3:  [("d", 4), ("e", 1)],
-    4:  [("e", 2), ("h", 1)],
-    5:  [("b", 2), ("d", 2)],
-    6:  [("e", 2), ("f", 2)],
-    7:  [("c", 3), ("h", 1)],
-    8:  [("c", 3), ("d", 2)],
-    9:  [("c", 1), ("f", 4)],
-    10: [("c", 2), ("f", 3)],
-    11: [("f", 5)],
-}
+# 조합 = rate-check/_common.py 의 COMBOS 단일 소스 (TOP 20).
+# rate-check 의 list[0..N-1] 을 dict{1..N} 으로 변환 (combo_no 1-based 사용).
+sys.path.insert(0, str(PROJECT_ROOT / "rate-check"))
+from _common import COMBOS as _COMBOS_LIST  # noqa: E402
+COMBOS: dict[int, list[tuple[str, int]]] = {i + 1: c for i, c in enumerate(_COMBOS_LIST)}
 
 
 # ───────────── 공통 ─────────────
@@ -430,12 +424,27 @@ def lotte_login(page: Page, account_id: str, account_pw: str) -> bool:
     page1(mall popup) → 로그인 클릭 → page2(login popup) → fill → Enter →
     page3(guide popup) → page2.close() → page3 처리 후 close.
     page1(mall popup)은 절대 close 안 함.
+    멀티계정 시나리오: 이미 다른 계정 로그인 상태면 logout 후 fresh login.
     """
     context = page.context
     try:
         # 클릭 전 page focus (anti-bot detection 우회 도움)
         try:
             page.bring_to_front()
+        except Exception:
+            pass
+
+        # 0) 기존 로그인 상태 확인 — 있으면 logout 후 fresh login (계정 확인 까다로워서 무조건 logout)
+        try:
+            body = page.inner_text("body")
+            if "로그아웃" in body and "로그인" not in body.split("로그아웃")[0][-20:]:
+                # 로그아웃 텍스트 존재 = 이미 로그인 상태
+                try:
+                    page.get_by_role("link", name="로그아웃").first.click(timeout=3000)
+                    page.wait_for_timeout(2500)
+                    print(f"  [INFO] 기존 로그인 해제 → {account_id} fresh login 진행")
+                except Exception as e:
+                    print(f"  [WARN] logout click 실패: {e} — 그대로 login 시도")
         except Exception:
             pass
 
@@ -527,16 +536,26 @@ def lotte_add_product_by_url(page: Page, goods_no: str, qty: int) -> bool:
         page.wait_for_timeout(2000)
         dismiss_popup(page)
 
-        # 쿠폰받기 → 쿠폰 전체 다운로드 → 닫기
+        # 쿠폰받기 → 쿠폰 전체 다운로드 → 닫기 (단계별 명시 로그)
+        coupon_status = "skip"  # skip / popup_only / downloaded / err_*
         try:
             page.get_by_role("button", name="쿠폰받기").click(timeout=3000)
             page.wait_for_timeout(800)
-            page.get_by_role("button", name="쿠폰 전체 다운로드").click(timeout=2000)
-            page.wait_for_timeout(800)
-            page.get_by_role("button", name="닫기", exact=True).click(timeout=2000)
-            page.wait_for_timeout(500)
-        except Exception:
-            pass
+            coupon_status = "popup_opened"
+            try:
+                page.get_by_role("button", name="쿠폰 전체 다운로드").click(timeout=2000)
+                page.wait_for_timeout(800)
+                coupon_status = "downloaded"
+            except Exception as ce:
+                coupon_status = f"err_download:{type(ce).__name__}"
+            try:
+                page.get_by_role("button", name="닫기", exact=True).click(timeout=2000)
+                page.wait_for_timeout(500)
+            except Exception:
+                pass
+        except Exception as oe:
+            coupon_status = f"err_open:{type(oe).__name__}"
+        print(f"      [coupon] {goods_no}: {coupon_status}")
 
         # 옵션 (타입 선택 → 세트)
         try:
@@ -862,6 +881,12 @@ def main() -> int:
             if not lotte_add_combo(mall_page, combo_no):
                 print("[FATAL] 조합 추가 실패")
                 return 1
+            if LOTTE_CART_ONLY:
+                # 적립 받으려면 앱 결제 필수 → 컴터에선 cart 담은 상태로 종료.
+                # 사용자는 폰 앱에서 동일 계정 로그인 → 장바구니 → 주문/결제.
+                print(f"\n✓ [lotte] #{idx} 장바구니 담기 완료 (LOTTE_CART_ONLY=true)")
+                print("  → 폰 앱에서 동일 계정 로그인 후 결제 진행 필요 (적립 받으려면 앱 결제 필수)")
+                return 0
             result = lotte_checkout(mall_page, account_id=acc["id"])
 
         if result["success"]:
