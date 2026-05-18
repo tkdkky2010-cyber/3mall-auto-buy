@@ -32,6 +32,8 @@ except ImportError:
 
 ROOT = Path(__file__).parent
 PROJECT_ROOT = ROOT.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+from chrome_launcher import ensure_chrome  # noqa: E402
 load_dotenv(PROJECT_ROOT / "buy" / ".env")
 
 ACCOUNTS_FILE = Path(os.environ.get("HMALL_CONFIG_PATH") or (PROJECT_ROOT / "hmall_config.json"))
@@ -58,10 +60,105 @@ EVERYDAY_PAYBACK_CARDS = [
 ]
 
 
+def derive_alias_result(base: dict, prod: dict) -> dict:
+    """alias 상품(같은 URL, 다른 옵션)을 base의 benefit_ratio 로 derive.
+
+    핵심:
+    1. base의 benefit_ratio = base.benefit_unit_price / base.unit_list_price (대표옵션 우수가/정가)
+    2. alias.unit_list_price (옵션의 1개당 정가) × benefit_ratio = alias 1개당 혜택가
+    3. 5만원 임계 미달이면 qty 자동 증가 (카드 즉시할인 5만원 이상에만 적용)
+    4. H = 혜택가 × qty × (1 - 즉시할인%) — base 카드 슬라이드 재사용
+    5. I = (H × 페이백계수) - 적립금(H 기준) — _compute_reward로 산출
+
+    prod 에 unit_list_price 가 없으면 (=옵션가 미상) → 옛 동작(clone) 폴백 + 경고.
+    """
+    base_pay = base.get("payment") or {}
+    unit_list = prod.get("unit_list_price")
+    base_list_total = base_pay.get("list_price")
+    base_qty = base_pay.get("qty") or 1
+    base_benefit = base_pay.get("benefit_unit_price")
+
+    # ★ unit_list_price 미지정이면 base.options 에서 option_keyword 로 자동 lookup
+    if not unit_list and prod.get("option_keyword"):
+        opts = base_pay.get("options") or []
+        kw = prod["option_keyword"]
+        matched = next((o for o in opts if kw in (o.get("name") or "")), None)
+        if matched:
+            unit_list = matched["list_price"]
+            print(f"     ⓘ #{prod['id']} 옵션 자동매칭: '{matched['name'][:35]}' [선택 {matched.get('idx')}] = {unit_list:,}원")
+
+    if not unit_list or not base_list_total or not base_benefit:
+        # 폴백: 옛 동작 (clone) — 경고 출력
+        print(f"     ⚠️ alias #{prod['id']} unit_list_price 못찾음 (옵션 키워드 '{prod.get('option_keyword')}' 매칭 실패) → clone 폴백")
+        cloned = dict(base)
+        cloned["id"] = prod["id"]
+        cloned["name"] = prod["name"]
+        cloned["alias_of"] = prod.get("alias_of")
+        return cloned
+
+    # benefit_ratio = 대표옵션 우수가 / 대표옵션 정가
+    base_unit_list_price = base_list_total / base_qty
+    benefit_ratio = base_benefit / base_unit_list_price
+    alias_benefit_unit = round(unit_list * benefit_ratio)
+
+    # 5만원 임계 자동 qty 증가
+    qty = 1
+    while alias_benefit_unit * qty < 50000:
+        qty += 1
+        if qty > 99:
+            break
+    member = alias_benefit_unit * qty
+
+    # 카드 슬라이드는 base 결과 재사용 (같은 URL이라 같은 카드 즉시할인 적용)
+    card_slides = base_pay.get("card_slides") or []
+    pick_slide = next((s for s in card_slides if "카카오" in (s.get("text") or "")), None)
+    if not pick_slide:
+        with_pct = [s for s in card_slides if s.get("percent")]
+        if with_pct:
+            pick_slide = max(with_pct, key=lambda s: s.get("percent") or 0)
+
+    payment = {
+        "qty": qty,
+        "list_price": int(unit_list * qty),
+        "benefit_unit_price": alias_benefit_unit,
+        "member_price": member,
+        "card_slides": card_slides,
+        "kakao_price": None,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": None,
+        "paybacks": {},
+        "error": None,
+    }
+
+    if pick_slide and pick_slide.get("percent") and member > 0:
+        imm_pct = pick_slide["percent"] / 100
+        slide_text = pick_slide.get("text") or ""
+        pb_pct = 0
+        for name, pct in EVERYDAY_PAYBACK_CARDS:
+            short = name.replace("카드", "")
+            if name in slide_text or short in slide_text:
+                pb_pct = pct
+                break
+        imm_price = round(member * (1 - imm_pct))
+        after_payback = round(imm_price * (1 - pb_pct))
+        rw = _compute_reward(imm_price, base.get("tiers") or [], base.get("simple_ranges") or [])
+        payment["kakao_price"] = imm_price
+        payment["kakao_reward_pt"] = rw
+        payment["kakao_final_cost"] = after_payback - rw
+
+    out = dict(base)
+    out["id"] = prod["id"]
+    out["name"] = prod["name"]
+    out["alias_of"] = prod.get("alias_of")
+    out["url"] = ITEM_URL_FMT.format(slitmCd=prod["slitmCd"], extra=prod.get("url_extra", ""))
+    out["payment"] = payment
+    return out
+
+
 def _compute_reward(price: int | None, tiers: list[dict], simple_ranges: list[dict] | None = None) -> int:
     """price 가 어느 구간에 도달하는지로 reward 결정.
     - tier-based: applicable tier 중 max reward
-    - simple_range (예: 5만원 ~ 1천만원 10% 적립): min ≤ price ≤ max 면 price × pct 추가
+    - simple_range (단순 N% 적립, min_won ≤ price ≤ max_won 범위): price × pct 추가
     """
     if not price:
         return 0
@@ -82,7 +179,7 @@ PRODUCTS = [
     {"id": 2,  "name": "하루견과 초록색 100봉",                "slitmCd": "2151046312", "url_extra": "&sectId=3059445"},
     {"id": 3,  "name": "하루견과 갈색 100봉",                 "slitmCd": "2225431602", "url_extra": "&sectId=3059445"},
     {"id": 4,  "name": "곡물도감 곡물서리태",                  "slitmCd": "2227834416", "url_extra": "&sectId=3059445"},
-    {"id": 5,  "name": "말차 (4와 동일 URL)",                  "slitmCd": "2227834416", "url_extra": "&sectId=3059445", "alias_of": 4},
+    {"id": 5,  "name": "말차 (4와 동일 URL, 옵션 다름)",        "slitmCd": "2227834416", "url_extra": "&sectId=3059445", "alias_of": 4,  "option_keyword": "말차", "unit_list_price": 99_900},  # codegen 5/15 확정 [선택 2] = 곡물도감 말차 서리태...
     {"id": 6,  "name": "레놉티",                             "slitmCd": "2244138695", "url_extra": "&sectId=3059445"},
     {"id": 7,  "name": "락토핏",                             "slitmCd": "2151878435", "url_extra": ""},
     {"id": 8,  "name": "이디야 디카페인",                      "slitmCd": "2244409628", "url_extra": "&sectId=3059445"},
@@ -90,8 +187,10 @@ PRODUCTS = [
     {"id": 10, "name": "이경제 더힘찬녹용 30포",                "slitmCd": "2240802022", "url_extra": "&ordpreview=true"},
     {"id": 11, "name": "라메종드미엘 프랑스 라벤더 천연꿀 8병",   "slitmCd": "2246845189", "url_extra": "&sectId=3059445"},
     {"id": 12, "name": "갱년기 다이어트 리얼퀸 3병",            "slitmCd": "2202276847", "url_extra": "&sectId=3059445"},
-    {"id": 13, "name": "GRN 핑크 초록이 (12와 동일)",           "slitmCd": "2202276847", "url_extra": "",                "alias_of": 12},
-    {"id": 14, "name": "GRN 곰돌이 (12와 동일)",                "slitmCd": "2202276847", "url_extra": "&sectId=3059445", "alias_of": 12},
+    # codegen 5/15 확정: [선택 2]="[GRN] 벨리곰 콜라보 분홍이 초록이 SET"=26,900 / [선택 3]="GRN 흡수빠른 쾌변다이어트"=17,800
+    # 사용자 5/15 확정: #13 핑크초록이 = #14 곰돌이 = 둘 다 [선택 2] 벨리곰 = 26,900 (sectId만 다름 — 캠페인 추적용)
+    {"id": 13, "name": "GRN 핑크 초록이 (12와 동일 URL, [선택 2] 벨리곰)", "slitmCd": "2202276847", "url_extra": "",                "alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": 26900},
+    {"id": 14, "name": "GRN 곰돌이 (12와 동일 URL, [선택 2] 벨리곰)",      "slitmCd": "2202276847", "url_extra": "&sectId=3059445", "alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": None},  # auto-lookup → 26,900
     {"id": 15, "name": "셀게이트 글루타치온 30p",               "slitmCd": "2244515588", "url_extra": ""},
     {"id": 16, "name": "루솔",                               "slitmCd": "2225275921", "url_extra": ""},
     {"id": 17, "name": "데이즈온 원데이 알파 18개",             "slitmCd": "2247036059", "url_extra": "&sectId=3059445"},
@@ -420,28 +519,91 @@ def _click_coupon(page: Page) -> None:
         pass
 
 
-def _execute_buy_now(page: Page, qty: int) -> bool:
-    """구매하기 → 옵션[선택 1] → qty + → 바로구매 → /order 페이지 도달 확인."""
+def _execute_buy_now(page: Page, qty: int, option_keyword: str | None = None) -> tuple[bool, list[dict]]:
+    """구매하기 → (옵션 모두 스크랩) → 옵션 선택 → qty + → 바로구매 → /order 페이지 도달 확인.
+
+    Returns (success, options).
+    options: [{idx, name, list_price}] — 옵션 패널의 모든 선택지 (alias unit_list_price 자동 보충용)
+    option_keyword: 지정 시 해당 키워드 포함 옵션 클릭. None이면 [선택 1] (대표).
+    """
     try:
         page.locator("button.btn-purchase").first.click()
         page.wait_for_timeout(1500)
     except Exception:
-        return False
+        return False, []
+
+    # ★ 옵션 패널 등장 → span.choice-num.title 기반 스크랩 (가이드 line 422)
+    # 가격은 같은 span 에 없을 수 있어 조상 4단계까지 올라가며 'N원' 패턴 검색
     try:
-        opt = page.locator("span.choice-num.title").filter(has_text="[선택 1]").first
+        options = page.evaluate("""() => {
+            const out = [];
+            const spans = Array.from(document.querySelectorAll('span.choice-num.title'))
+                .filter(s => s.offsetParent !== null);
+            for (const s of spans) {
+                const text = (s.textContent || '').trim().replace(/\\s+/g, ' ');
+                const m = text.match(/\\[선택\\s*(\\d+)\\]/);
+                if (!m) continue;
+                const idx = parseInt(m[1]);
+                const name = text.replace(/\\[선택\\s*\\d+\\]/, '').replace(/^\\[우수고객전용\\]/, '').trim();
+                let price = null;
+                let cur = s.parentElement;
+                for (let i = 0; i < 5 && cur; i++) {
+                    const t = cur.innerText || '';
+                    const pm = t.match(/([\\d,]{4,})\\s*원/);
+                    if (pm) { price = parseInt(pm[1].replace(/,/g, '')); break; }
+                    cur = cur.parentElement;
+                }
+                out.push({ idx, name, list_price: price });
+            }
+            // 폴백: 옛 <a> 패턴 (DOM 롤백 대비)
+            if (out.length === 0) {
+                for (const a of document.querySelectorAll('a')) {
+                    const text = (a.textContent || '').trim().replace(/\\s+/g, ' ');
+                    const m = text.match(/\\[선택\\s*(\\d+)\\][^\\d]*?([\\d,]+)\\s*원/);
+                    if (m) {
+                        const name = text.replace(/\\[선택\\s*\\d+\\]/, '').replace(/[\\d,]+\\s*원.*$/, '').trim();
+                        out.push({ idx: parseInt(m[1]), name, list_price: parseInt(m[2].replace(/,/g, '')) });
+                    }
+                }
+            }
+            const seen = new Set();
+            return out.filter(o => { if (seen.has(o.idx)) return false; seen.add(o.idx); return true; });
+        }""") or []
+    except Exception:
+        options = []
+
+    # 옵션 클릭 — span.choice-num.title 우선 + 폴백 <a>. invisible 매칭 방지 위해 timeout 5초.
+    try:
+        if option_keyword:
+            opt = page.locator("span.choice-num.title").filter(has_text=option_keyword).first
+            if opt.count() == 0:
+                opt = page.locator("a").filter(has_text=option_keyword).first
+        else:
+            opt = page.locator("span.choice-num.title").filter(has_text=re.compile(r"\[선택\s*1\]")).first
+            if opt.count() == 0:
+                opt = page.locator("a").filter(has_text=re.compile(r"\[선택\s*1\]")).first
         if opt.count() > 0:
-            opt.click()
-            page.wait_for_timeout(700)
+            opt.click(timeout=5000)
+            page.wait_for_timeout(1500)
     except Exception:
         pass
+
     if qty > 1:
         try:
-            plus = page.locator("button.btn-plus").first
+            # codegen 확인: 팝업 + 버튼은 텍스트 "증가"
+            plus = page.get_by_role("button", name="증가").first
             for _ in range(qty - 1):
                 plus.click()
                 page.wait_for_timeout(180)
         except Exception:
-            pass
+            # fallback: 옛 클래스 button.btn-plus
+            try:
+                plus = page.locator("button.btn-plus").first
+                for _ in range(qty - 1):
+                    plus.click()
+                    page.wait_for_timeout(180)
+            except Exception:
+                pass
     clicked = page.evaluate("""
         () => {
             const buyNow = Array.from(document.querySelectorAll('button'))
@@ -451,13 +613,13 @@ def _execute_buy_now(page: Page, qty: int) -> bool:
         }
     """)
     if not clicked:
-        return False
+        return False, options
     try:
         page.wait_for_load_state("domcontentloaded", timeout=20000)
     except Exception:
         pass
     page.wait_for_timeout(3500)
-    return "/order" in (page.url or "")
+    return ("/order" in (page.url or "")), options
 
 
 def _extract_order_page(page: Page) -> dict:
@@ -576,28 +738,47 @@ def _extract_order_page(page: Page) -> dict:
                     }
                     const target = (cardSec && (cardSec.innerText || '').includes('즉시할인')) ? cardSec : best;
                     if (target) {
-                        const lines = target.innerText.split(/\\n/).map(l => l.trim()).filter(Boolean);
+                        // 빈 라인 보존 (필터링 X) — discount_type 이 별도 라인에 오는 케이스 처리
+                        const lines = target.innerText.split(/\\n/).map(l => l.trim());
                         for (let i = 0; i < lines.length; i++) {
-                            const m = lines[i].match(/(\\d+)\\s*%\\s*즉시할인/);
-                            if (!m) continue;
-                            const pct = parseInt(m[1]);
-                            // 카드명 = 직전 라인 (숫자/% 시작 아님)
-                            let card = '';
-                            if (i > 0) {
-                                const prev = lines[i-1];
-                                if (prev && !/^\\d/.test(prev) && !prev.includes('%') && !prev.includes('원') && prev.length < 30) {
-                                    card = prev;
+                            // 패턴 A: 한 라인에 "N% (즉시할인|청구할인)" 다 들어있는 경우
+                            let m = lines[i].match(/(\\d+)\\s*%\\s*(즉시할인|청구할인)/);
+                            let pct = null, dtype = null;
+                            if (m) {
+                                pct = parseInt(m[1]); dtype = m[2];
+                            } else {
+                                // 패턴 B: 라인이 "N%" 만, discount_type 은 다음 3라인 안
+                                const mp = lines[i].match(/^\\s*(\\d+)\\s*%\\s*$/);
+                                if (mp) {
+                                    pct = parseInt(mp[1]);
+                                    for (let j = i+1; j < Math.min(i+4, lines.length); j++) {
+                                        const md = lines[j].match(/(즉시할인|청구할인)/);
+                                        if (md) { dtype = md[1]; break; }
+                                    }
                                 }
                             }
-                            // 가격 = 다음 4줄 안에서 첫 "X원"
+                            if (pct === null || !dtype) continue;
+                            // 카드명 = 이전 4라인 중 '카드' 포함 + '카드할인' 헤더 제외
+                            let card = '';
+                            for (let j = i-1; j >= Math.max(0, i-4); j--) {
+                                const prev = lines[j].trim();
+                                if (!prev || prev === '카드할인') continue;
+                                if (prev.includes('카드') && prev.length < 50) {
+                                    card = prev; break;
+                                }
+                            }
+                            // 가격 = 다음 5라인 안에서 첫 "X원"
                             let price = null;
-                            for (let j = i+1; j < Math.min(i+5, lines.length); j++) {
+                            for (let j = i+1; j < Math.min(i+6, lines.length); j++) {
                                 const pm = lines[j].match(/([\\d,]{4,})\\s*원/);
                                 if (pm) { price = parseInt(pm[1].replace(/,/g, '')); break; }
                             }
                             out.slides.push({
-                                alt: card, text: (card + ' ' + lines[i]).trim().slice(0, 120),
-                                percent: pct, price: price,
+                                alt: card,
+                                text: (card + ' ' + pct + '% ' + dtype).trim().slice(0, 120),
+                                percent: pct,
+                                price: price,
+                                discount_type: dtype,
                             });
                         }
                     }
@@ -643,12 +824,66 @@ def _extract_order_page(page: Page) -> dict:
     """) or {}
 
 
+def _find_optimal_qty(unit_price: int | None, tiers: list[dict], cap_won: int = 500_000, min_pct: float = 10.0) -> dict | None:
+    """≥min_pct nominal ratio tier 중 best 선택.
+
+    nominal_pct = tier.reward_pt / tier.min_won × 100.
+    candidates 중 (highest nominal_pct, tiebreak smallest qty) 선정.
+    actual_total (= qty × unit_price) > cap_won 인 tier 는 제외.
+
+    Returns dict {qty, tier_min, tier_reward, nominal_pct, actual_total, actual_reward, effective_pct}
+    또는 None (조건 만족 tier 없음).
+    """
+    if not tiers or not unit_price or unit_price <= 0:
+        return None
+    candidates = []
+    for tier in tiers:
+        tier_min = tier.get("min_won")
+        reward = tier.get("reward_pt")
+        if not tier_min or not reward:
+            continue
+        nominal_pct = (reward / tier_min) * 100
+        if nominal_pct < min_pct:
+            continue
+        qty = math.ceil(tier_min / unit_price)
+        actual_total = qty * unit_price
+        if actual_total > cap_won:
+            continue
+        # 실제 hit 되는 가장 높은 tier = actual_reward
+        actual_reward = max(
+            (t["reward_pt"] for t in tiers if t.get("min_won") and t["min_won"] <= actual_total),
+            default=reward,
+        )
+        effective_pct = (actual_reward / actual_total) * 100
+        candidates.append({
+            "qty": qty,
+            "tier_min": tier_min,
+            "tier_reward": reward,
+            "nominal_pct": nominal_pct,
+            "actual_total": actual_total,
+            "actual_reward": actual_reward,
+            "effective_pct": effective_pct,
+        })
+    if not candidates:
+        return None
+    # best nominal_pct, tiebreak smallest qty
+    return max(candidates, key=lambda c: (c["nominal_pct"], -c["qty"]))
+
+
 def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges: list[dict] | None = None) -> dict:
-    """상품 페이지 → 쿠폰받기 → 바로구매 → 결제 페이지에서 가격 정보 추출.
-    우수가(member_price) < 5만원이면 카드할인 임계 미달 → qty 늘려 1회 재시도.
+    """상품 페이지 → 혜택가 추출 → optimal qty 결정 → 바로구매 → 결제 페이지에서 카드할인 추출.
+
+    qty 결정 정책 (5/18~):
+      - tiers 중 nominal ratio ≥ 10% AND actual_total ≤ 500K 인 best tier 선택
+      - 만족 tier 없으면 effective_ten_percent=False, 바로구매 skip
+
     적립 계산:
-      - tiers (구간별, 예: 50K/5K, 100K/10K, ...)
-      - simple_ranges (단순 N%, 예: 5만원 ~ 1천만원 10% 적립)
+      - tiers (구간별, min_won 임계마다 reward_pt 부여 — 적용 가능한 tier 중 max)
+      - simple_ranges (단순 N% 적립, min_won ≤ price ≤ max_won 범위)
+
+    카드할인 (5/18~ DOM 신구조):
+      - 즉시할인 → H 감소 (member × (1 - imm_pct))
+      - 청구할인 → 결제 후 카드사 환급 (페이백 취급, I 에서 차감)
     """
     url = ITEM_URL_FMT.format(slitmCd=prod["slitmCd"], extra=prod.get("url_extra", ""))
     out = {
@@ -656,90 +891,109 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
         "list_price": None,        # 상품금액 라벨 (소비자가격, 정가)
         "member_price": None,      # 총 결제금액 라벨 (우수고객 혜택가)
         "card_slides": [],
-        "kakao_price": None,       # 카카오페이 즉시할인가
+        "kakao_price": None,       # H — 즉시할인 적용된 결제 시점 금액
         "kakao_reward_pt": 0,
-        "kakao_final_cost": None,
-        # 슬라이드에 등장한 페이백 5개 카드만 — 즉시할인 + 페이백 둘 다 받는 케이스
-        "paybacks": {},            # {카드명: {immediate_price, payback_pct, after_payback, reward_pt, final_cost}}
+        "kakao_final_cost": None,  # I — 청구할인/페이백/적립 다 적용한 실비
+        "paybacks": {},
+        "optimal_tier": None,      # _find_optimal_qty 결과 (None = ≥10% 불가)
+        "effective_ten_percent": None,
         "error": None,
     }
-    qty = 1
-    kakao_slide = None
-    for attempt in range(2):
-        try:
-            page.goto(url, wait_until="domcontentloaded", timeout=20000)
-            page.wait_for_timeout(1500)
-        except Exception as e:
-            out["error"] = f"goto: {e}"
-            return out
 
-        # ★ 상품 상세페이지의 '혜택가' 추출 (= 진짜 우수가, 즉시할인 적용 전)
-        # 사용자 정의: H열 우수가 = 혜택가 (1개 기준)
-        try:
-            benefit_unit = page.evaluate("""() => {
-                const all = document.body.innerText || '';
-                const m = all.match(/혜택가\\s*\\n?\\s*([\\d,]+)\\s*원/);
-                return m ? parseInt(m[1].replace(/,/g, '')) : null;
-            }""")
-        except Exception:
-            benefit_unit = None
-        out["benefit_unit_price"] = benefit_unit  # 1개 기준 혜택가
+    # 1) PDP 진입 + 혜택가 추출
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=20000)
+        page.wait_for_timeout(1500)
+    except Exception as e:
+        out["error"] = f"goto: {e}"
+        return out
 
-        _click_coupon(page)
-        if not _execute_buy_now(page, qty):
-            out["error"] = "바로구매 실패"
-            return out
+    try:
+        benefit_unit = page.evaluate("""() => {
+            const all = document.body.innerText || '';
+            const m = all.match(/혜택가\\s*\\n?\\s*([\\d,]+)\\s*원/);
+            return m ? parseInt(m[1].replace(/,/g, '')) : null;
+        }""")
+    except Exception:
+        benefit_unit = None
+    out["benefit_unit_price"] = benefit_unit
 
-        info = _extract_order_page(page)
-        out["card_slides"] = info.get("slides") or []
-        out["list_price"] = info.get("list_price") or info.get("list_total")
-        # member_price를 혜택가 × qty 로 override (주문 페이지 '총 결제금액'은
-        # 추가 할인이 적용된 값이라 H열 의미와 다름)
-        actual_qty = info.get("qty") or qty
-        if benefit_unit:
-            out["member_price"] = benefit_unit * actual_qty
-        else:
-            out["member_price"] = info.get("member_price")
-        out["qty"] = actual_qty
+    # 2) optimal qty 계산 (≥10% nominal, cap 500K)
+    optimal = _find_optimal_qty(benefit_unit, tiers, cap_won=500_000, min_pct=10.0)
+    out["optimal_tier"] = optimal
+    if not optimal:
+        out["effective_ten_percent"] = False
+        out["error"] = "≥10% tier unreachable (cap 500K)" if benefit_unit else "no benefit_unit"
+        return out
+    out["effective_ten_percent"] = True
+    qty = optimal["qty"]
+    out["qty"] = qty
 
-        kakao_slide = next((s for s in out["card_slides"] if "카카오" in (s.get("text") or "")), None)
+    # 3) 쿠폰 + 바로구매 (optimal qty)
+    _click_coupon(page)
+    ok, options = _execute_buy_now(page, qty, option_keyword=prod.get("option_keyword"))
+    out["options"] = options
+    if not ok:
+        out["error"] = "바로구매 실패"
+        return out
 
-        # retry 조건: 우수가 < 5만원 → qty 늘려 임계 돌파
-        member = out["member_price"] or 0
-        if attempt == 0 and 0 < member < 50000:
-            unit_member = member / max(out["qty"], 1)
-            qty = math.ceil(50000 / unit_member) if unit_member > 0 else qty + 1
-            continue
-        break
+    # 4) 결제 페이지 정보 추출
+    info = _extract_order_page(page)
+    out["card_slides"] = info.get("slides") or []
+    out["list_price"] = info.get("list_price") or info.get("list_total")
+    actual_qty = info.get("qty") or qty
+    if benefit_unit:
+        out["member_price"] = benefit_unit * actual_qty
+    else:
+        out["member_price"] = info.get("member_price")
+    out["qty"] = actual_qty
 
-    # ── I열/J열 (즉시할인가 / 실비) — 수식 기반 ──
-    # I = 우수가 × (1 - 금일 즉시할인%)
-    # 즉시할인% 결정: card_slides 중 카카오페이 우선 → 없으면 max % 슬라이드
-    # J = I × (1 - 카드페이백%) - 적립금(I 가격 기준)
+    kakao_slide = next((s for s in out["card_slides"] if "카카오" in (s.get("text") or "")), None)
+
+    # ── H열/I열 (즉시할인가 / 실비) — 수식 기반 ──
+    # H = 우수가 × (1 - 즉시할인%)
+    # I = H × (1 - 청구할인% - 일상페이백%) - 적립금(H 기준)
+    #   ★ 즉시할인 = 결제 시점 차감, 청구할인 = 카드사 환급 (페이백 취급)
+    #   ★ 적립금은 H 기준 — 청구할인은 결제 시점에 적용 안 되므로
     member = out.get("member_price") or 0
-    pick_slide = kakao_slide
-    if not pick_slide:
-        with_pct = [s for s in out["card_slides"] if s.get("percent")]
-        if with_pct:
-            pick_slide = max(with_pct, key=lambda s: s.get("percent") or 0)
-    if pick_slide and pick_slide.get("percent") and member > 0:
-        imm_pct = pick_slide["percent"] / 100
-        slide_text = pick_slide.get("text") or ""
-        # 카드 페이백 매칭 (text에 페이백 대상 카드명 포함되면 해당 페이백 적용)
-        pb_pct = 0
+
+    # 즉시할인 slide: discount_type='즉시할인' 또는 카카오 (legacy: 카카오는 항상 즉시할인 취급)
+    imm_candidates = [s for s in out["card_slides"]
+                      if s.get("percent") and (s.get("discount_type") == "즉시할인" or "카카오" in (s.get("text") or ""))]
+    imm_slide = max(imm_candidates, key=lambda s: s.get("percent") or 0) if imm_candidates else None
+    imm_pct = (imm_slide.get("percent") or 0) / 100 if imm_slide else 0
+
+    # 청구할인 slide (페이백 취급)
+    billed_candidates = [s for s in out["card_slides"]
+                         if s.get("percent") and s.get("discount_type") == "청구할인"]
+    billed_slide = max(billed_candidates, key=lambda s: s.get("percent") or 0) if billed_candidates else None
+    billed_pct = (billed_slide.get("percent") or 0) / 100 if billed_slide else 0
+
+    # 일상 페이백 카드 매칭 (EVERYDAY_PAYBACK_CARDS) — slide 텍스트 기반
+    pb_pct = 0
+    for slide in (imm_slide, billed_slide):
+        if not slide:
+            continue
+        slide_text = slide.get("text") or ""
         for name, pct in EVERYDAY_PAYBACK_CARDS:
             short = name.replace("카드", "")
             if name in slide_text or short in slide_text:
-                pb_pct = pct
-                break
-        # I = 우수가 × (1 - 즉시할인%)
+                pb_pct = max(pb_pct, pct)
+
+    if member > 0 and (imm_pct or billed_pct or pb_pct):
         imm_price = round(member * (1 - imm_pct))
-        # J = round(I × (1 - 페이백%)) - 적립(at J가 아닌 I 가격 기준 = 결제금액 기준)
-        after_payback = round(imm_price * (1 - pb_pct))
-        rw = _compute_reward(after_payback, tiers, simple_ranges)
-        out["kakao_price"] = imm_price        # I열 — "즉시할인가" 라벨
+        total_pb = billed_pct + pb_pct
+        after_payback = round(imm_price * (1 - total_pb))
+        rw = _compute_reward(imm_price, tiers, simple_ranges)  # ★ H 기준
+        out["kakao_price"] = imm_price        # H열
         out["kakao_reward_pt"] = rw
-        out["kakao_final_cost"] = after_payback - rw   # J열 — "실비" 라벨
+        out["kakao_final_cost"] = after_payback - rw   # I열
+    elif member > 0:
+        # 할인 슬라이드 전무 → H = 우수가 그대로, I = H - 적립금
+        rw = _compute_reward(member, tiers, simple_ranges)
+        out["kakao_price"] = member
+        out["kakao_reward_pt"] = rw
+        out["kakao_final_cost"] = member - rw
 
     # 페이백 5개 카드 — 카드할인 슬라이드에 등장한 경우에만 적용
     # (예: 어느 날 슬라이드에 '롯데 7%즉시할인' 가 뜨면 → 즉시할인가 × 0.98 - 적립)
@@ -753,7 +1007,7 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
             short = name.replace("카드", "")
             if name in text or short in text:
                 after = round(imm * (1 - pct))
-                rw = _compute_reward(after, tiers, simple_ranges)
+                rw = _compute_reward(imm, tiers, simple_ranges)  # ★ H(즉시할인가) 기준
                 out["paybacks"][name] = {
                     "immediate_price": imm,
                     "payback_pct": pct * 100,
@@ -932,8 +1186,8 @@ def main() -> int:
     print(f"[INFO] 사용 계정 #{acc_idx} {acc['id']}")
     print(f"[INFO] PW backend: {PW_BACKEND}")
 
-    # CDP 9223 자동 launch — 없으면 launch-check10-chrome.sh 호출
-    _ensure_chrome()
+    # CDP 9223 자동 launch — chrome_launcher.ensure_chrome() (LAUNCHERS dict 기반)
+    ensure_chrome(int(CDP_PORT))
 
     with sync_playwright() as p:
         try:
@@ -946,31 +1200,6 @@ def main() -> int:
         return _run(context, acc)
 
 
-def _ensure_chrome() -> None:
-    """CDP 9223 안 떠있으면 launch-check10-chrome.sh 자동 호출."""
-    import subprocess
-    import urllib.error
-    import urllib.request
-
-    try:
-        urllib.request.urlopen(f"{CDP_ENDPOINT}/json/version", timeout=1.5)
-        return  # 이미 살아있음
-    except (urllib.error.URLError, OSError):
-        pass
-
-    launcher = PROJECT_ROOT / "launch-check10-chrome.sh"
-    if not launcher.exists():
-        print(f"[WARN] {launcher} 없음 — Chrome 수동 실행 필요")
-        return
-    print(f"[INFO] CDP {CDP_PORT} 안 떠있음 — {launcher.name} 자동 실행...")
-    try:
-        subprocess.run(["bash", str(launcher)], check=True, timeout=15)
-    except subprocess.CalledProcessError as e:
-        print(f"[WARN] launch script 실패 (exit {e.returncode})")
-    except subprocess.TimeoutExpired:
-        print(f"[WARN] launch script timeout (15s)")
-
-
 def _run(context, acc) -> int:
     page = context.new_page()
     if not login(page, acc["id"], acc["pw"]):
@@ -979,7 +1208,7 @@ def _run(context, acc) -> int:
         return 1
     print(f"[OK] 로그인")
 
-    # 중복 URL은 한 번만 체크 (alias_of 처리)
+    # 중복 URL은 base 한 번만 페이지 방문, alias는 base의 benefit_ratio + 자기 옵션 unit_list_price로 derive
     cache: dict[str, dict] = {}
     results: list[dict] = []
     products_to_run = PRODUCTS[:1] if os.environ.get("DEBUG_ORDER") else PRODUCTS
@@ -987,12 +1216,15 @@ def _run(context, acc) -> int:
         if prod.get("alias_of"):
             base = next((r for r in results if r["id"] == prod["alias_of"]), None)
             if base:
-                cloned = dict(base)
-                cloned["id"] = prod["id"]
-                cloned["name"] = prod["name"]
-                cloned["alias_of"] = prod["alias_of"]
-                results.append(cloned)
-                print(f"  #{prod['id']:>3} (alias of #{prod['alias_of']}) 건너뜀, 동일 결과 적용")
+                derived = derive_alias_result(base, prod)
+                results.append(derived)
+                p = derived.get("payment") or {}
+                tag = "✓" if derived.get("ten_percent") else "✗"
+                print(f"  #{prod['id']:>3} (alias of #{prod['alias_of']}) derive: "
+                      f"unit_list={prod.get('unit_list_price') or '?'} "
+                      f"benefit_unit={p.get('benefit_unit_price') or '?'} "
+                      f"qty={p.get('qty') or '?'} "
+                      f"H={p.get('kakao_price') or '?'} I={p.get('kakao_final_cost') or '?'} {tag}")
                 continue
 
         print(f"  #{prod['id']:>3} {prod['name'][:30]:30s} 검사 중...", flush=True)
