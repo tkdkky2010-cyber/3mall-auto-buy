@@ -247,6 +247,35 @@ pip install easyocr
 
 ---
 
+## 2026-05-18 오후 진행 메모
+
+**Continuity Camera 길 폐기 결정**:
+- Python AVFoundation (Cursor parent) 에서 iPhone Continuity 안 잡힘
+- 원인: Python.app Info.plist `NSCameraUseContinuityCameraDeviceType` 누락 + Cursor 책임 프로세스 attribution
+- 해결 시도: Info.plist 키 추가 (Resources/Python.app/Contents/Info.plist) → 효과 없음 (TCC 책임 프로세스 문제)
+- Swift CLI `phone_auto/continuity_probe.swift` 빌드 시도 (future reference 용 keep, 사용 X)
+- 본질적 문제: Continuity 는 iPhone 모션/BLE 의존 → 매일 4시 무인 자동화에 부적합
+
+**채택: Camo Studio (Reincubate)**:
+- iPhone Camo iOS 앱 + Mac Camo Studio
+- USB 케이블 연결 → macOS 가 UVC 가상 카메라로 인식 ("Camo Camera", 720×1280)
+- OpenCV `cv2.VideoCapture(0)` 으로 즉시 캡처 OK
+- Continuity 의 idle/모션 문제 없음
+
+**OCR 검증 결과** (Camo 캡처 기반):
+- EasyOCR 단독: 8/10 (1, 9 누락)
+- Tesseract 단독: 8/10 (1, 2 누락)
+- macOS Vision 단독: 7/10 (셔플마다 다름)
+- **3엔진 union: 10/10 ✓**
+
+**다음 단계 (대기 중)**:
+- GCP Vision API 셋업 (사용자) → 4엔진 voting + 0~9 distinct 검증
+- 셀 기반 ROI 분할 (파란 키패드 검출 → 3×4 grid → 셀별 OCR)
+- 다중 프레임 일관성 + PIN dot 검수 함수
+- `phone_auto/ocr_keypad.py` 구현 + 5회 셔플 캡처 검증
+
+---
+
 ## ★ 재시작 후 진행 명령 (다음 세션 첫 입력)
 
 ```
