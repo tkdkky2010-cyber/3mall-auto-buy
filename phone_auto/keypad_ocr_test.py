@@ -18,7 +18,7 @@ from pathlib import Path
 
 OUT = Path(__file__).parent / "_tmp"
 OUT.mkdir(exist_ok=True)
-CAM_IDX = 1
+CAM_IDX = 0  # 로지텍 (Mac 내장 분리되어 0번이 됨)
 
 # 1) 캡처 — 자동초점 안정화 위해 워밍업 강화 + 사용자 카운트다운
 import time

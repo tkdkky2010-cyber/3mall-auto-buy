@@ -214,14 +214,67 @@ pip install easyocr
 
 **완료**:
 - 환경 셋업: opencv-python, easyocr, scrcpy 4.0, adb 1.0.41
-- 로지텍 웹캠 인식 검증 (cam index=1)
+- 로지텍/NV76 웹캠 인식 검증
 - 카메라 위치 미러 효과는 라이브 미리보기만 — raw OpenCV 캡처는 글자 정상 방향
 
-**결정 사항**:
-- **카드사별 hybrid 채택** (농협 = 웹캠, 나머지 6 = scrcpy)
-- 농협 외 USB 디버그 토글 부담 매일 1회 — 사용자 수동 (필요시 Tasker 자동화 검토)
-- scrcpy 사용을 위한 무선 ADB 페어링은 다음 세션에서 진행 (사용자가 폰 화면 정보 알려줘야)
+**결정 사항 (가설)**:
+- 카드사별 hybrid (농협 = 웹캠, 나머지 6 = scrcpy)
 
-**보류**:
-- 웹캠 EasyOCR 키패드 정확도 검증 (폰 위치 + 조명 안정 후 재시도)
-- lotte 앱 ADB 감지 차단 여부 실제 검증 (KB 카드 등으로 결제 진입 시도)
+---
+
+## 2026-05-18 진행 메모 (오늘)
+
+**검증 결과 → 가설 폐기**:
+- 무선 ADB 페어링 성공 (Galaxy SM-G9960 Android 15)
+- scrcpy 미러링 성공
+- **lotte 앱 결제 단계에서 ADB 감지 → 결제 자체 차단** (농협뿐 아니라 lotte 도 차단)
+- **scrcpy 길 폐기. 7 카드사 전부 웹캠 OCR 단일 길**
+
+**카메라 셋업 진행 중**:
+- macOS 카메라 인덱스 비결정적 (Continuity Camera 끼어들면 충돌)
+- iPhone 14 Pro Max Continuity Camera 셋업 시도 — Photo Booth 에 안 뜸
+- wifi 동일 (KT_GiGA_8650), iCloud 동일, 연속성 카메라 토글 ON 확인
+- 미해결: iPhone 거치 + 충전 + 저전력 모드 OFF 후 재시도 필요
+
+**결정 보류**:
+- iPhone Continuity Camera 사용 vs NV76-CM400A 외부 웹캠
+- iPhone 은 화질 좋지만 배터리/거리/자동잠금 등 변수 많음
+- NV76 은 USB 전원 + 케이블 고정으로 매일 운영 안정성 ↑ — **본 운영에는 NV76 권장**
+
+**오늘 commit**:
+- phone_auto/camera_probe.py — 매 인덱스 밝기 측정 + 살아있는 카메라 자동 판별
+- phone_auto/keypad_ocr_test.py — cam0 기본 + 자동초점 3초 wait
+
+---
+
+## ★ 재시작 후 진행 명령 (다음 세션 첫 입력)
+
+```
+"PHASE_3B_SETUP.md 의 '재시작 후 진행' 섹션 따라 진행. iPhone Continuity Camera
+한 번 더 시도해보고 안 되면 NV76-CM400A 웹캠 모드로 즉시 전환."
+```
+
+### 재시작 후 절차
+
+**① 환경 확인** (Claude Code 가 자동):
+```bash
+cd "/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy"
+git log --oneline -3
+system_profiler SPCameraDataType
+```
+
+**② iPhone Continuity 시도** (사용자):
+1. iPhone 충전 케이블 연결 (배터리 50%+ 확보)
+2. iPhone 설정 → 배터리 → 저전력 모드 OFF 확인
+3. iPhone 거치대 / 책상 평평하게 가만히 (가로 권장, 후면 카메라가 Galaxy 향함)
+4. iPhone 잠금 해제 + 화면 켠 상태 (자동 잠금 시간 5분+)
+5. Mac 의 Photo Booth 열기 → 카메라 메뉴 → "Jason's iPhone" 보이는지 확인
+
+**③ Photo Booth 결과 분기**:
+- ✅ iPhone 보임 → `python3 phone_auto/camera_probe.py` → iPhone 인덱스 확인 → keypad_ocr_test.py
+- ❌ 안 보임 → iPhone Continuity OFF + NV76 웹캠 USB 연결 → `python3 phone_auto/camera_probe.py`
+
+**④ EasyOCR 키패드 검증**:
+- Galaxy 의 lotte 앱 결제 키패드 화면 (또는 임의 보안 키패드)
+- `python3 phone_auto/keypad_ocr_test.py`
+- 결과 stdout 의 EasyOCR 인식 개수 확인 — 10개 (0~9) 다 잡혀야 OK
