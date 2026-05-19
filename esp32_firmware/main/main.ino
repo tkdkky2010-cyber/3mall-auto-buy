@@ -124,7 +124,7 @@ void setup() {
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);  // USB 안정성 우선
+  // WiFi.setTxPower(WIFI_POWER_8_5dBm);  // USB 안정성 위해 낮췄으나 연결 실패 → 기본값 사용 (5/19)
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.println("WiFi.begin() returned, continuing setup");
 
@@ -140,11 +140,19 @@ void setup() {
 void loop() {
   server.handleClient();
   static unsigned long last = 0;
+  static unsigned long lastReconnect = 0;
   if (millis() - last > 5000) {
     last = millis();
     Serial.print("[status] WiFi=");
     Serial.print(WiFi.status() == WL_CONNECTED ? "OK" : "no");
     Serial.print(" IP=");
     Serial.println(WiFi.localIP());
+  }
+  // wifi 끊겼으면 15초마다 재연결 시도
+  if (WiFi.status() != WL_CONNECTED && millis() - lastReconnect > 15000) {
+    lastReconnect = millis();
+    Serial.println("[reconnect] WiFi.begin() 재시도");
+    WiFi.disconnect();
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
   }
 }

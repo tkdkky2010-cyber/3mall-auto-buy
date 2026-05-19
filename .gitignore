@@ -34,3 +34,8 @@ card_pins.json
 
 # Chrome 확장 인증키 (배포용 아님)
 lotte-dialog-blocker.pem
+
+
+# GCP Vision API key (gitignored)
+gcp-vision-key.json
+mall-ocr-*.json

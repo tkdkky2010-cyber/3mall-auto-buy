@@ -502,30 +502,73 @@ def lotte_login(page: Page, account_id: str, account_pw: str) -> bool:
         return False
 
 
-def lotte_clear_cart(page: Page) -> None:
-    """롯데 장바구니 비우기. '일반 (N/N)' 전체선택 + '선택삭제' + dialog accept."""
+def lotte_clear_cart(page: Page) -> bool:
+    """롯데 장바구니 비우기. 모든 item checkbox 직접 클릭 + 선택삭제.
+
+    Returns True (비어있음 or 비우기 성공) / False (실패).
+    feedback_cart_clear_must_succeed.md — 실패 시 caller 가 add 진행 중단해야 함.
+
+    전략 (2026-05-19 수정):
+      1. 카트 페이지 진입 + 안정화 대기
+      2. 빈 카트 텍스트/카운트 확인 (이미 비어있으면 즉시 True)
+      3. JS 로 모든 cart item checkbox 강제 check + change event 발생
+      4. 선택삭제 클릭 + dialog accept
+      5. 페이지 재로드 후 cart item 카운트 = 0 검증
+    """
     try:
         page.get_by_role("link", name="장바구니 장바구니").click(timeout=5000)
         page.wait_for_load_state("domcontentloaded", timeout=10000)
-        page.wait_for_timeout(2000)
-        body = page.inner_text("body")
-        if "장바구니에 담긴 상품이 없" in body or "0/0" in body:
+        page.wait_for_timeout(2500)
+
+        # 빈 카트 확인 — 본문 텍스트 + DOM count 둘 다
+        def cart_item_count() -> int:
+            return page.evaluate("""() => {
+                const m = (document.body.innerText || '').match(/일반\\s*\\(\\d+\\/(\\d+)\\)/);
+                return m ? parseInt(m[1]) : 0;
+            }""")
+
+        n_items = cart_item_count()
+        if n_items == 0:
             print("    [cart] 이미 비어있음")
-            return
-        # "일반 (N/N)" 텍스트 — 클릭해서 전체선택 토글
-        try:
-            general_label = page.get_by_text(re.compile(r"일반\s*\(\d+/\d+\)")).first
-            general_label.click()
-            page.wait_for_timeout(500)
-        except Exception:
-            pass
+            return True
+        print(f"    [cart] {n_items}개 상품 존재 → 전체 선택 + 삭제 시도")
+
+        # 모든 cart item checkbox JS 로 강제 check + change event
+        checked = page.evaluate("""() => {
+            const boxes = Array.from(document.querySelectorAll('input[type="checkbox"]'));
+            let cnt = 0;
+            for (const box of boxes) {
+                if (!box.disabled && box.offsetParent !== null) {
+                    box.checked = true;
+                    box.dispatchEvent(new Event('change', {bubbles: true}));
+                    box.dispatchEvent(new Event('click', {bubbles: true}));
+                    cnt++;
+                }
+            }
+            return cnt;
+        }""")
+        print(f"    [cart] checkbox {checked}개 체크")
+        page.wait_for_timeout(800)
+
         # 선택삭제 — dialog accept
         page.once("dialog", lambda dialog: dialog.accept())
-        page.get_by_role("link", name="선택삭제").click()
-        page.wait_for_timeout(1500)
-        print("    [cart] 비우기 완료")
+        try:
+            page.get_by_role("link", name="선택삭제").click(timeout=5000)
+        except Exception:
+            # button 형태 fallback
+            page.get_by_role("button", name="선택삭제").click(timeout=5000)
+        page.wait_for_timeout(2500)
+
+        # 검증 — cart item 카운트 0 확인
+        remaining = cart_item_count()
+        if remaining == 0:
+            print("    [cart] 비우기 완료 (검증)")
+            return True
+        print(f"    [cart] 비우기 후에도 {remaining}개 남음 → 실패")
+        return False
     except Exception as e:
-        print(f"    [cart] 비우기 실패: {e}")
+        print(f"    [cart] 비우기 예외: {e}")
+        return False
 
 
 def lotte_add_product_by_url(page: Page, goods_no: str, qty: int) -> bool:
@@ -876,7 +919,9 @@ def main() -> int:
                 return 1
             result = galleria_checkout(mall_page, naver_id=naver_id, naver_pw=naver_pw, naver_pay_pw=naver_pay_pw)
         else:
-            lotte_clear_cart(mall_page)
+            if not lotte_clear_cart(mall_page):
+                print("[FATAL] 카트 비우기 실패 — add 진행 중단 (기존 상품 보호)")
+                return 1
             print(f"[INFO] 조합 {combo_no} 추가: {COMBOS.get(combo_no)}")
             if not lotte_add_combo(mall_page, combo_no):
                 print("[FATAL] 조합 추가 실패")

@@ -4,7 +4,8 @@
 LP 미사용 (scipy 의존 X). 표준 라이브러리만.
 
 분배 로직 (make_cart_plan):
-- 공급률 오름차순 정렬 → 재고 OVERSTOCK (>50) 코드 포함 조합 스킵
+- 가중 수익 점수 (Σ PRODUCT_PROFIT × PRODUCT_VELOCITY × qty) 내림차순 정렬
+- 재고 OVERSTOCK (>50) 코드 포함 조합 스킵
 - N개 슬롯을 available 조합에 round-robin (slot % len(available))
 - **available < N 이면 같은 조합 2~3개씩 자동 누적** (N=14/36 친구 카드 케이스 핵심).
   예: available=7, N=14 → 각 조합 2개씩 / available=10, N=36 → 평균 3.6개씩.
@@ -102,16 +103,35 @@ def is_overstocked(combo: list[tuple[str, int]], stocks: dict[str, int]) -> bool
     return any(stocks.get(code, 0) > OVERSTOCK_THRESHOLD for code, _ in combo)
 
 
+def _combo_score(combo: list[tuple[str, int]]) -> int:
+    """조합의 가중 수익 점수 = Σ (PRODUCT_PROFIT[c] × PRODUCT_VELOCITY[c] × qty).
+
+    상품별 수익금 (개당 남는 금액) × 회전율 (월환산 판매수량) × 수량.
+    회전 빠른 상품을 더 많이 포함하는 조합이 우선 선택됨 → 악성재고 회피 + 수익 극대화.
+    """
+    return sum(
+        C.PRODUCT_PROFIT[code] * C.PRODUCT_VELOCITY[code] * q
+        for code, q in combo
+    )
+
+
 def make_cart_plan(
     channel_rates: list[float | None],
     combos: list[list[tuple[str, int]]],
     n: int,
     stocks: dict[str, int],
 ) -> dict[int, int]:
-    """sort + round-robin + 재고 OVERSTOCK 스킵. 반환: {조합번호(1-based): 수량}."""
-    # 공급률 있는 조합만 선택 + 오름차순 정렬 (인덱스 0-based 유지)
+    """sort + round-robin + 재고 OVERSTOCK 스킵. 반환: {조합번호(1-based): 수량}.
+
+    정렬 기준 (5/19 변경): **상품별 수익금 × 회전율 가중합** 내림차순.
+    이전: 공급률 오름차순 (5/18 이전), 그 후 조합 수익금 (소비자가 × (1−공급률)) (5/19 오전).
+    변경 사유: 채널 공급률은 분배 결정에 무관 (이미 공급률 있는 조합만 후보).
+              상품별 절대 수익금 × 회전 가중치로 조합 자체의 가치 평가.
+    """
+    # 공급률 있는 조합만 후보 (rate is None = 데이터 누락 조합 제외)
     indexed = [i for i, rate in enumerate(channel_rates) if rate is not None]
-    indexed.sort(key=lambda i: channel_rates[i])  # type: ignore[arg-type]
+    # 가중 수익 점수 내림차순 정렬 (공급률 자체는 정렬에 무관)
+    indexed.sort(key=lambda i: -_combo_score(combos[i]))
     available = [i for i in indexed if not is_overstocked(combos[i], stocks)]
     # 다 스킵되면 정렬 순서대로 fallback (사용자 spec)
     if not available:
@@ -140,10 +160,12 @@ def write_sheet_section(
     """O1:U{end} 카트플랜 + b~h 총 수량 섹션 1회 batch update."""
     grid: list[list] = []
     grid.append(["카트 플랜", channel, f"N={n}", today_label])
-    grid.append(["조합번호", "조합", "구매수", "공급률"])
+    grid.append(["조합번호", "조합", "구매수", "공급률", "수익금"])
     for r in plan_rows:
-        grid.append([r["combo_idx"], r["label"], r["qty"], round(r["supply_rate"], 4)])
-    grid.append([channel, total_qty, total_pay, round(avg_rate, 4)])
+        grid.append([r["combo_idx"], r["label"], r["qty"], round(r["supply_rate"], 4), r["profit"]])
+    # 합계 행: 채널, 총 수량, 총 결제, 평균 공급률, 총 수익금
+    total_profit_sum = sum(r["profit"] for r in plan_rows)
+    grid.append([channel, total_qty, total_pay, round(avg_rate, 4), total_profit_sum])
     # 하단: b~h 제품별 총 수량 (오늘 카트플랜대로 구매 시 받게 되는 본품 합계)
     grid.append([])  # 빈 행 (분리)
     grid.append(["[b~h 제품별 총 수량 (본)]"])
@@ -197,6 +219,7 @@ def main(argv=None) -> int:
 
     plan_rows: list[dict] = []
     total_pay = 0
+    total_profit = 0
     weighted_rate_sum = 0.0
     total_qty = 0
     product_totals: dict[str, int] = {code: 0 for code in "bcdefgh"}
@@ -207,7 +230,10 @@ def main(argv=None) -> int:
         label = C.combo_label_ko(combo)
         소비자가 = sum(C.PRODUCTS[code]["price"] * q for code, q in combo)
         pay_per_combo = round(소비자가 * rate)
+        # 조합 1회 구매 시 수익금 = Σ PRODUCT_PROFIT[code] × q
+        profit_per_combo = sum(C.PRODUCT_PROFIT[code] * q for code, q in combo)
         total_pay += pay_per_combo * qty
+        total_profit += profit_per_combo * qty
         weighted_rate_sum += rate * qty
         total_qty += qty
         # b~h 제품 누적 (qty × 조합 내 개수)
@@ -218,6 +244,7 @@ def main(argv=None) -> int:
             "qty": qty,
             "supply_rate": rate,
             "label": label,
+            "profit": profit_per_combo * qty,
         })
     avg_rate = weighted_rate_sum / total_qty if total_qty else 0.0
 
