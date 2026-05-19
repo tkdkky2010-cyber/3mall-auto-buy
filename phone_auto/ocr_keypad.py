@@ -67,6 +67,83 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "n_digits_pin": 6,
         "description": "하나카드 6자리 결제 비밀번호 (앱 비밀번호, 로고 2개 셔플)",
     },
+    "nh_pin6": {
+        "flip_h": False,
+        "roi_y_frac": (0.67, 0.95),
+        "layout": "shuffled_3x4",  # 3 cols × 4 rows (롯데 LOCA Pay 와 동일 구조). row 4 가운데 1 digit + 양쪽 재배열/삭제.
+        "n_digits_pin": 6,
+        "description": "농협카드 6자리 결제 비밀번호 (파란 키패드, 롯데 LOCA Pay 와 유사)",
+    },
+    "nh_code7": {
+        "flip_h": False,
+        "roi_y_frac": (0.28, 0.65),
+        "layout": "shuffled_3x4",  # 3 cols × 4 rows, row 4 가운데 1 digit + 양쪽 버튼. 키패드가 화면 상단에 있음 (다른 카드와 정반대).
+        "n_digits_pin": 7,
+        "description": "농협카드 7자리 결제코드 (화면 상단 키패드, 셔플)",
+    },
+    "kb_code7": {
+        "flip_h": False,
+        "roi_y_frac": (0.55, 0.88),
+        "layout": "fixed_3x4",  # 표준 1-9 + 0(row4 중앙).
+        "n_digits_pin": 7,
+        "description": "KB Pay 7자리 결제 인증코드 (보라/연분홍 배경)",
+    },
+    "kb_pin6": {
+        "flip_h": False,
+        "roi_y_frac": (0.70, 0.90),
+        "layout": "shuffled_4x3",  # 4 cols × 3 rows. row 2 cols 1, 2 = ← 삭제 / 입력완료 버튼.
+        "n_digits_pin": 6,
+        "description": "KB Pay 6자리 결제 비밀번호 (보라 배경, 4x3 셔플)",
+    },
+    "samsung_code7": {
+        "flip_h": False,
+        "roi_y_frac": (0.55, 0.95),
+        "layout": "shuffled_3x4",  # 3 cols × 4 rows, row 4 가운데 1 digit + 양쪽 버튼.
+        "n_digits_pin": 7,
+        "description": "삼성 Pay 7자리 결제 보안번호 (셔플)",
+    },
+    "samsung_pin6": {
+        "flip_h": False,
+        "roi_y_frac": (0.55, 0.95),
+        "layout": "shuffled_3x4",  # 3 cols × 4 rows, row 4 가운데 1 digit + 양쪽 버튼.
+        "n_digits_pin": 6,
+        "description": "삼성 Pay 6자리 결제 비밀번호 (셔플, 7자리와 동일 위치/구조)",
+    },
+    "bc_login6": {  # 5/20 rename from bc_pin6 — 결제 비번 아니라 앱 로그인 비번
+        "flip_h": False,
+        "roi_y_frac": (0.71, 0.92),
+        "layout": "shuffled_4x3",  # 4 cols × 3 rows, row 2 cols 1,2 = 빈 영역 (KB PIN6 와 유사 구조).
+        "n_digits_pin": 6,
+        "description": "BC 카드 앱 로그인 6자리 비밀번호 (회색/보라 배경, 셔플) — 결제 비번 별도",
+    },
+    "bc_code7": {
+        "flip_h": False,
+        "roi_y_frac": (0.54, 0.88),
+        "layout": "fixed_3x4",  # 표준 1-9 + 0(row4 중앙). KB Pay 7자리와 동일 위치/구조.
+        "n_digits_pin": 7,
+        "description": "BC 카드 7자리 결제코드 (보라/연분홍 배경, 고정)",
+    },
+    "bc_pin6": {
+        "flip_h": False,
+        "roi_y_frac": (0.65, 0.95),
+        "layout": "shuffled_4x3",  # 4 cols × 3 rows, 빈 셀 2개 random (BC 로그인과 동일 구조).
+        "n_digits_pin": 6,
+        "description": "BC 카드 결제 6자리 비밀번호 (보라 배경, 셔플) — 로그인 비번 별도 (bc_login6)",
+    },
+    "lotte_code7": {
+        "flip_h": False,
+        "roi_y_frac": (0.62, 0.95),
+        "layout": "shuffled_3x4",  # 3 cols × 4 rows, row 4 가운데 1 digit + 양쪽 버튼. NH7 과 동일 구조.
+        "n_digits_pin": 7,
+        "description": "롯데카드 LOCA Pay 7자리 결제 인증코드 (파란 배경, 셔플)",
+    },
+    "lotte_pin6": {
+        "flip_h": False,
+        "roi_y_frac": (0.55, 0.95),
+        "layout": "shuffled_3x4",  # 3 cols × 4 rows, row 4 가운데 1 digit + 양쪽 버튼. lotte_code7 과 동일 구조.
+        "n_digits_pin": 6,
+        "description": "롯데카드 LOCA Pay 6자리 결제 비밀번호 (파란 배경, 셔플)",
+    },
 }
 
 
@@ -398,6 +475,15 @@ def vote_digits(
 
     # ★ 키패드 영역 ROI 검출 + UI 영역 detection 제거
     roi = _detect_keypad_roi(image_path, fallback_y_frac=roi_y_frac)
+    # 자동 ROI 가 너무 넓으면 roi_y_frac 으로 추가 narrowing (intersection)
+    if roi and roi_y_frac:
+        img_h = img.shape[0]
+        rx, ry, rw, rh = roi
+        ry2 = ry + rh
+        nry = max(ry, int(img_h * roi_y_frac[0]))
+        nry2 = min(ry2, int(img_h * roi_y_frac[1]))
+        if nry2 > nry:
+            roi = (rx, nry, rw, nry2 - nry)
     if roi:
         before = len(detections)
         detections = _filter_detections_by_roi(detections, roi)
