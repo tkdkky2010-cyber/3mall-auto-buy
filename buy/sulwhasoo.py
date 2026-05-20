@@ -454,10 +454,13 @@ def lotte_login(page: Page, account_id: str, account_pw: str) -> bool:
         login_page = new_page_info.value
 
         login_page.wait_for_load_state("domcontentloaded", timeout=15000)
+        login_page.wait_for_timeout(1000)  # popup 안정화 (anti-bot 자동입력 감지 회피, Hmall login E.1 패턴)
         login_page.get_by_role("textbox", name="아이디 또는 이메일").click()
         login_page.get_by_role("textbox", name="아이디 또는 이메일").fill(account_id)
+        login_page.wait_for_timeout(1000)  # id fill 후 1s
         login_page.get_by_role("textbox", name="아이디 또는 이메일").press("Tab")
         login_page.get_by_role("textbox", name="비밀번호(영문+숫자+특수 8~15자)").fill(account_pw)
+        login_page.wait_for_timeout(600)  # pw fill 후 Enter 전 0.6s
 
         # Enter → guide popup (없으면 timeout)
         guide_page = None

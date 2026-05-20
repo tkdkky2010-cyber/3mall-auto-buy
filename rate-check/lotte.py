@@ -156,13 +156,13 @@ print(f"카드: {card_info}")
 # ★ 결과파일(_lotte_reward_dump.json) 절대 사용 X — sheet가 SoT.
 # tiers[code] = [{'threshold': int, 'reward': int}, ...] — threshold 오름차순.
 # compute() 가 조합 결제금액 vs threshold 비교해서 max 1회 적립 (RULES §7-3).
-import os, subprocess
+import os, subprocess, sys
 tiers: dict[str, list[dict]] = {code: [] for code in 'bcdefgh'}
 try:
     reward_script = '/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/rate-check/_check_lotte_reward.py'
     if os.path.exists(reward_script):
         proc = subprocess.run(
-            ['python3', reward_script, 'all'],
+            [sys.executable, reward_script, 'all'],
             capture_output=True, text=True, timeout=300,
         )
         out = proc.stdout

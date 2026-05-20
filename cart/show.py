@@ -42,7 +42,7 @@ def fmt_paybacks(pb: dict | None) -> str:
 
 def main(argv=None):
     p = argparse.ArgumentParser()
-    p.add_argument("--only-10pct", action="store_true", help="10% 적립 상품만")
+    p.add_argument("--only-10pct", action="store_true", help="10%% 적립 상품만")
     p.add_argument("--raw", type=int, metavar="ID", help="특정 상품 ID raw JSON 덤프")
     args = p.parse_args(argv)
 

@@ -212,6 +212,9 @@ def append_combo_rows(ws, today_combos: dict[int, dict[str, int]],
             name = C.PRODUCTS[code]["name"] if code in C.PRODUCTS else ""  # 본품만 자동
             grid.append([label, code, name, qty])
     end_row = start_row + len(grid) - 1
+    # grid 한도 초과 시 행 추가 (sheet 의 max row 가 데이터로 가득 차있는 경우)
+    if end_row > ws.row_count:
+        ws.add_rows(end_row - ws.row_count)
     rng = f"A{start_row}:D{end_row}"
     ws.update(values=grid, range_name=rng, value_input_option="USER_ENTERED")
     return rng

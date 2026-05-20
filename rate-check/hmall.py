@@ -41,76 +41,43 @@ CARD_NAME_TO_PAYBACK = {
     "하나카드": C.CARD_PAYBACK["하나카드"],
     "농협카드": C.CARD_PAYBACK["농협카드"],
     "NH농협카드": C.CARD_PAYBACK["농협카드"],
+    "KB국민카드": C.CARD_PAYBACK["KB국민카드"],
+    "국민카드": C.CARD_PAYBACK["KB국민카드"],
 }
 
 CHECKOUT_URL_FRAG = "/mo/oda/order"
 
 
-def detect_card_offers(page) -> list[dict]:
-    """체크아웃 페이지의 '카드할인' 캐러셀 <section> 내부 카드 후보 추출.
+def detect_card_offer(page) -> dict | None:
+    """체크아웃 페이지 '카드할인' 헤더 다음 캐러셀에서 카드 1개 정보 추출.
 
-    Returns: [{cardCd, brand, percent, preview_price}, ...]
+    헤더 룰: <div class="tarvxz0"><h2>카드할인</h2></div>
+    당일 최대 할인율 카드 1개만 뜨므로 그대로 사용 (사용자 5/18 확정).
+
+    Returns: {cardCd, brand, percent, preview_price} | None
     """
     js = r"""
     () => {
         const hdr = Array.from(document.querySelectorAll('.tarvxz0'))
-            .find(d => /카드할인/.test(d.textContent));
-        if (!hdr) return [];
-        const sec = hdr.nextElementSibling;
-        if (!sec) return [];
-        const cards = [];
-
-        // section 안 모든 카드 row 후보: img[alt^="cardCd"] 가진 컨테이너
-        const imgs = Array.from(sec.querySelectorAll('img[alt^="cardCd"]'));
-        for (const img of imgs) {
-            // 가장 가까운 row container (img + N% + 카드명 단독 포함)
-            let row = img.parentElement;
-            for (let lvl = 0; lvl < 8 && row && row !== sec; lvl++) {
-                const t = (row.textContent || '').replace(/\s+/g, ' ').trim();
-                const pcts = t.match(/\d+\s*%/g) || [];
-                if (pcts.length === 1 && t.length < 80) break;
-                row = row.parentElement;
-            }
-            if (!row || row === sec) row = img.parentElement;
-
-            const rowTxt = (row.textContent || '').replace(/\s+/g, ' ').trim();
-            const pctMatch = rowTxt.match(/(\d+)\s*%/);
-            const percent = pctMatch ? parseInt(pctMatch[1]) : 0;
-            // 카드명: row 텍스트에서 N% 앞부분 (예: "현대5%즉시할인" → "현대")
-            const namePart = rowTxt.split(/\d+\s*%/)[0].trim();
-            // 미리보기 가격: row 또는 section에서 row 이후 가장 가까운 '521,930원' 패턴
-            const priceRow = (rowTxt.match(/[\d,]{4,}\s*원/) || [null])[0];
-            let priceVal = null;
-            if (priceRow) priceVal = parseInt(priceRow.replace(/[,원\s]/g, ''));
-            else {
-                // section 전체 텍스트에서 row 다음 가장 첫 가격
-                const secTxt = sec.textContent.replace(/\s+/g, ' ');
-                const idxRow = secTxt.indexOf(rowTxt);
-                const tail = idxRow >= 0 ? secTxt.slice(idxRow + rowTxt.length, idxRow + rowTxt.length + 200) : '';
-                const m = tail.match(/([\d,]{4,})\s*원/);
-                if (m) priceVal = parseInt(m[1].replace(/,/g, ''));
-            }
-            cards.push({
-                cardCd: img.alt,
-                brand: namePart,
-                percent,
-                preview_price: priceVal,
-                rowTxt,
+            .find(d => {
+                const h2 = d.querySelector('h2');
+                return h2 && h2.textContent.trim() === '카드할인';
             });
-        }
-        return cards;
+        if (!hdr) return null;
+        const sec = hdr.nextElementSibling;
+        if (!sec) return null;
+        const img = sec.querySelector('img[alt^="cardCd"]');
+        if (!img) return null;
+        const txt = (sec.textContent || '').replace(/\s+/g, ' ').trim();
+        const pctMatch = txt.match(/(\d+)\s*%/);
+        const percent = pctMatch ? parseInt(pctMatch[1]) : 0;
+        const namePart = txt.split(/\d+\s*%/)[0].trim();
+        const priceMatch = txt.match(/([\d,]{4,})\s*원/);
+        const preview_price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : null;
+        return { cardCd: img.alt, brand: namePart, percent, preview_price };
     }
     """
-    return page.evaluate(js) or []
-
-
-def pick_best_card(offers: list[dict]) -> dict | None:
-    """최고 할인율 카드 선택. percent 내림차순, 동률이면 첫 번째 등장."""
-    valid = [o for o in offers if o.get("percent") and o.get("preview_price")]
-    if not valid:
-        return None
-    valid.sort(key=lambda o: -o["percent"])
-    return valid[0]
+    return page.evaluate(js)
 
 
 def lookup_payback(brand: str) -> float:
@@ -169,27 +136,22 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
     if CHECKOUT_URL_FRAG not in page.url:
         return {"idx": idx, "error": f"체크아웃 페이지 미도달 (cur={page.url[:60]})"}
 
-    # 5) 카드할인 캐러셀 탐색
-    offers = detect_card_offers(page)
-    if not offers:
-        return {"idx": idx, "error": "카드할인 캐러셀 카드 0개"}
-    print(f"  [INFO] 캐러셀 카드 {len(offers)}개:")
-    for o in offers:
-        print(f"    · {o['brand']} {o['percent']}% → {o['preview_price']:,}원 (cardCd={o['cardCd']})")
-
-    # 6) 최고 할인 카드
-    best = pick_best_card(offers)
+    # 5) 카드할인 캐러셀 (당일 최대 할인율 카드 1개)
+    best = detect_card_offer(page)
     if not best:
-        return {"idx": idx, "error": "유효 카드 없음 (가격/% 없음)"}
+        return {"idx": idx, "error": "카드할인 캐러셀 없음 (.tarvxz0 h2='카드할인' 또는 다음 캐러셀 카드 없음)"}
+    if not best.get("percent") or not best.get("preview_price"):
+        return {"idx": idx, "error": f"카드 정보 추출 실패 (brand={best.get('brand')!r}, %={best.get('percent')}, price={best.get('preview_price')})"}
+    print(f"  [INFO] 카드할인: {best['brand']} {best['percent']}% → {best['preview_price']:,}원 (cardCd={best['cardCd']})")
 
-    # 7) 페이백 적용
+    # 6) 페이백 적용
     payback = lookup_payback(best["brand"])
     if payback:
         구매가격 = round(best["preview_price"] * (1 - payback))
-        print(f"  [OK] best: {best['brand']} {best['percent']}% {best['preview_price']:,}원 × (1-{payback}) = {구매가격:,}원")
+        print(f"  [OK] {best['brand']} {best['percent']}% {best['preview_price']:,}원 × (1-{payback}) = {구매가격:,}원")
     else:
         구매가격 = best["preview_price"]
-        print(f"  [OK] best: {best['brand']} {best['percent']}% → {구매가격:,}원 (페이백 없음)")
+        print(f"  [OK] {best['brand']} {best['percent']}% → {구매가격:,}원 (페이백 없음)")
 
     순 = 구매가격 - 총샘플
     공급률 = 순 / 소비자가 if 소비자가 else 0
@@ -200,7 +162,6 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
         "card_brand": best["brand"], "card_pct": best["percent"], "payback_pct": payback,
         "preview_price": best["preview_price"], "구매가격": 구매가격,
         "순구매가": 순, "공급률": round(공급률, 4),
-        "all_offers": offers,
     }
 
 
