@@ -32,7 +32,7 @@
        │
        │ USB-C OTG
        ▼
-[Galaxy S22 1080×2400] — Touchscreen HID host
+[Galaxy S21+ 1080×2400] — Touchscreen HID host
 ```
 
 ## 사용 가능한 명령 (오늘 검증된 것)

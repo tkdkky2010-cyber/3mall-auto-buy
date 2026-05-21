@@ -253,6 +253,7 @@ void setup() {
     server.on("/click", HTTP_POST, handleClick);
     server.on("/tap", HTTP_POST, handleTap);
     server.on("/move", HTTP_POST, handleMove);
+    server.on("/swipe", HTTP_POST, handleSwipe);
     server.on("/type", HTTP_POST, handleType);
     server.begin();
     Serial.println("HTTP server on :80");

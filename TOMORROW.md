@@ -117,7 +117,7 @@ HYUNDAI_WORKFLOW = [
 
 ## 알려진 이슈 / TODO
 
-1. **뒤로가기 (Back)**: ESC 키 HID 보내봤지만 Galaxy S22 가 안 받음 (`Keyboard.write(0x1b)`). 다른 방법 시도:
+1. **뒤로가기 (Back)**: ESC 키 HID 보내봤지만 Galaxy S21+ 가 안 받음 (`Keyboard.write(0x1b)`). 다른 방법 시도:
    - HID Keyboard `press(KEY_ESC)` (write 대신 press/release)
    - 또는 swipe right (왼쪽 가장자리에서) 으로 gesture back
    - 또는 OCR 로 "<" 버튼 위치 정확히 잡아 탭 (현재 좌표 off)
