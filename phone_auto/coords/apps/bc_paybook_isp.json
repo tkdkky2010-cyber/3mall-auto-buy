@@ -1,0 +1,68 @@
+{
+  "package": "kvp.jjy.MispAndroid320",
+  "screen": {"w": 1080, "h": 2400},
+  "captured_at": "2026-05-22",
+  "note": "PIN 137601 자동 입력 가능 (매 키 0.5초+ 페이싱 필수). 키패드 셔플 — 매 입력 후 dump+OCR 재매핑",
+  "pin_screen": {
+    "input_box": {"x": 540, "y": 638, "note": "비밀번호 6자리 입력란"},
+    "keypad_button_slots": {
+      "comment": "12 slot fixed positions (셔플은 표시 숫자만). OCR로 매번 매핑",
+      "row1_y": 1677, "row2_y": 1845, "row3_y": 2013, "row4_y": 2181,
+      "col_x_keypad": [135, 405, 675, 945],
+      "col_x_func": [180, 540, 900]
+    },
+    "func_buttons": {
+      "재배열": {"x": 180, "y": 2181},
+      "삭제":   {"x": 540, "y": 2181},
+      "완료":   {"x": 900, "y": 2181}
+    },
+    "auto_login_checkbox": {"x": 261, "y": 1489, "note": "✓ 자동로그인"},
+    "bio_login":           {"x": 764, "y": 1489, "note": "다음부터 지문인증 사용"}
+  },
+  "main_screen": {
+    "top_icons": [
+      {"x": 650, "y": 154, "note": "menu1"},
+      {"x": 763, "y": 154, "note": "사각형 (코드/QR 화면 진입)"},
+      {"x": 876, "y": 154, "note": "menu3"},
+      {"x": 989, "y": 154, "note": "종 알림 (개수 2 표시)"}
+    ],
+    "ad_banner_phishing": {"x": 945, "y": 335, "note": "피싱 주의 banner X (있을 때)"},
+    "card_usage_list":    {"x": 306, "y": 666},
+    "card_pay_btn":       {"x": 945, "y": 1928, "note": "카드별 결제 button (목록에서)"}
+  },
+  "qr_screen": {
+    "tab_qr_top":        {"x": 185, "y": 154, "note": "멤버십"},
+    "tab_scan_top":      {"x": 540, "y": 154, "note": "스캔 (selected)"},
+    "alert_top":         {"x": 989, "y": 154},
+    "pc_code_input_btn": {"x": 540, "y": 1228, "note": "PC 결제코드 입력 button"}
+  },
+  "pc_code_screen": {
+    "info_text":      {"x": 574, "y": 522, "note": "PC화면의 결제코드를 입력해주세요"},
+    "code_input":     {"x": 540, "y": 790, "note": "결제코드 입력 EditText — 7자리"},
+    "card_selected":  {"x": 573, "y": 1050, "note": "신세계 BC 바로 리워드 플러스"},
+    "tab_qr":         {"x": 224, "y": 1136},
+    "tab_pc_code":    {"x": 539, "y": 1136, "note": "selected"},
+    "tab_nfc":        {"x": 855, "y": 1136},
+    "pay_btn":        {"TODO": "7자리 입력 후 화면 dump 필요"}
+  },
+  "flow_payment": [
+    {"action": "tap", "target": "home_apps.페이북/ISP"},
+    {"action": "sleep_ms": 4000},
+    {"action": "input_pin", "kind": "bc_6digit_shuffle", "value": "137601", "tap_delay_sec": 0.7,
+     "method": "매 키 dump+OCR 재매핑 (셔플 카드). OCR 부족 시 button crop OCR fallback"},
+    {"action": "tap", "xy": [900, 2181], "name": "완료"},
+    {"action": "sleep_ms": 3000},
+    {"action": "close_popup_if_present", "note": "광고 banner X — 있다면"},
+    {"action": "tap", "xy": [763, 154], "name": "우상단 사각형 (코드/QR 화면)"},
+    {"action": "sleep_ms": 2500},
+    {"action": "tap", "xy": [540, 1228], "name": "PC 결제코드 입력"},
+    {"action": "sleep_ms": 2000},
+    {"action": "tap", "xy": [540, 790], "name": "결제코드 입력 EditText"},
+    {"action": "sleep_ms": 1500},
+    {"action": "input_pin", "kind": "bc_7digit_shuffle_or_fixed", "value": "<PC결제 7자리 코드>", "tap_delay_sec": 0.5},
+    {"action": "tap", "name": "키패드 완료", "TODO": "키패드 dump 필요"},
+    {"action": "tap", "name": "결제하기", "TODO": "코드 입력 후 화면 dump 필요"},
+    {"action": "sleep_ms": 2000},
+    {"action": "input_pin", "kind": "bc_6digit_shuffle", "value": "137601", "tap_delay_sec": 0.7}
+  ]
+}

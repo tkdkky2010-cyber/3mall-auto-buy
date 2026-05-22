@@ -1,0 +1,15 @@
+{
+  "screen": {"w": 1080, "h": 2400, "density": 450},
+  "status_bar": {"h": 75, "frame": [0, 0, 1080, 75]},
+  "navigation_bar": {
+    "frame": [0, 2265, 1080, 2400],
+    "h": 135,
+    "keys": {
+      "recent_apps": {"x": 180, "y": 2333, "keycode": "KEYCODE_APP_SWITCH"},
+      "home":        {"x": 540, "y": 2333, "keycode": "KEYCODE_HOME"},
+      "back":        {"x": 900, "y": 2333, "keycode": "KEYCODE_BACK"}
+    }
+  },
+  "captured_at": "2026-05-22",
+  "note": "navigation bar 키 좌표는 Samsung 3-key 가정값. 실제 운영 시 KEYCODE 사용 권장 (좌표 무관 100% 동작)"
+}

@@ -1,0 +1,23 @@
+{
+  "package": "com.hyundaicard.appcard",
+  "screen": {"w": 1080, "h": 2400},
+  "captured_at": "2026-05-22",
+  "buttons": {
+    "app_card_tab":          {"x": 965, "y": 165, "note": "PIN 화면 위 우상단 '앱카드' 탭. PIN 입력 X — 바로 tap 가능"},
+    "close_top":             {"x": 995, "y": 165, "note": "앱카드 화면 우상단 X (닫기)"},
+    "settings_top":          {"x": 832, "y": 165, "note": "앱카드 화면 설정"},
+    "card_x_boost_check":    {"x": 531, "y": 675, "note": "X BOOST 카드 표시 확인 (visual only, tap 안 함)"},
+    "pc_pay_login_verify":   {"x": 507, "y": 1057, "note": "PC 결제 ∙ 로그인 ∙ 본인 확인"},
+    "qr_code_scan":          {"x": 507, "y": 978, "note": "QR스캔 또는 숫자 코드 입력"},
+    "store_pay":             {"x": 575, "y": 1300, "note": "바코드 또는 NFC 태그로 매장에서 결제"}
+  },
+  "tabs_bottom": {
+    "card_mgmt": {"x": 260, "y": 351},
+    "pay":       {"x": 539, "y": 351},
+    "coupon":    {"x": 819, "y": 351}
+  },
+  "pin_screen": {
+    "note": "현대카드 진입 시 PIN 셔플 키패드가 떠있어도 그 위에 '앱카드' 탭이 노출됨. PIN 입력 우회하고 바로 앱카드 tap.",
+    "layout_dump_required": "셔플 layout — 매 진입마다 dump해서 숫자→좌표 매핑 재추출"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "rule": "모든 카드사 앱 공통 — 진입 또는 로그인 후 홈 화면 첫 진입 시 광고 팝업이 뜸. 무조건 닫기 버튼 (X) 찾아서 눌러야 다음 단계 진행 가능.",
+  "captured_at": "2026-05-22",
+  "popup_close_detection": {
+    "priority": ["dump_content_desc", "ocr_x_symbol", "ocr_dump_known_position"],
+    "dump_content_desc_keywords": ["닫기", "팝업 닫기", "close", "Close"],
+    "ocr_text_keywords": ["×", "x", "X"],
+    "typical_positions": [
+      {"note": "modal 우상단 X", "x_range": [950, 1010], "y_range": [600, 720]},
+      {"note": "modal 상단 X (작은 modal)", "x_range": [950, 1010], "y_range": [130, 250]}
+    ]
+  },
+  "card_specific_known": {
+    "하나카드":   {"x": 994, "y": 695, "note": "메인 진입 광고 modal X"},
+    "현대카드":   {"x": 990, "y": 616, "note": "카카오톡 이모티콘 광고 X (앱카드 진입 전)"},
+    "롯데카드":   {"note": "사용자 확인 시 광고 없음. 있을 시 modal 우상단 추정"},
+    "monimo":     {"note": "PIN 화면 modal — 광고 별도 안 뜸. 사용자 자동 로그인이면 광고 있을 수도"},
+    "페이북ISP":  {"note": "PIN 화면 진입. 광고 별도 검출 필요"}
+  },
+  "fallback_strategy": "광고 X 못 찾으면 ADB KEYCODE_BACK 한 번 시도 (modal 닫힘) 또는 ESC swipe"
+}

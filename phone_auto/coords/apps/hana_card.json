@@ -1,0 +1,41 @@
+{
+  "package": "com.hanaskcard.paycla",
+  "screen": {"w": 1080, "h": 2400},
+  "captured_at": "2026-05-22",
+  "note": "FLAG_SECURE 적용 — screencap은 검정, dump는 정상. OCR 일부만 잡힘.",
+  "main": {
+    "ad_popup_close":  {"x": 994, "y": 695, "note": "광고성 팝업 X (있을 때만, OCR 'x' 검색)"},
+    "qr_scan_top":     {"x": 902, "y": 312, "note": "우측 상단 QR스캔 button"},
+    "payment_mgmt":    {"x": 219, "y": 312, "note": "좌측 결제관리"}
+  },
+  "qr_screen": {
+    "close_top":       {"x": 998, "y": 146, "note": "QR 화면 우상단 X"},
+    "auth_code_input": {"x": 540, "y": 1820, "note": "인증코드 입력 (PC결제 모드)"}
+  },
+  "auth_code_screen": {
+    "tab_samsung_pay": {"x": 156, "y": 329},
+    "tab_qr":          {"x": 411, "y": 329},
+    "tab_barcode":     {"x": 667, "y": 329},
+    "tab_auth_code":   {"x": 924, "y": 329, "note": "인증코드 탭 (selected 상태)"},
+    "input_7digit":    {"x": 540, "y": 927, "note": "'7자리 입력' 란 — 클릭 시 키패드 popup"},
+    "confirm_btn":     {"x": 540, "y": 1115, "note": "확인 button"},
+    "qr_pc_scan_btn":  {"x": 539, "y": 1318, "note": "QR스캔/PC결제 전환"}
+  },
+  "flow_payment": [
+    {"action": "tap", "target": "home_apps.하나카드"},
+    {"action": "sleep_ms": 3000},
+    {"action": "close_popup_if_present", "x": 994, "y": 695},
+    {"action": "sleep_ms": 1000},
+    {"action": "tap", "xy": [902, 312], "name": "QR스캔"},
+    {"action": "sleep_ms": 2000},
+    {"action": "tap", "xy": [540, 1820], "name": "인증코드 입력"},
+    {"action": "sleep_ms": 2000},
+    {"action": "tap", "xy": [540, 927], "name": "7자리 입력 란"},
+    {"action": "sleep_ms": 1000},
+    {"action": "input_pin", "kind": "hana_7digit_keypad", "value": "<7자리 코드>"},
+    {"action": "tap", "xy": [540, 1115], "name": "확인"},
+    {"action": "sleep_ms": 2000},
+    {"action": "tap", "name": "다음", "TODO": "다음 button 좌표 별도 측정 필요"},
+    {"action": "input_pin", "kind": "hana_6digit_shuffle", "value": "137601"}
+  ]
+}

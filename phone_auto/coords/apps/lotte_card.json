@@ -1,0 +1,44 @@
+{
+  "package": "com.lcacApp",
+  "screen": {"w": 1080, "h": 2400},
+  "captured_at": "2026-05-22",
+  "main": {
+    "pay_top":         {"x": 775, "y": 156, "note": "상단 '금융' 오른쪽 PAY (바코드 모양 gif). 종모양 왼쪽"},
+    "menu_loan":       {"x": 130, "y": 465, "note": "고유가지원"},
+    "menu_card_mgr":   {"x": 358, "y": 465, "note": "카드매니저"},
+    "menu_split":      {"x": 578, "y": 465, "note": "분할납부"},
+    "menu_benefit":    {"x": 798, "y": 465, "note": "혜택플러스"},
+    "menu_instant":    {"x": 1018, "y": 465, "note": "즉시결제"}
+  },
+  "pay_screen": {
+    "title_loca_pay":  {"x": 168, "y": 154},
+    "settings_top":    {"x": 843, "y": 154},
+    "close_top":       {"x": 978, "y": 154},
+    "card_selected":   {"x": 539, "y": 595, "note": "LOCA Professional 2224 선택됨"},
+    "tab_field_pay":   {"x": 235, "y": 1089, "note": "현장결제"},
+    "tab_qr_scan":     {"x": 536, "y": 1089, "note": "QR스캔"},
+    "tab_num_code":    {"x": 841, "y": 1089, "note": "숫자 코드 ← 사용자 flow target"}
+  },
+  "num_code_screen": {
+    "title":           {"x": 540, "y": 1274, "note": "'숫자코드 입력' 헤더"},
+    "keypad_dump_required": "셔플 키패드 — 매 진입마다 dump해서 숫자→좌표 매핑 재추출 필요",
+    "keypad_sample_layout": {
+      "comment": "이번 dump 기준 (셔플이라 매번 다름). 사용 시 dump 후 desc 파싱",
+      "row1_y": 1607, "row2_y": 1795, "row3_y": 1983, "row4_y": 2171,
+      "col_x": [180, 540, 900],
+      "special": {"삭제": "(180,2171)", "입력완료": "(900,2171)"}
+    }
+  },
+  "flow_payment": [
+    {"action": "tap", "target": "home_apps.롯데카드"},
+    {"action": "sleep_ms": 3500},
+    {"action": "close_popup_if_present"},
+    {"action": "tap", "xy": [775, 156], "name": "상단 PAY"},
+    {"action": "sleep_ms": 2000},
+    {"action": "tap", "xy": [841, 1089], "name": "숫자 코드"},
+    {"action": "sleep_ms": 2000},
+    {"action": "input_pin", "kind": "lotte_7digit_shuffle", "value": "<7자리 결제비번>", "completion_btn": "입력완료"},
+    {"action": "tap", "name": "결제하기", "TODO": "코드 입력 후 화면 dump 필요"},
+    {"action": "input_pin", "kind": "lotte_6digit_shuffle", "value": "137601"}
+  ]
+}

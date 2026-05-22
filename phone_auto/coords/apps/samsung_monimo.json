@@ -1,0 +1,53 @@
+{
+  "package": "net.ib.android.smcard",
+  "screen": {"w": 1080, "h": 2400},
+  "captured_at": "2026-05-22",
+  "note": "강한 보안 — capture/OCR 검정, dump도 PIN 화면에선 키패드 button만 보임. 진입 시 자동 PIN modal 위에 우상단 Pay button 있음 (912, 179) — PIN 무시하고 바로 tap 가능",
+  "pin_screen_entry": {
+    "pay_top_right": {"x": 912, "y": 179, "note": "진입 직후 우상단 Pay (PIN 무시 가능)"},
+    "keypad_layout_dump": {
+      "comment": "셔플 — np1~np10 button 위치 고정, 표시 숫자는 매번 다름. content-desc 없어 어느 숫자인지 dump로 모름 — 매번 visual 확인 필요",
+      "row1_y": 1583, "row2_y": 1765, "row3_y": 1947, "row4_y": 2129,
+      "col_x": [200, 540, 880],
+      "special": {"재배열": [200, 2129], "삭제": [880, 2129], "np10": [540, 2129]}
+    }
+  },
+  "monimo_pay_screen": {
+    "back": {"x": 102, "y": 151},
+    "title": {"x": 540, "y": 151, "note": "Monimo Pay"},
+    "manage_top": {"x": 930, "y": 152, "note": "관리"},
+    "tab_field_pay": {"x": 298, "y": 305, "note": "현장결제"},
+    "tab_pc_pay":    {"x": 782, "y": 305, "note": "PC결제 ← 사용자 flow target"},
+    "barcode_tab":   {"x": 424, "y": 610},
+    "qrcode_tab":    {"x": 652, "y": 610},
+    "verify_btn":    {"x": 574, "y": 1031, "note": "인증하기"},
+    "card_select":   {"x": 514, "y": 1395, "note": "현재 카드 (American Express Reserve 897)"},
+    "card_change":   {"x": 863, "y": 1426, "note": "변경"}
+  },
+  "pc_pay_screen": {
+    "info_text": {"x": 540, "y": 639, "note": "'PC 화면의 QR코드를 스캔하거나 숫자코드를 입력해 주' 안내"},
+    "warning_text": {"x": 540, "y": 737, "note": "타인 요청으로 결제 시 금융사기 피해 주의"},
+    "num_code_input_header": {"x": 540, "y": 1917, "note": "'숫자코드 입력' 헤더"},
+    "num_code_input_field": {"x": 540, "y": 2099, "note": "7개 동그라미 입력란 (clickable LinearLayout). tap 시 키패드 popup"},
+    "input_circles": [
+      {"x": 266, "y": 2057}, {"x": 357, "y": 2057}, {"x": 448, "y": 2057},
+      {"x": 539, "y": 2057}, {"x": 630, "y": 2057}, {"x": 721, "y": 2057}, {"x": 812, "y": 2057}
+    ],
+    "pay_btn": {"x": 540, "y": 2375, "note": "'결제하기' button (clickable LinearLayout 하단)"}
+  },
+  "flow_payment": [
+    {"action": "tap", "target": "home_apps.monimo"},
+    {"action": "sleep_ms": 3500},
+    {"action": "close_popup_if_present", "note": "광고 X — 매번 검출"},
+    {"action": "tap", "xy": [912, 179], "name": "Pay top-right (PIN 무시)"},
+    {"action": "sleep_ms": 2000},
+    {"action": "tap", "xy": [782, 305], "name": "PC결제 tab"},
+    {"action": "sleep_ms": 2000},
+    {"action": "tap", "xy": [540, 2099], "name": "숫자코드 입력란"},
+    {"action": "sleep_ms": 1500},
+    {"action": "input_pin", "kind": "samsung_7digit_shuffle", "value": "<7자리 결제코드>"},
+    {"action": "tap", "xy": [540, 2375], "name": "결제하기"},
+    {"action": "sleep_ms": 2000},
+    {"action": "input_pin", "kind": "samsung_6digit_shuffle", "value": "137601"}
+  ]
+}
