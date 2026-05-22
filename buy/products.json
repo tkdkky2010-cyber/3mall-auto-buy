@@ -111,5 +111,33 @@
     "url_extra": "&sectId=3059445",
     "option_index": 1,
     "auto_coupon": true
+  },
+  "29": {
+    "name": "아이클타임 키성장 에프지오 6박",
+    "slitmCd": "2237140367",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "30": {
+    "name": "올바른 파로 효소 골드 30포 10박스 (총 300포)",
+    "slitmCd": "2244523957",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "31": {
+    "name": "닥터린 알파CD 원데이 핏 6박스",
+    "slitmCd": "2245068818",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "32": {
+    "name": "셀게이트 엑스트라버진 올리브오일 그리스 30포 6박",
+    "slitmCd": "2244447362",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
   }
 }
