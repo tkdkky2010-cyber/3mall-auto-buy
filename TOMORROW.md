@@ -99,7 +99,7 @@ HYUNDAI_WORKFLOW = [
 - Primitives:
   - `tap_text(query)` — 이미 구현됨
   - `wait_for_text(query, timeout=10)` — OCR 루프, 텍스트 나타날 때까지 대기
-  - `swipe(x1,y1,x2,y2)` — firmware 새 endpoint, 홈으로 가는 swipe up 등
+  - `swipe(x1,y1,x2,y2)` — firmware 새 endpoint (캐러셀 등 컨텐츠 swipe 용. 홈/뒤로가기는 swipe 아닌 nav bar KEYCODE_HOME/BACK 사용)
   - `enter_pin(card_key, pin)` — 기존 `pin_entry.enter_pin` 활용
   - `sleep(sec)`, `verify_text(query)` (단순 OCR 검증)
 - CLI: `python3 -m phone_auto.workflow run --card hyundai`
@@ -117,11 +117,7 @@ HYUNDAI_WORKFLOW = [
 
 ## 알려진 이슈 / TODO
 
-1. **뒤로가기 (Back)**: ESC 키 HID 보내봤지만 Galaxy S21+ 가 안 받음 (`Keyboard.write(0x1b)`). 다른 방법 시도:
-   - HID Keyboard `press(KEY_ESC)` (write 대신 press/release)
-   - 또는 swipe right (왼쪽 가장자리에서) 으로 gesture back
-   - 또는 OCR 로 "<" 버튼 위치 정확히 잡아 탭 (현재 좌표 off)
-2. **Home 으로 가기**: gesture nav 라면 swipe up (firmware 의 새 /swipe endpoint). 또는 nav bar 가운데 버튼 tap.
+1. **뒤로가기 / 홈 (해결됨)**: 3-key nav bar 사용 — ADB `KEYCODE_BACK` / `KEYCODE_HOME` 으로 처리. swipe gesture 안 씀 (`workflow.back()` / `workflow.home()` 가 ADB subprocess 호출).
 3. **Calibration 의존성**: 폰/카메라 위치 살짝 변하면 좌표 어긋남. 자동 검출 강화 (현재 흰배경 가정만 작동) — ORB keypoint align 으로 reference frame 대비 transform 정밀화.
 4. **OCR 정확도**: 한글 키패드 외 일반 텍스트는 conf 0.5 인 경우 많음. 멀티 프레임 평균 또는 EasyOCR 보조 활용 검토.
 5. **Card 비밀번호 어떻게 입력**: 사용자가 매번 수동 입력? 또는 hsmaster 에 카드별 PIN 저장하고 자동? 보안 정책 확인.

@@ -1,5 +1,8 @@
 """폰 자율 조작 워크플로 runner.
 
+⛔ 절대 원칙: phone 좌표 추정 금지. SYSTEM_READY.md 의 "좌표 추정 금지" 섹션 참조.
+매 탭 직전 카메라 캡쳐 + OCR + 캘리브 변환으로 정확 좌표 획득. tap_text() 사용 우선.
+
 Step 시퀀스로 카드사 결제 같은 다단계 작업 자동화.
 
 Primitives:
@@ -10,7 +13,8 @@ Primitives:
   - enter_pin(card_key, pin) — phone_auto.pin_entry 호출
   - sleep(sec)
   - verify_text(query) — OCR 검증, 없으면 fail
-  - back() — phone 화면 좌상단 < 위치 탭 (캘리브 기반 추정)
+  - back() — 3-key nav bar 의 KEYCODE_BACK (ADB)
+  - home() — 3-key nav bar 가운데 home key 의 KEYCODE_HOME (ADB)
   - capture(label) — 디버그용 스크린샷 저장
 
 각 step 은 dict 또는 tuple. 실패 시 retry, final fail 시 step 결과 반환.
@@ -94,9 +98,21 @@ class Workflow:
         self.history.append({"action": "tap_text", "query": query, "fail": True})
         return False
 
-    def tap_xy(self, x: int, y: int, duration_ms: int = 80, post_delay: float = None) -> None:
+    def tap_xy(self, x: int, y: int, duration_ms: int = 80, post_delay: float = None,
+               verified: bool = False) -> None:
+        """직접 phone 좌표 탭. ⛔ 좌표 추정 금지 — verified=True 필수.
+
+        verified=True 의미: 좌표가 (1) OCR + 캘리브 변환 결과이거나
+        (2) 사용자가 직접 알려준 정확 좌표일 때만. 머릿속 계산/비례 추정 금지.
+        OCR 으로 라벨 잡히면 tap_text() 사용 우선.
+        """
+        if not verified:
+            raise WorkflowError(
+                f"tap_xy({x},{y}) verified=False — 추정 좌표 금지. "
+                f"tap_text(라벨) 사용 또는 verified=True 명시 (OCR/사용자 확인 좌표만)."
+            )
         delay = self.step_delay if post_delay is None else post_delay
-        self._log(f"tap_xy phone({x},{y}) {duration_ms}ms")
+        self._log(f"tap_xy phone({x},{y}) {duration_ms}ms [verified]")
         if duration_ms <= 50:
             self.esp.click(x, y)
         else:
@@ -141,13 +157,21 @@ class Workflow:
         self._log(f"sleep {sec}s")
         time.sleep(sec)
 
-    def back_via_swipe(self) -> None:
-        """좌측 가장자리에서 오른쪽으로 swipe — Galaxy gesture nav back."""
-        self.swipe(5, 1200, 400, 1200, 200)
+    def back(self) -> None:
+        """뒤로 — 3-key nav bar (KEYCODE_BACK). ADB 신뢰성이 ESP HID 보다 높음."""
+        import subprocess
+        self._log("back (KEYCODE_BACK)")
+        subprocess.run(["adb", "shell", "input", "keyevent", "KEYCODE_BACK"], check=False)
+        time.sleep(self.step_delay)
+        self.history.append({"action": "back"})
 
-    def home_via_swipe(self) -> None:
-        """화면 하단에서 위로 swipe — gesture nav home."""
-        self.swipe(540, 2300, 540, 1200, 250)
+    def home(self) -> None:
+        """홈 — 3-key nav bar 가운데 (네모+동그란 home key, KEYCODE_HOME)."""
+        import subprocess
+        self._log("home (KEYCODE_HOME)")
+        subprocess.run(["adb", "shell", "input", "keyevent", "KEYCODE_HOME"], check=False)
+        time.sleep(self.step_delay)
+        self.history.append({"action": "home"})
 
     def enter_pin(self, card_key: str, pin: str) -> bool:
         from .pin_entry import enter_pin
@@ -212,9 +236,9 @@ def _main():
             print("--query 또는 --x --y 필요"); sys.exit(1)
         sys.exit(0 if ok else 2)
     elif args.cmd == "back":
-        wf.back_via_swipe()
+        wf.back()
     elif args.cmd == "home":
-        wf.home_via_swipe()
+        wf.home()
     elif args.cmd == "enter-pin":
         if not args.card or not args.pin:
             print("--card --pin 필요"); sys.exit(1)

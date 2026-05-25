@@ -8,6 +8,7 @@
  *   POST /click  {"x":N,"y":N}                    -- 절대좌표 클릭
  *   POST /tap    {"x":N,"y":N,"duration_ms":N}    -- 절대좌표 긴 탭
  *   POST /move   {"x":N,"y":N}                    -- 커서 이동만
+ *   POST /swipe  {"x1":N,"y1":N,"x2":N,"y2":N,"duration_ms":N}  -- 스와이프
  *   POST /type   {"text":"..."}                   -- 키보드 입력 (영문/숫자)
  *
  * 빌드 옵션 (필수):

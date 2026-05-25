@@ -418,6 +418,7 @@ def vote_digits(
     flip_h: bool = True,
     roi_y_frac: Optional[tuple[float, float]] = None,
     verbose: bool = False,
+    allow_partial: bool = False,
 ) -> Optional[dict[str, tuple[int, int]]]:
     """4엔진 union voting. 0~9 distinct cluster 매핑 성공 시 dict, 실패 시 None.
 
@@ -519,9 +520,12 @@ def vote_digits(
             missing = sorted(expected - found)
             extra = sorted(found - expected)
             print(f"❌ 검증 실패 — 누락 {missing}, 추가 {extra}")
-        return None
+        if not allow_partial:
+            return None
+        # allow_partial 시 partial map 반환 — 빈 cluster 도 union 에 활용
+        if verbose:
+            print(f"[partial] {len(found)}/10 매핑 반환")
     # 좌표는 flipped (un-mirrored = 실제 폰 화면) + 원본 사이즈 공간으로 반환
-    # → ESP32 가 받으면 그대로 클릭 (폰 실 좌표). 시각화는 flipped 이미지에 그려야 일치.
     if scale != 1.0:
         digit_map = {d: (int(x / scale), int(y / scale)) for d, (x, y) in digit_map.items()}
     return digit_map

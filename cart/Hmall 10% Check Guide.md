@@ -106,8 +106,6 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 | 1 | 이너플로라 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2154750833 |
 | 2 | 하루견과 초록색 100봉 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2151046312&sectId=3059445 |
 | 3 | 하루견과 갈색 100봉 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2225431602&sectId=3059445 |
-| 4 | 곡물도감 곡물서리태 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2227834416&sectId=3059445 |
-| 5 | 말차 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2227834416&sectId=3059445 |
 | 6 | 레놉티 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244138695&sectId=3059445 |
 | 7 | 락토핏 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2151878435 |
 | 8 | 이디야 디카페인 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244409628&sectId=3059445 |

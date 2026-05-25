@@ -173,34 +173,53 @@ def _compute_reward(price: int | None, tiers: list[dict], simple_ranges: list[di
     return rw
 
 
-# 가이드 cart/Hmall 10% Check Guide.md 의 상품 목록 (Phase 2)
-PRODUCTS = [
-    {"id": 1,  "name": "이너플로라",                          "slitmCd": "2154750833", "url_extra": ""},
-    {"id": 2,  "name": "하루견과 초록색 100봉",                "slitmCd": "2151046312", "url_extra": "&sectId=3059445"},
-    {"id": 3,  "name": "하루견과 갈색 100봉",                 "slitmCd": "2225431602", "url_extra": "&sectId=3059445"},
-    {"id": 4,  "name": "곡물도감 곡물서리태",                  "slitmCd": "2227834416", "url_extra": "&sectId=3059445"},
-    {"id": 5,  "name": "말차 (4와 동일 URL, 옵션 다름)",        "slitmCd": "2227834416", "url_extra": "&sectId=3059445", "alias_of": 4,  "option_keyword": "말차", "unit_list_price": 99_900},  # codegen 5/15 확정 [선택 2] = 곡물도감 말차 서리태...
-    {"id": 6,  "name": "레놉티",                             "slitmCd": "2244138695", "url_extra": "&sectId=3059445"},
-    {"id": 7,  "name": "락토핏",                             "slitmCd": "2151878435", "url_extra": ""},
-    {"id": 8,  "name": "이디야 디카페인",                      "slitmCd": "2244409628", "url_extra": "&sectId=3059445"},
-    {"id": 9,  "name": "이디야 카페인",                       "slitmCd": "2246603712", "url_extra": "&sectId=3059445"},
-    {"id": 10, "name": "이경제 더힘찬녹용 30포",                "slitmCd": "2240802022", "url_extra": "&ordpreview=true"},
-    {"id": 11, "name": "라메종드미엘 프랑스 라벤더 천연꿀 8병",   "slitmCd": "2246845189", "url_extra": "&sectId=3059445"},
-    {"id": 12, "name": "갱년기 다이어트 리얼퀸 3병",            "slitmCd": "2202276847", "url_extra": "&sectId=3059445"},
-    # codegen 5/15 확정: [선택 2]="[GRN] 벨리곰 콜라보 분홍이 초록이 SET"=26,900 / [선택 3]="GRN 흡수빠른 쾌변다이어트"=17,800
-    # 사용자 5/15 확정: #13 핑크초록이 = #14 곰돌이 = 둘 다 [선택 2] 벨리곰 = 26,900 (sectId만 다름 — 캠페인 추적용)
-    {"id": 13, "name": "GRN 핑크 초록이 (12와 동일 URL, [선택 2] 벨리곰)", "slitmCd": "2202276847", "url_extra": "",                "alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": 26900},
-    {"id": 14, "name": "GRN 곰돌이 (12와 동일 URL, [선택 2] 벨리곰)",      "slitmCd": "2202276847", "url_extra": "&sectId=3059445", "alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": None},  # auto-lookup → 26,900
-    {"id": 15, "name": "셀게이트 글루타치온 30p",               "slitmCd": "2244515588", "url_extra": ""},
-    {"id": 16, "name": "루솔",                               "slitmCd": "2225275921", "url_extra": ""},
-    {"id": 17, "name": "데이즈온 원데이 알파 18개",             "slitmCd": "2247036059", "url_extra": "&sectId=3059445"},
-    {"id": 20, "name": "바디랩 유기농 레몬즙 1박",              "slitmCd": "2244671296", "url_extra": "&sectId=3059445"},
-    {"id": 22, "name": "올바른건강식품 와이 9박",                "slitmCd": "2244934734", "url_extra": "&sectId=3059445"},
-    {"id": 23, "name": "셀게이트 컬리케일 6박",                 "slitmCd": "2244447010", "url_extra": "&sectId=3059445"},
-    {"id": 25, "name": "유기농 석류젤리 9박(90개)",             "slitmCd": "2243971283", "url_extra": "&sectId=3059445"},
-    {"id": 26, "name": "오라틱스 구강유산균 10박",              "slitmCd": "2244032427", "url_extra": "&sectId=3059445"},
-    {"id": 28, "name": "스키니랩 시서스 다이어트 11박",          "slitmCd": "2202464603", "url_extra": "&sectId=3059445"},
-]
+# alias 상품 메타 (Guide.md 표에 없는 정보 — 같은 URL 다른 옵션 처리용)
+# - alias_of: base 상품 id (benefit_ratio 재사용)
+# - option_keyword: base 페이지에서 클릭할 옵션 키워드 (실제 DOM 텍스트에 포함되어야 매칭)
+# - unit_list_price: 옵션의 1개당 정가 (None 이면 base.options 에서 자동 lookup)
+ALIAS_META: dict[int, dict] = {
+    5:  {"alias_of": 4,  "option_keyword": "말차",   "unit_list_price": 99_900},  # codegen 5/15 확정 [선택 2]
+    13: {"alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": 26900},
+    14: {"alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": None},   # auto-lookup → 26,900
+}
+
+GUIDE_PATH = Path(__file__).parent / "Hmall 10% Check Guide.md"
+_GUIDE_ROW_RE = re.compile(
+    r"^\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|\s*(https?://www\.hmall\.com/md/pda/itemPtc\?[^\s|]+)"
+)
+
+
+def _load_products_from_guide() -> list[dict]:
+    """Guide.md (Phase 2 상품 표) 를 single source of truth 로 파싱.
+
+    | # | 제품명 | URL | 행을 모두 추출해서 PRODUCTS 리스트 생성.
+    URL 에서 slitmCd / 나머지 query 분리 → url_extra 필드 채움.
+    alias 상품은 ALIAS_META 의 메타데이터 자동 병합.
+    """
+    text = GUIDE_PATH.read_text(encoding="utf-8")
+    by_id: dict[int, dict] = {}
+    for line in text.splitlines():
+        m = _GUIDE_ROW_RE.match(line)
+        if not m:
+            continue
+        pid = int(m.group(1))
+        name = m.group(2).strip()
+        url = m.group(3).strip()
+        qs = url.split("?", 1)[1]
+        params = [p.split("=", 1) for p in qs.split("&") if "=" in p]
+        slitm = next((v for k, v in params if k == "slitmCd"), None)
+        if not slitm:
+            continue
+        url_extra = "".join(f"&{k}={v}" for k, v in params if k != "slitmCd")
+        prod = {"id": pid, "name": name, "slitmCd": slitm, "url_extra": url_extra}
+        meta = ALIAS_META.get(pid)
+        if meta:
+            prod.update(meta)
+        by_id[pid] = prod  # 같은 id 가 두 표에 있어도 마지막 row 가 승
+    return [by_id[k] for k in sorted(by_id.keys())]
+
+
+PRODUCTS = _load_products_from_guide()
 
 
 def login(page: Page, account_id: str, account_pw: str) -> bool:
@@ -267,9 +286,13 @@ def check_one_product(page: Page, prod: dict) -> dict:
         return out
 
     # Step 3 (쿠폰 검출) — ten_percent 여부와 무관하게 항상 실행
-    # "쿠폰 받기" 버튼 존재 여부 (buy/run.py의 click_coupon_receive와 동일 로직)
+    # 의미: 이 상품 페이지에 쿠폰 행사가 있는가 (미수령/이미 받음 둘 다 True)
+    # - "쿠폰 받기" = 아직 안 받은 상태
+    # - "받은 쿠폰" = 이미 받음 (계정이 다 받으면 라벨이 이렇게 바뀜)
     try:
-        out["has_coupon"] = page.locator("button").filter(has_text="쿠폰 받기").count() > 0
+        body_text = page.evaluate("document.body.innerText")
+        out["has_coupon"] = ("쿠폰 받기" in body_text) or ("받은 쿠폰" in body_text)
+        out["coupon_claimed"] = "받은 쿠폰" in body_text  # 이미 받았는지 표시
     except Exception:
         pass
 
@@ -1019,9 +1042,10 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
     return out
 
 
-def write_to_sheet(results: list[dict], date_str: str) -> bool:
+def write_to_sheet(results: list[dict], date_str: str, acc_idx: int = 1) -> bool:
     """Step 1과 동일 시트의 "{M.DD}" 탭에 Hmall 10% 결과 추가 입력.
     기존 데이터 마지막 행에서 2행 띄운 후 헤더+상품 행들 입력.
+    계정 #2 이상은 탭명에 " (계정N)" suffix — 사용자 수동 수정 보존용.
     """
     if not GSPREAD_KEY or not GSPREAD_KEY.exists():
         print("[WARN] gspread 서비스 계정 키 없음 (gen-lang-*.json) — 시트 입력 skip")
@@ -1033,8 +1057,13 @@ def write_to_sheet(results: list[dict], date_str: str) -> bool:
         return False
 
     # 탭명 = "M.DD 식품" (식품 전용 탭, rate-check의 "M.DD" 와 분리)
+    # acc_idx > 1 이면 " (계정N)" suffix 로 분리 — 계정 #1 의 수동 수정 보존
     dt = datetime.strptime(date_str, "%Y-%m-%d")
-    tab_candidates = [f"{dt.month}.{dt.day:02d} 식품", f"{dt.month}.{dt.day} 식품"]
+    suffix = f" (계정{acc_idx})" if acc_idx > 1 else ""
+    tab_candidates = [
+        f"{dt.month}.{dt.day:02d} 식품{suffix}",
+        f"{dt.month}.{dt.day} 식품{suffix}",
+    ]
 
     try:
         gc = gspread.service_account(filename=str(GSPREAD_KEY))
@@ -1145,14 +1174,15 @@ def _tier_summary(tiers: list[dict]) -> str:
 
 def print_report(results: list[dict]) -> None:
     print("\n========= 10% 적립 + 결제 흐름 결과 =========")
-    hdr = (f"{'#':>3} | {'제품명':30s} | {'qty':>3} | {'정가':>9} | {'우수가':>9} | "
+    hdr = (f"{'#':>3} | {'제품명':30s} | {'쿠폰':4s} | {'qty':>3} | {'정가':>9} | {'우수가':>9} | "
            f"{'즉시할인가':>10} | {'실비':>9} | 페이백카드")
     print(hdr)
-    print("-" * 120)
+    print("-" * 130)
     for r in results:
         name = (r["name"][:28] + "…") if len(r["name"]) > 29 else r["name"]
+        coupon = "🎟️" if r.get("has_coupon") else "—"
         if r.get("error"):
-            print(f"{r['id']:>3} | {name:30s} | ERR {r['error'][:30]}")
+            print(f"{r['id']:>3} | {name:30s} | {coupon:4s} | ERR {r['error'][:30]}")
             continue
         p = r.get("payment") or {}
         qty = str(p.get("qty") or "—")
@@ -1162,7 +1192,7 @@ def print_report(results: list[dict]) -> None:
         kkf = f"{p['kakao_final_cost']:,}" if p.get("kakao_final_cost") is not None else "—"
         pb = p.get("paybacks") or {}
         pb_str = ", ".join(f"{k}={v['final_cost']:,}" for k, v in pb.items()) if pb else "—"
-        print(f"{r['id']:>3} | {name:30s} | {qty:>3} | {lp:>9} | {mp:>9} | "
+        print(f"{r['id']:>3} | {name:30s} | {coupon:4s} | {qty:>3} | {lp:>9} | {mp:>9} | "
               f"{kk:>9} | {kkf:>9} | {pb_str}")
 
 
@@ -1197,10 +1227,10 @@ def main() -> int:
             print(f"  수동 실행: bash {PROJECT_ROOT}/launch-check10-chrome.sh")
             return 1
         context = browser.contexts[0] if browser.contexts else browser.new_context()
-        return _run(context, acc)
+        return _run(context, acc, acc_idx)
 
 
-def _run(context, acc) -> int:
+def _run(context, acc, acc_idx: int = 1) -> int:
     page = context.new_page()
     if not login(page, acc["id"], acc["pw"]):
         print(f"[FATAL] 로그인 실패")
@@ -1260,7 +1290,7 @@ def _run(context, acc) -> int:
     print(f"\n[OK] 결과 저장: {TODAY_OUT}")
 
     # Google Sheets 입력 (Step 1과 동일 시트의 "{M.DD}" 탭에 추가)
-    write_to_sheet(results, date_str)
+    write_to_sheet(results, date_str, acc_idx=acc_idx)
 
     page.close()
     return 0

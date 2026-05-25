@@ -1,10 +1,44 @@
 {
-  "date": "2026-05-22",
-  "_comment": "오늘 담을 매핑. accounts는 hmall_config.json 의 1-based 순서. 매일 이 파일만 갱신하면 됨.",
+  "date": "2026-05-25",
+  "_comment": "#1 완료, #2 #16 #17 완료. 다음 = #3 부터.",
   "items": [
-    { "product": 29, "accounts": [1, 2, 3],                    "qty": 1 },
-    { "product": 30, "accounts": [4, 5, 7, 8, 19],             "qty": 1 },
-    { "product": 31, "accounts": [9, 10, 11, 12, 13],          "qty": 3 },
-    { "product": 32, "accounts": [14, 15, 16, 17, 18],         "qty": 3 }
+    {
+      "product": 16,
+      "accounts": [
+        3,
+        4,
+        5
+      ],
+      "qty": 4
+    },
+    {
+      "product": 17,
+      "accounts": [
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        7,
+        6,
+        5,
+        4,
+        3
+      ],
+      "qty": 2
+    },
+    {
+      "product": 25,
+      "accounts": [
+        13,
+        12,
+        11,
+        10,
+        9,
+        8
+      ],
+      "qty": 2
+    }
   ]
 }

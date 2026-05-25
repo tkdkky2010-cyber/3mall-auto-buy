@@ -46,7 +46,7 @@ LOGIN_URL = "https://www.hmall.com/mo/cob/loginForm"
 CART_URL = "https://www.hmall.com/mo/odb/basktList"
 ITEM_URL_FMT = "https://www.hmall.com/md/pda/itemPtc?slitmCd={slitmCd}{extra}"
 
-ACCOUNT_DELAY_SEC = 5
+ACCOUNT_DELAY_SEC = 420  # 7분 — 본사 주소/IP 추적 회피 (같은 계정 product 사이 + 계정 사이 둘 다 적용)
 CDP_PORT = os.environ.get("CDP_PORT", "9222")
 CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
 
@@ -75,6 +75,17 @@ CARD_CD_TO_NAME = {
     "cardCd08": "롯데카드",
     "cardCd10": "하나카드",
     "cardCd40": "NH농협카드",
+}
+
+# cardCd → phone_auto/coords/apps/{name}.json 의 flow 매핑.
+# 7자리 코드 추출 성공 시 자동 호출. 향후 카드 추가 시 이 dict 만 갱신.
+CARD_CD_TO_PHONE_FLOW = {
+    "cardCd02": ("samsung_monimo", "flow_payment"),  # 삼성 → monimo PC결제
+    "cardCd04": ("hyundai_card",   "flow_payment"),  # 현대카드
+    "cardCd08": ("lotte_card",     "flow_payment"),  # 롯데카드
+    "cardCd10": ("hana_card",      "flow_payment"),  # 하나카드
+    "cardCd01": ("bc_paybook_isp", "flow_payment"),  # BC 페이북
+    # cardCd03 KB / cardCd40 NH 는 좌표 미완 — 추후
 }
 
 # 오늘의 결제수단 강제 지정 — 비우면 캐러셀 자동 판독
@@ -371,7 +382,7 @@ def do_checkout(page: Page) -> dict:
     """cart→구매하기→카드선택→결제하기→7자리 추출.
     Returns dict: {success, code, card_brand, error}
     """
-    out = {"success": False, "code": None, "card_brand": None,
+    out = {"success": False, "code": None, "card_brand": None, "card_cd": None,
            "is_pay": False, "qr_pay": None, "error": None}
     try:
         # 1) cart 페이지로 이동 + 일반상품 체크
@@ -420,6 +431,7 @@ def do_checkout(page: Page) -> dict:
             return out
 
         cardcd = pick.get("cardCd", "")
+        out["card_cd"] = cardcd
         brand_text = pick.get("brand", "")
         # 카카오페이/토스페이는 alt='cardCdXX' 라도 brand 텍스트 기준으로 페이로 강제 분류
         # (alt.startsWith('cardCd') 만으로는 카카오페이를 카드로 오분류 → 결제까지 진행되는 버그)
@@ -451,21 +463,30 @@ def do_checkout(page: Page) -> dict:
             out["manual_payment_needed"] = "kakao_pay"
             return out
 
-        # 캐러셀 슬라이드 클릭 (Playwright real-click으로 React 핸들러 트리거)
-        if not click_carousel_slide(page, cardcd):
-            out["error"] = "캐러셀 슬라이드 클릭 실패"
-            return out
+        # 캐러셀 슬라이드 click — 결제 페이지 진입 시 최적 카드(첫 슬라이드)가 자동 selected 상태.
+        # 자동 모드 (TODAY_BRAND 빈문자열) = pick 한 카드가 첫 슬라이드와 같으면 click X (toggle off 방지).
+        # override 모드 또는 다른 카드 pick 시에만 click.
+        already_selected = page.evaluate(f"""() => {{
+            const el = document.querySelector('div._32o920j:has(img[alt="{cardcd}"])');
+            return el ? (el.className || '').includes('selected') : false;
+        }}""")
+        if already_selected:
+            print(f"    [SKIP] cardCd={cardcd} 이미 selected 상태 — click 안 함 (한 번 더 누르면 toggle off)")
+        else:
+            if not click_carousel_slide(page, cardcd):
+                out["error"] = "캐러셀 슬라이드 클릭 실패"
+                return out
 
-        # 4) 결제하기 클릭
+        # 4) 결제하기 클릭 (button.btn-confirm + "N원 결제하기" 형태 매칭)
         page.wait_for_timeout(800)
-        pay_btn = page.locator("button").filter(has_text=re.compile(r"^\s*결제하기\s*$")).first
+        pay_btn = page.locator("button.btn-confirm").filter(has_text="결제하기").first
         if pay_btn.count() == 0:
             pay_btn = page.locator("button").filter(has_text="결제하기").first
         if pay_btn.count() == 0:
             out["error"] = "결제하기 버튼 없음"
             return out
-        pay_btn.click()
-        page.wait_for_timeout(3500)
+        pay_btn.click()  # v3 에서 동작 검증된 locator click
+        page.wait_for_timeout(3500)  # v3 timing
 
         # 5) 카드 path → 7자리 / 페이 path → QR 화면 도달 확인
         if out["is_pay"]:
@@ -491,15 +512,57 @@ def do_checkout(page: Page) -> dict:
 
 
 def detect_carousel_slides(page: Page) -> list[dict]:
-    """카드할인 캐러셀 모든 슬라이드의 메타데이터 list 반환 (클릭 X)."""
+    """카드할인 캐러셀 모든 슬라이드의 메타데이터 list 반환 (클릭 X).
+
+    Hmall 결제 페이지 DOM 변경 대응 (5/25):
+    - 옛 구조: .swiper-slide (deprecated, Swiper.js 제거됨)
+    - 새 구조: img[alt^="cardCd"] 의 _32o920j ancestor 컨테이너
+      카드 1개만 DOM 에 렌더링되는 게 정상 (가장 왼쪽 = 최고 할인율).
+      여러 카드인 날은 swipe 안 해도 N개 다 DOM 에 있을 수도 있음 (둘 다 처리).
+    """
     js = """
         () => {
+            const cls = (el) => (el && typeof el.className === 'string') ? el.className : '';
             const h2 = Array.from(document.querySelectorAll('h2'))
                 .find(h => h.textContent.trim() === '카드할인');
             if (!h2) return [];
-            let section = h2.closest('div');
-            for (let lvl = 0; lvl < 5 && section; lvl++) {
-                const slides = Array.from(section.querySelectorAll('.swiper-slide'))
+
+            // ── 1차: 새 _32o920j 구조 (현재 Hmall DOM) ──
+            const section = h2.closest('section') || h2.closest('div');
+            if (section) {
+                const imgs = Array.from(section.querySelectorAll('img[alt^="cardCd"]'));
+                const slides = [];
+                for (const img of imgs) {
+                    // _32o920j ancestor (개별 카드 컨테이너)
+                    let container = img;
+                    for (let d = 0; d < 10 && container; d++) {
+                        if (cls(container).includes('_32o920j')) break;
+                        container = container.parentElement;
+                    }
+                    if (!container) continue;
+                    const strong = container.querySelector('strong');
+                    if (!strong) continue;
+                    const m = (strong.textContent || '').match(/(\\d+)\\s*%/);
+                    if (!m) continue;
+                    // brand 텍스트 — img.alt 만으로 매핑 가능 (CARD_CD_TO_NAME). p 텍스트 fallback.
+                    const ps = Array.from(container.querySelectorAll('p'))
+                        .map(p => p.textContent.trim()).filter(t => t);
+                    const brand = ps.find(t => t.includes('카드') || t.includes('페이')) || ps[0] || '';
+                    slides.push({
+                        cardCd: img.alt,
+                        brand: brand,
+                        percent: parseInt(m[1]),
+                        isCard: img.alt.startsWith('cardCd'),
+                        left: Math.round(container.getBoundingClientRect().left),
+                    });
+                }
+                if (slides.length > 0) return slides;
+            }
+
+            // ── 2차: 옛 .swiper-slide 구조 (DOM 롤백 대비 fallback) ──
+            let scope = h2.closest('div');
+            for (let lvl = 0; lvl < 5 && scope; lvl++) {
+                const slides = Array.from(scope.querySelectorAll('.swiper-slide'))
                     .filter(s => {
                         if (s.offsetParent === null) return false;
                         const img = s.querySelector('img[alt]');
@@ -521,7 +584,7 @@ def detect_carousel_slides(page: Page) -> list[dict]:
                         };
                     });
                 }
-                section = section.parentElement;
+                scope = scope.parentElement;
             }
             return [];
         }
@@ -547,26 +610,31 @@ def pick_carousel_slide(slides: list[dict], override: str = "") -> dict | None:
 
 
 def click_carousel_slide(page: Page, cardCd: str) -> bool:
-    """카드할인 캐러셀의 슬라이드를 Playwright real-click으로 선택.
-    캐러셀 클릭이 정상 흐름 (99%). 결제수단변경 모달은 최후의 수단.
+    """카드할인 캐러셀의 슬라이드를 mouse.click(box center) 으로 선택.
+    locator.click() 은 React onClick handler 가 chain 에 없는 element 에 실패 — bounding box mouse click 이 robust.
+
+    DOM 변경 대응 (5/25): 새 컨테이너 = _32o920j (Swiper.js 제거됨).
+    옛 .swiper-slide fallback 도 유지 (롤백 대비).
     """
-    # img[alt=cardCd]을 가진 슬라이드 안의 hstack.root div가 실제 클릭 핸들러
-    slide = page.locator(f'.swiper-slide:has(img[alt="{cardCd}"]) div[data-slot="hstack.root"]').first
-    if slide.count() == 0:
-        # fallback: swiper-slide 외곽
-        slide = page.locator(f'.swiper-slide:has(img[alt="{cardCd}"])').first
-    if slide.count() == 0:
-        print(f"    [WARN] 슬라이드 cardCd={cardCd} 미발견")
-        return False
-    try:
-        slide.scroll_into_view_if_needed(timeout=5000)
-        slide.click()
-        page.wait_for_timeout(1500)
-        print(f"    [OK] 캐러셀 슬라이드 클릭 (cardCd={cardCd})")
-        return True
-    except Exception as e:
-        print(f"    [WARN] 슬라이드 클릭 실패: {e}")
-        return False
+    candidates = [
+        ("_32o920j", page.locator(f'div._32o920j:has(img[alt="{cardCd}"])').first),
+        (".swiper-slide outer", page.locator(f'.swiper-slide:has(img[alt="{cardCd}"])').first),
+        ("img ancestor", page.locator(f'img[alt="{cardCd}"]').first),
+    ]
+    for label, slide in candidates:
+        if slide.count() == 0:
+            continue
+        try:
+            slide.scroll_into_view_if_needed(timeout=3000)
+            slide.click()  # locator click — v3 에서 동작 검증된 방식
+            page.wait_for_timeout(1500)
+            print(f"    [OK] 캐러셀 슬라이드 click (cardCd={cardCd}, via {label})")
+            return True
+        except Exception as e:
+            print(f"    [WARN] {label} 클릭 실패: {e}")
+            continue
+    print(f"    [WARN] 슬라이드 cardCd={cardCd} 미발견 (모든 셀렉터 실패)")
+    return False
 
 
 def detect_qr_screen(page: Page) -> str | None:
@@ -718,9 +786,16 @@ def click_payment_app_option(page: Page, card_brand: str) -> bool:
     # 모든 page (새 창 popup 포함) + 각 page의 모든 frame 순회
     # 삼성카드 결제 popup은 별도 브라우저 창으로 열림 (window.open)
     context = page.context
-    deadline = time.time() + 8  # 새 창 8초까지 기다림
+    deadline = time.time() + 8  # 새 창 8초까지 기다림 (v3 검증)
     while time.time() < deadline:
         all_pages = context.pages
+        # 우선순위: hmall.com orderRequest > hmall.com 기타 > 외부 도메인 (monimo.com 등)
+        # 이전 잔여 탭 (monimo.com 메인 등) 의 '모니모' 텍스트가 먼저 매칭되어 잘못 클릭되는 것 방지
+        all_pages = sorted(all_pages, key=lambda p: (
+            0 if 'hmall.com' in p.url and 'order' in p.url else
+            1 if 'hmall.com' in p.url else
+            2
+        ))
         # NH 등 카드사별 overlay 안내 popup 자동 dismiss
         dismiss_card_overlay_popups(all_pages)
         for pi, p in enumerate(all_pages):
@@ -776,10 +851,146 @@ def extract_monimo_code(page: Page) -> str | None:
                     if m:
                         code = "".join(m.groups())
                         print(f"    [OK] 결제 코드: {code} (page={p.url[:50]})")
+                        # 결제 코드 페이지를 사용자 시야로 활성화 (background 가 아닌 foreground)
+                        try:
+                            p.bring_to_front()
+                        except Exception:
+                            pass
                         return code
         page.wait_for_timeout(500)
     print("    [WARN] 15초 안에 결제 코드 미발견")
     return None
+
+
+# ───────────── 결제 verify ─────────────
+
+
+def _read_mypage_paid_count(page: Page) -> int | None:
+    """hmall mypage 의 '결제완료' 주문 수 읽기 — 결제 전후 비교용.
+    page 가 닫혔으면 context.pages 에서 살아있는 hmall page 또는 새 page 생성.
+    """
+    try:
+        ctx = page.context
+        # 살아있는 hmall page 우선
+        target = None
+        for p in ctx.pages:
+            try:
+                if not p.is_closed() and "hmall.com" in p.url:
+                    target = p
+                    break
+            except Exception:
+                continue
+        if target is None:
+            target = ctx.new_page()
+        target.goto("https://www.hmall.com/mo/mpf/selectMyPageMain",
+                  wait_until="domcontentloaded", timeout=15000)
+        target.wait_for_timeout(2000)
+        txt = target.evaluate("document.body.innerText")
+        m = re.search(r"(\d+)\s*\n*\s*결제완료", txt)
+        return int(m.group(1)) if m else None
+    except Exception as e:
+        print(f"    [VERIFY] mypage paid count err: {e}")
+        return None
+
+
+# ───────────── H.Point 적립 신청 ─────────────
+
+
+def _load_prmo_list(product_id: int) -> list[str]:
+    """cart/today.json 의 products[].events 에서 prmoNo list 추출 (dual 적립 대응)."""
+    try:
+        today_path = PROJECT_ROOT / "cart" / "today.json"
+        if not today_path.exists():
+            return []
+        d = json.loads(today_path.read_text(encoding="utf-8"))
+        for p in d.get("products", []):
+            if str(p.get("id")) == str(product_id):
+                return [e.get("prmo") for e in (p.get("events") or []) if e.get("prmo")]
+    except Exception as e:
+        print(f"    [HPOINT] prmo lookup error: {e}")
+    return []
+
+
+def apply_hpoint(page: Page, prmoNo: str) -> dict:
+    """결제 완료 후 H.Point 적립 신청 (evntHPointDtl 페이지 진입 + 신청하기 클릭).
+
+    Returns {"success": bool, "already_done": bool, "error": str|None}.
+    """
+    out = {"success": False, "already_done": False, "error": None}
+    try:
+        url = f"https://www.hmall.com/md/eva/evntHPointDtl?prmoNo={prmoNo}"
+        page.goto(url, wait_until="domcontentloaded", timeout=15000)
+        page.wait_for_timeout(2000)
+        # 이미 신청 완료 (.complete class)
+        if page.locator(".get-reward-btn.complete").count() > 0:
+            out["success"] = True
+            out["already_done"] = True
+            print(f"    [HPOINT] prmo={prmoNo} 이미 신청 완료 — skip")
+            return out
+        # 신청하기 버튼
+        btn = page.locator(".get-reward-btn:not(.complete)").first
+        if btn.count() == 0:
+            out["error"] = "신청하기 버튼 없음"
+            return out
+        btn.click()
+        page.wait_for_timeout(2500)
+        # 확인 popup 자동 닫기 (있으면)
+        for txt in ("확인", "예", "신청"):
+            ok = page.locator("button").filter(has_text=txt).first
+            if ok.count() > 0 and ok.is_visible():
+                try:
+                    ok.click()
+                    page.wait_for_timeout(800)
+                    break
+                except Exception:
+                    pass
+        # 완료 검증
+        page.wait_for_timeout(1000)
+        if page.locator(".get-reward-btn.complete").count() > 0:
+            out["success"] = True
+            print(f"    [HPOINT] prmo={prmoNo} ✓ 신청 완료")
+        else:
+            out["success"] = True  # 일단 클릭 됐으니 success (검증은 다음 진입 시)
+            print(f"    [HPOINT] prmo={prmoNo} 신청 클릭됨 (검증 미확인)")
+    except Exception as e:
+        out["error"] = f"{e}"
+    return out
+
+
+# ───────────── 폰 자동 결제 brige ─────────────
+
+
+def trigger_phone_payment(card_cd: str, code: str, timeout_sec: int = 180) -> dict:
+    """7자리 코드 추출 성공 시 phone_auto/flow_runner.py 자동 호출.
+
+    cardCd → CARD_CD_TO_PHONE_FLOW 매핑으로 (coords_name, flow_key) 결정.
+    flow 안의 input_pin step 은 vars["code"] 로 7자리 자동 주입.
+    """
+    out = {"success": False, "error": None, "log_tail": ""}
+    mapping = CARD_CD_TO_PHONE_FLOW.get(card_cd)
+    if not mapping:
+        out["error"] = f"폰 자동화 flow 미정의 (cardCd={card_cd}) — CARD_CD_TO_PHONE_FLOW 에 추가 필요"
+        return out
+    coords_name, flow_key = mapping
+    import subprocess
+    py = os.environ.get("PYTHON_BIN") or "/opt/homebrew/bin/python3"
+    cmd = [py, "-m", "phone_auto.flow_runner", coords_name, flow_key, f"--code={code}"]
+    print(f"  [PHONE] 자동 결제 호출: {coords_name}/{flow_key} code={code}")
+    # FLOW_USE_CAMERA=1 → flow_runner 가 카메라 OCR 모드 (FLAG_SECURE 화면 우회)
+    env = {**os.environ, "FLOW_USE_CAMERA": "1"}
+    try:
+        result = subprocess.run(
+            cmd, cwd=str(PROJECT_ROOT), env=env,
+            capture_output=True, text=True, timeout=timeout_sec,
+        )
+        out["log_tail"] = (result.stdout[-600:] or "") + (("\n[stderr]\n" + result.stderr[-300:]) if result.stderr else "")
+        if result.returncode == 0:
+            out["success"] = True
+        else:
+            out["error"] = f"flow_runner exit {result.returncode}"
+    except subprocess.TimeoutExpired:
+        out["error"] = f"flow_runner timeout ({timeout_sec}s)"
+    return out
 
 
 # ───────────── 메인 흐름 ─────────────
@@ -787,7 +998,11 @@ def extract_monimo_code(page: Page) -> str | None:
 
 def process_account(context: BrowserContext, idx: int, account: dict, items: list[dict],
                      cdp_mode: bool = False) -> tuple[int, int, bool, dict | None]:
-    print(f"\n=== #{idx} {account['id']} — 담을 상품 {len(items)}개 ===")
+    """현대몰 쿠폰 정책: 쿠폰 가능한 상품은 단독 결제 필수.
+    → 같은 계정의 여러 product 도 각각 별도 cycle (clear_cart + add 1개 + checkout + 결제).
+    cycle 사이 ITEM_DELAY_SEC 대기.
+    """
+    print(f"\n=== #{idx} {account['id']} — 담을 상품 {len(items)}개 (각 단독 결제) ===")
     page = context.new_page()
 
     if cdp_mode:
@@ -805,29 +1020,66 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
         page.close()
         return (0, len(items), False, None)
 
-    clear_cart(page)
-
     success = 0
-    for entry in items:
-        if add_to_cart(page, entry["product_id"], entry["info"], entry["qty"]):
-            success += 1
+    last_checkout_result: dict | None = None
+    for ci, entry in enumerate(items, 1):
+        print(f"\n  ── #{idx} cycle {ci}/{len(items)} — product {entry['product_id']} x{entry['qty']} 단독 결제 ──")
+        clear_cart(page)
+        if not add_to_cart(page, entry["product_id"], entry["info"], entry["qty"]):
+            print(f"  [SKIP] cycle {ci} add_to_cart fail")
+            continue
+        success += 1
 
-    checkout_result: dict | None = None
-    if success > 0:
-        print(f"  [CHECKOUT] #{idx} 시작...")
+        print(f"  [CHECKOUT] cycle {ci} 시작...")
         checkout_result = do_checkout(page)
+        last_checkout_result = checkout_result
         if checkout_result["success"]:
             if checkout_result.get("is_pay"):
-                print(f"  ✓ [PAY QR] #{idx} {checkout_result['card_brand']} → {checkout_result.get('qr_pay')} QR (Phase 3-B 폰 처리)")
+                print(f"  ✓ [PAY QR] {checkout_result['card_brand']} → {checkout_result.get('qr_pay')} QR")
             else:
-                print(f"  ✓ [PAYMENT CODE] #{idx} {checkout_result['card_brand']} → {checkout_result['code']}")
+                print(f"  ✓ [PAYMENT CODE] {checkout_result['card_brand']} → {checkout_result['code']}")
+                # 카드 path + 7자리 추출 성공 + DRY_PAYMENT=false → 폰 자동 결제 trigger
+                if not DRY_PAYMENT and checkout_result.get("code") and checkout_result.get("card_cd"):
+                    # 결제 전 mypage 결제완료 count snapshot — 결제 후 +1 검증
+                    pre_count = _read_mypage_paid_count(page)
+                    phone_res = trigger_phone_payment(
+                        checkout_result["card_cd"], checkout_result["code"]
+                    )
+                    checkout_result["phone_result"] = phone_res
+                    if phone_res["success"]:
+                        # hmall 측 결제 완료 verify — mypage 결제완료 count 갱신 확인
+                        page.wait_for_timeout(8000)
+                        post_count = _read_mypage_paid_count(page)
+                        if pre_count is not None and post_count is not None and post_count > pre_count:
+                            print(f"  ✓ [PHONE+HMALL OK] #{idx} 결제 완료 확정 ({pre_count} → {post_count})")
+                        else:
+                            print(f"  ⚠ [VERIFY FAIL] #{idx} phone OK 이지만 hmall mypage 결제완료 미증가 ({pre_count}→{post_count}) — PIN 잘못 입력 가능")
+                            phone_res["success"] = False
+                            phone_res["error"] = "hmall mypage 결제완료 미증가"
+                        # H.Point 적립 신청 — 결제 완료 후만 신청 가능
+                        prmo_list = _load_prmo_list(entry["product_id"])
+                        if prmo_list:
+                            print(f"  [HPOINT] {len(prmo_list)}개 행사 신청 시도...")
+                            for prmo in prmo_list:
+                                apply_hpoint(page, prmo)
+                        else:
+                            print(f"  [HPOINT] product {entry['product_id']} prmoNo 없음 — skip")
+                    else:
+                        print(f"  ✗ [PHONE FAIL] #{idx} {phone_res['error']}")
+                        if phone_res.get("log_tail"):
+                            print(f"    └─ log: {phone_res['log_tail'][-200:]}")
             if DRY_PAYMENT:
-                print(f"  ⚠️ DRY_PAYMENT=true — 폰에서 수동 결제 또는 Phase 3-B 자동화 대기")
+                print(f"  ⚠️ DRY_PAYMENT=true — 폰 자동 결제 skip, 7자리 코드만 추출")
         else:
-            print(f"  ✗ [CHECKOUT FAIL] #{idx}: {checkout_result['error']}")
+            print(f"  ✗ [CHECKOUT FAIL] cycle {ci}: {checkout_result['error']}")
+
+        # 같은 계정 다음 cycle 전 wait (7분 — 본사 추적 회피)
+        if ci < len(items):
+            print(f"  [WAIT] 다음 cycle 전 {ACCOUNT_DELAY_SEC}s 대기...")
+            time.sleep(ACCOUNT_DELAY_SEC)
 
     page.close()
-    return (success, len(items), True, checkout_result)
+    return (success, len(items), True, last_checkout_result)
 
 
 def main() -> int:
