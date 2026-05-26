@@ -1073,10 +1073,12 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
         else:
             print(f"  ✗ [CHECKOUT FAIL] cycle {ci}: {checkout_result['error']}")
 
-        # 같은 계정 다음 cycle 전 wait (7분 — 본사 추적 회피)
+        # 같은 계정의 cycle 사이 = 즉시 진행 (한 아이디 안에서는 wait 불필요)
+        # 7분 wait 는 계정 간 (_process 의 ACCOUNT_DELAY_SEC) 에만 적용
         if ci < len(items):
-            print(f"  [WAIT] 다음 cycle 전 {ACCOUNT_DELAY_SEC}s 대기...")
-            time.sleep(ACCOUNT_DELAY_SEC)
+            cycle_delay = 5
+            print(f"  [WAIT] 같은 계정 다음 cycle 전 {cycle_delay}s 대기...")
+            time.sleep(cycle_delay)
 
     page.close()
     return (success, len(items), True, last_checkout_result)
