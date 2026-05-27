@@ -1230,6 +1230,25 @@ def main() -> int:
         return _run(context, acc, acc_idx)
 
 
+def _is_crash_error(err: str | None) -> bool:
+    """렌더러 크래시/페이지 소실 에러인지 — 메모리 압박 등으로 탭이 죽으면 발생."""
+    if not err:
+        return False
+    return any(k in err for k in (
+        "crashed", "Target closed", "has been closed",
+        "Target page, context or browser",
+    ))
+
+
+def _fresh_page(context, old):
+    """죽은 page 닫고 같은 context에서 새 page 생성 (쿠키 유지 → 재로그인 불필요)."""
+    try:
+        old.close()
+    except Exception:
+        pass
+    return context.new_page()
+
+
 def _run(context, acc, acc_idx: int = 1) -> int:
     page = context.new_page()
     if not login(page, acc["id"], acc["pw"]):
@@ -1259,12 +1278,20 @@ def _run(context, acc, acc_idx: int = 1) -> int:
 
         print(f"  #{prod['id']:>3} {prod['name'][:30]:30s} 검사 중...", flush=True)
         result = check_one_product(page, prod)
+        if _is_crash_error(result.get("error")):
+            print(f"     ⚠️ 페이지 크래시 — page 재생성 후 1회 재시도")
+            page = _fresh_page(context, page)
+            result = check_one_product(page, prod)
         status = "✓" if result["ten_percent"] else ("ERR" if result.get("error") else "✗")
         n_tiers = len(result.get("tiers") or [])
         print(f"     → 10%={status}  구간={n_tiers}단  phrase={(result.get('phrase') or '')[:40]}")
         # 10% 적립 상품만 결제 흐름 진행 (정가/카카오할인가/실비 추출)
         if result.get("ten_percent") and not result.get("error"):
             payment = check_payment_flow(page, prod, result.get("tiers") or [], result.get("simple_ranges") or [])
+            if _is_crash_error(payment.get("error")):
+                print(f"     ⚠️ 결제흐름 페이지 크래시 — page 재생성 후 1회 재시도")
+                page = _fresh_page(context, page)
+                payment = check_payment_flow(page, prod, result.get("tiers") or [], result.get("simple_ranges") or [])
             result["payment"] = payment
             pb = payment.get("paybacks") or {}
             pb_str = " / ".join(f"{k}={v['final_cost']:,}" for k, v in pb.items()) if pb else "-"
