@@ -1,0 +1,167 @@
+{
+  "package": "com.omnitel.android.lottewebview",
+  "main_activity": "com.lotteimall.common.lottewebview.MainActivity",
+  "screen": {"w": 1080, "h": 2400},
+  "captured_at": "2026-05-26",
+  "note": "WebView 기반 (DOM dump 빈약 → OCR 중심). goods_no 검색창 직접 입력 → 상품 detail 직진입. KB Pay redirect 시 screencap 차단 (FLAG_SECURE) → camera OCR + button-grid mapping 필요. 키패드 = 고정 layout (셔플 X).",
+
+  "home_screen": {
+    "search_icon": {"x": 700, "y": 152, "note": "상단 우측 돋보기"},
+    "popup_close": {"x": 820, "y": 2192, "note": "광고 popup 닫기 (또는 539, 2192 = 닫기 text 위치). 매 launch 시 매번 검출"},
+    "bottom_nav": {
+      "home":     {"x": 108, "y": 2179},
+      "category": {"x": 324, "y": 2179},
+      "shopping": {"x": 540, "y": 2179},
+      "my":       {"x": 756, "y": 2179},
+      "recent":   {"x": 972, "y": 2179}
+    }
+  },
+
+  "search_screen": {
+    "input_box": {"x": 540, "y": 152, "note": "검색창 진입 직후 자동 포커스됨. ADB input text 로 goods_no 입력 가능"},
+    "search_button": {"x": 1000, "y": 152, "note": "오른쪽 돋보기 (또는 KEYCODE_ENTER)"}
+  },
+
+  "product_detail": {
+    "_note": "goods_no 직검색 → 검색 결과 list 거치지 않고 상품 detail 직진입 (검증 5/26).",
+    "coupon_receive": {"x": 541, "y": 1861, "note": "쿠폰받기 button (full-width). 미 발견 시 쿠폰 없음 = OCR 검출 필수"},
+    "gift": {"x": 226, "y": 2152, "note": "선물하기 button (사용 X)"},
+    "buy": {"x": 698, "y": 2154, "note": "구매하기 button (이거 사용)"}
+  },
+
+  "coupon_modal": {
+    "title_keyword": "쿠폰 혜택",
+    "download_all": {"x": 536, "y": 1388, "note": "쿠폰 전체 다운로드 button"},
+    "close": {"x": 539, "y": 1524, "note": "닫기 button"},
+    "x_close": {"note": "우상단 X — 좌표 = OCR 동적 (변동 가능)"}
+  },
+
+  "option_modal": {
+    "_note": "구매하기 tap 후 떠오는 옵션 modal. dropdown 펼침 + 옵션 선택 + 수량 조정.",
+    "exclude_soldout": {"x": 146, "y": 734, "note": "품절제외 체크박스 (선택 시 품절 옵션 회색)"},
+    "type_dropdown": {"x": 540, "y": 938, "note": "타입 선택 펼치기 (이미 펼침 default)"},
+    "option_first": {"x": 94, "y": 1067, "note": "첫 옵션 (이번 케이스 = '세트'). 옵션 여러 개일 시 OCR 매칭"},
+    "qty_minus": {"x": 110, "y": 1213},
+    "qty_plus":  {"x": 308, "y": 1213, "note": "+ tap 으로 수량 증가"},
+    "qty_display": {"x": 207, "y": 1213, "note": "현재 수량 표시"},
+    "cart":   {"x": 207, "y": 2117, "note": "장바구니 button"},
+    "buy_now": {"x": 538, "y": 2117, "note": "바로구매 button (이거 사용)"},
+    "quick_pay": {"x": 870, "y": 2115, "note": "빠른결제 button (사용 X)"}
+  },
+
+  "checkout_screen": {
+    "_note": "바로구매 후 진입. SubActivity. 스크롤 필요 (결제수단/동의 = 화면 아래).",
+    "delivery_info": {"x": 540, "y": 340, "note": "배송정보 헤더"},
+    "scroll_to_pay": {"from": [540, 1800], "to": [540, 600], "duration_ms": 500, "note": "결제수단 섹션까지 스크롤"},
+    "card_carousel": {
+      "_note": "최근 사용한 결제수단 = 기본 선택. 매번 다른 카드. ★ 당일 할인카드 자동 선택 필수 (memory: feedback_lotte_daily_discount_card).",
+      "card_1": {"x": 205, "y": 1009, "note": "첫 카드 (예: KB국민카드)"},
+      "card_2": {"x": 541, "y": 1010, "note": "둘째 (예: 롯데카드)"},
+      "card_3": {"x": 876, "y": 1008, "note": "셋째 (예: 현대카드)"},
+      "other_card": {"note": "'다른 결제수단' radio — 좌표 OCR 동적"}
+    },
+    "agreement_checkbox": {"x": 60, "y": 1848, "note": "'주문 내역 확인 동의(필수)' 체크박스. 미체크 시 결제하기 tap → alert popup"},
+    "pay_button": {"x": 538, "y": 2171, "note": "{금액}원 결제하기 button. 금액 부분 = OCR 변동"},
+    "agreement_alert_confirm": {"x": 877, "y": 1294, "note": "동의 미체크 popup 의 '확인' button"}
+  },
+
+  "card_pay_modal": {
+    "_kb_note": "결제하기 tap 후 KB국민카드 modal 떠오름 (또는 다른 카드사). 카드별 button layout 다름.",
+    "kb_pay": {"x": 426, "y": 570, "note": "KB Pay 결제 (큰 button)"},
+    "kb_starbank": {"x": 463, "y": 879, "note": "KB 스타뱅킹 결제"},
+    "kb_isp": {"x": 757, "y": 1046, "note": "ISP 결제"},
+    "kb_no_app": {"x": 324, "y": 1207, "note": "앱 없이 결제 (안전결제 페이지)"},
+    "kb_pay_code": {"x": 752, "y": 1205, "note": "결제코드 보기 (통합결제)"},
+    "modal_close": {"x": 920, "y": 308, "note": "modal 우상단 X"}
+  },
+
+  "kb_pay_app": {
+    "_note": "com.kbcard.cxh.appcard / PaymentControlActivity. 화면 자체 ADB tap OK. 단 PIN 키패드 = FLAG_SECURE → screencap 차단 → camera OCR 필수.",
+    "package": "com.kbcard.cxh.appcard",
+    "activity": "com.kbcard.cxh.appcard.screen.payment.PaymentControlActivity",
+    "card_label": {"x": 593, "y": 763, "note": "카드명 (KB ALL 카드 ... 6072)"},
+    "amount": {"x": 529, "y": 1351, "note": "금액 표시"},
+    "installment": {"x": 111, "y": 1697, "note": "할부 (default 일시불)"},
+    "cancel": {"x": 287, "y": 2152, "note": "취소 button"},
+    "pay": {"x": 790, "y": 2152, "note": "결제하기 button"}
+  },
+
+  "kb_pay_pin_keypad": {
+    "_note": "6자리 PIN 입력. 고정 layout (셔플 X). FLAG_SECURE → screencap 검정 → camera OCR + matrix 변환. 매번 calibration 검증 필요.",
+    "layout": "fixed",
+    "cam_coords": {
+      "_note": "iPhone Continuity Camera 1920x1080 frame 기준. OCR 잡힌 cam center (5/26).",
+      "col_x": [605, 751, 898],
+      "row_y": [757, 836, 915, 996],
+      "keys": {
+        "1": {"row": 0, "col": 0}, "2": {"row": 0, "col": 1}, "3": {"row": 0, "col": 2},
+        "4": {"row": 1, "col": 0}, "5": {"row": 1, "col": 1}, "6": {"row": 1, "col": 2},
+        "7": {"row": 2, "col": 0}, "8": {"row": 2, "col": 1}, "9": {"row": 2, "col": 2},
+        "back": {"row": 3, "col": 0}, "0": {"row": 3, "col": 1}, "ok": {"row": 3, "col": 2}
+      }
+    },
+    "_warning": "phone 좌표 = matrix (calibration.json) 적용 후 도출. matrix 부정확 시 (폰 위치 변동) tap miss. 매 결제 전 calibrate_from_home() 호출 필수."
+  },
+
+  "post_payment": {
+    "_note": "PIN 입력 → 결제 처리 → KB Pay 자동 종료 → lotte 앱 복귀 (또는 home).",
+    "expected_focus_keywords": ["주문완료", "주문이 완료", "감사합니다"],
+    "verify_lpoint": {"keyword": "L.POINT", "note": "예상 적립 금액 OCR 매칭"}
+  },
+
+  "flow_payment": [
+    {"_note": "cart 기반 (장바구니 사전 담기 후 결제). 단일 상품 검색 결제는 flow_payment_single 참고. ★ sleep_ms = 500 (default), 주문하기 후만 5000 (페이지 transition)"},
+    {"action": "force_stop", "package": "com.omnitel.android.lottewebview"},
+    {"action": "sleep_ms", "ms": 500},
+    {"action": "launch", "package": "com.omnitel.android.lottewebview"},
+    {"action": "sleep_ms", "ms": 5000, "note": "앱 launch 대기"},
+    {"action": "close_popup_if_present", "fallback_xy": [820, 2192]},
+    {"action": "tap", "xy": [965, 152], "name": "장바구니 icon"},
+    {"action": "sleep_ms", "ms": 500},
+    {"action": "swipe", "from_xy": [540, 1800], "to_xy": [540, 600], "duration_ms": 500, "note": "주문하기 button 까지"},
+    {"action": "sleep_ms", "ms": 500},
+    {"action": "tap_dump_text", "text": "주문하기", "fallback_xy": [613, 2152], "regex": "주문하기.*"},
+    {"action": "sleep_ms", "ms": 5000, "note": "★ 주문하기 → checkout 진입 = 5초 대기 필수 (페이지 transition, 두 번째 tap = 결제하기 alert)"},
+
+    {"action": "lotte_change_address", "address_keyword": "화곡동 890",
+      "note": "★ 매 아이디 default 주소 다름. 무조건 화곡동 890 변경 (memory: feedback_lotte_address_change)"},
+
+    {"_note": "할인쿠폰 (10%) 자동 적용 — 여러 상품 시 상품별 선택"},
+    {"action": "lotte_apply_coupons", "section": "할인쿠폰", "verify_total_change": true},
+
+    {"_note": "추가할인 (플러스쿠폰) — 활성/비활성 () 마크 + 합계 변화 검증으로 fail-safe"},
+    {"action": "lotte_apply_coupons", "section": "플러스쿠폰", "verify_total_change": true},
+
+    {"action": "lotte_change_card", "card_name_var": "daily_discount_card",
+      "note": "★ 당일 할인카드 (memory: feedback_lotte_daily_discount_card). banner OCR 또는 사용자 외부 인자"},
+
+    {"action": "lotte_tap_agreement"},
+    {"action": "sleep_ms", "ms": 500},
+
+    {"action": "tap_dump_text", "text": "결제하기", "fallback_xy": [538, 2171], "regex": ".+원 결제하기"},
+    {"action": "sleep_ms", "ms": 500, "note": "카드 modal 진입 or 카드사 앱 직진입"},
+
+    {"action": "wait_for_activity", "activity_var": "card_app_activity", "timeout_sec": 15,
+      "note": "카드사 결제 app activity (card_codes 참고). 카드사별 다름"},
+
+    {"action": "tap_dump_text", "text": "결제하기", "fallback_xy": [790, 2152],
+      "note": "카드사 앱 의 결제하기 button. 카드사별 좌표 = card_codes JSON"},
+    {"action": "sleep_ms", "ms": 500, "note": "PIN 키패드 로딩 (FLAG_SECURE)"},
+
+    {"action": "input_pin_fixed_layout", "value": "137601", "use_camera": true, "tap_delay_sec": 0.5,
+      "note": "고정 layout 6자리 PIN. cam OCR → matrix 변환 → 폰 좌표 tap"},
+    {"action": "sleep_ms", "ms": 500, "note": "결제 처리 + lotte 앱 복귀"},
+    {"action": "verify_text", "keywords": ["주문완료", "주문이 완료"], "timeout_sec": 15},
+    {"action": "verify_lpoint"}
+  ],
+
+  "card_codes": {
+    "_note": "lotte 앱 결제수단 화면의 카드 라벨 → 카드앱 패키지 매핑.",
+    "KB국민카드":     {"package": "com.kbcard.cxh.appcard",        "main_button_xy": [426, 570]},
+    "롯데카드":       {"package": "com.lcacard.lcamobile",          "main_button_xy": null, "note": "TBD"},
+    "현대카드":       {"package": "com.hyundaicard.appcard",        "main_button_xy": null, "note": "TBD"},
+    "삼성카드":       {"package": "com.samsungcard.mpocket",         "main_button_xy": null, "note": "monimo flow_payment 와 통합?"},
+    "신한카드":       {"package": "com.shcard.smartpay",             "main_button_xy": null, "note": "TBD"},
+    "하나카드":       {"package": "com.hanaskcard.paycla",           "main_button_xy": null, "note": "TBD"}
+  }
+}

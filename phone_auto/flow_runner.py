@@ -440,6 +440,229 @@ class FlowRunner:
                 raise FlowError(f"verify_text fail: '{text}' not seen on screen")
             self._log(f"verify_text ✓ '{text}'")
 
+        elif kind == "lotte_change_address":
+            target_keyword = action.get("address_keyword", "화곡동 890")
+            self._log(f"lotte_change_address target='{target_keyword}'")
+            import subprocess
+            def _ocr_now():
+                subprocess.run(["adb", "shell", "screencap", "-p", "/sdcard/_lf.png"], check=False, capture_output=True)
+                subprocess.run(["adb", "pull", "/sdcard/_lf.png", self._tmp_img], check=False, capture_output=True)
+                return _ocr_texts(self._tmp_img)
+            items = _ocr_now()
+            expand_arrow = next((it for it in items if it["text"].strip() in ("~", "v", "∨") and 280 < it["cy"] < 360), None)
+            if expand_arrow:
+                self.adb.tap(expand_arrow["cx"], expand_arrow["cy"])
+                self._log(f"  배송정보 펼침 ({expand_arrow['cx']},{expand_arrow['cy']})")
+                time.sleep(0.5)
+                items = _ocr_now()
+            change_btn = next((it for it in items if "변경" in it["text"] and 600 < it["cy"] < 800), None)
+            if not change_btn:
+                raise FlowError("lotte_change_address: '변경 >' button 없음")
+            self.adb.tap(change_btn["cx"], change_btn["cy"])
+            self._log(f"  변경 tap ({change_btn['cx']},{change_btn['cy']})")
+            time.sleep(0.5)
+            items = _ocr_now()
+            target = next((it for it in items if target_keyword in it["text"]), None)
+            if not target:
+                raise FlowError(f"lotte_change_address: 주소 '{target_keyword}' 없음")
+            self.adb.tap(target["cx"], target["cy"])
+            self._log(f"  주소 tap '{target['text'][:40]}' ({target['cx']},{target['cy']})")
+            time.sleep(0.5)
+            items = _ocr_now()
+            if not any(target_keyword in it["text"] for it in items):
+                raise FlowError(f"lotte_change_address: 주소 변경 검증 실패")
+            self._log(f"  ✓ 주소 변경 완료")
+
+        elif kind == "lotte_apply_coupons":
+            coupon_section = action.get("section", "할인쿠폰")
+            verify_change = action.get("verify_total_change", True)
+            import subprocess
+            def _ocr_now():
+                subprocess.run(["adb", "shell", "screencap", "-p", "/sdcard/_lf.png"], check=False, capture_output=True)
+                subprocess.run(["adb", "pull", "/sdcard/_lf.png", self._tmp_img], check=False, capture_output=True)
+                return _ocr_texts(self._tmp_img)
+            def _get_total(items):
+                for it in items:
+                    if it["cy"] > 1950 and "원" in it["text"]:
+                        m = re.search(r"([\d,]+)\s*원", it["text"])
+                        if m:
+                            return int(m.group(1).replace(",", ""))
+                return 0
+            items = _ocr_now()
+            section_hdr = next((it for it in items if coupon_section in it["text"]), None)
+            if not section_hdr:
+                raise FlowError(f"lotte_apply_coupons: '{coupon_section}' section 없음")
+            self.adb.tap(section_hdr["cx"], section_hdr["cy"])
+            time.sleep(0.5)
+            items = _ocr_now()
+            change_btn = next((it for it in items if "변경" in it["text"] and abs(it["cy"] - section_hdr["cy"]) < 150), None)
+            if not change_btn:
+                raise FlowError(f"lotte_apply_coupons: '{coupon_section}' 변경 button 없음")
+            self.adb.tap(change_btn["cx"], change_btn["cy"])
+            self._log(f"  {coupon_section} 변경 tap")
+            time.sleep(0.5)
+            items = _ocr_now()
+            dropdowns = [it for it in items if "쿠폰을 선택해 주세요" in it["text"]]
+            self._log(f"  상품 dropdown {len(dropdowns)}개")
+            import re
+            for idx, dd in enumerate(dropdowns):
+                self._log(f"  [{idx+1}/{len(dropdowns)}] dropdown @ ({dd['cx']},{dd['cy']})")
+                self.adb.tap(540, dd["cy"])
+                time.sleep(0.5)
+                items_p = _ocr_now()
+                pre_total = _get_total(items_p)
+                cands = [it for it in items_p if "%" in it["text"] and 800 < it["cy"] < 1600]
+                cands.sort(key=lambda c: c["cy"])
+                picked = False
+                for c in cands:
+                    is_inactive_mark = c["text"].lstrip().startswith(("()", ")"))
+                    if is_inactive_mark:
+                        self._log(f"    skip 비활성 mark: '{c['text'][:30]}'")
+                        continue
+                    self.adb.tap(540, c["cy"])
+                    time.sleep(0.5)
+                    items_v = _ocr_now()
+                    post_total = _get_total(items_v)
+                    if not verify_change or post_total != pre_total:
+                        self._log(f"    ✓ tap '{c['text'][:30]}' total {pre_total}→{post_total}")
+                        picked = True
+                        break
+                    self._log(f"    no change → 다음 옵션")
+                if not picked:
+                    raise FlowError(f"lotte_apply_coupons: 상품 {idx+1} 활성 쿠폰 못 찾음")
+            items = _ocr_now()
+            ok_btn = next((it for it in items if it["text"].strip() == "선택완료"), None)
+            if ok_btn:
+                self.adb.tap(ok_btn["cx"], ok_btn["cy"])
+                self._log(f"  선택완료 tap")
+                time.sleep(0.5)
+
+        elif kind == "lotte_change_card":
+            card_name = action.get("card_name", "삼성카드")
+            self._log(f"lotte_change_card target='{card_name}'")
+            import subprocess
+            def _ocr_now():
+                subprocess.run(["adb", "shell", "screencap", "-p", "/sdcard/_lf.png"], check=False, capture_output=True)
+                subprocess.run(["adb", "pull", "/sdcard/_lf.png", self._tmp_img], check=False, capture_output=True)
+                return _ocr_texts(self._tmp_img)
+            items = _ocr_now()
+            other_btn = next((it for it in items if "다른 결제수단" in it["text"]), None)
+            if not other_btn:
+                raise FlowError("lotte_change_card: '다른 결제수단' button 없음")
+            self.adb.tap(80, other_btn["cy"])
+            self._log(f"  다른결제수단 radio tap")
+            time.sleep(0.5)
+            items = _ocr_now()
+            credit_btn = next((it for it in items if it["text"].strip() == "신용카드"), None)
+            if not credit_btn:
+                raise FlowError("lotte_change_card: '신용카드' button 없음")
+            self.adb.tap(credit_btn["cx"], credit_btn["cy"])
+            time.sleep(0.5)
+            items = _ocr_now()
+            pick_btn = next((it for it in items if "선택 해주세요" in it["text"] and 1800 < it["cy"] < 1950), None)
+            if not pick_btn:
+                raise FlowError("lotte_change_card: '선택 해주세요' dropdown 없음")
+            self.adb.tap(pick_btn["cx"], pick_btn["cy"])
+            time.sleep(0.5)
+            items = _ocr_now()
+            card_opt = next((it for it in items if card_name in it["text"]), None)
+            if not card_opt:
+                raise FlowError(f"lotte_change_card: '{card_name}' option 없음")
+            self.adb.tap(card_opt["cx"], card_opt["cy"])
+            self._log(f"  ✓ {card_name} tap")
+            time.sleep(0.5)
+
+        elif kind == "lotte_tap_agreement":
+            import subprocess
+            subprocess.run(["adb", "shell", "screencap", "-p", "/sdcard/_lf.png"], check=False, capture_output=True)
+            subprocess.run(["adb", "pull", "/sdcard/_lf.png", self._tmp_img], check=False, capture_output=True)
+            items = _ocr_texts(self._tmp_img)
+            ag = next((it for it in items if "동의(필수)" in it["text"]), None)
+            if not ag:
+                # 스크롤로 찾기 (1회만) — swipe up (cy 큰 → 작은) = 페이지 아래쪽 reveal
+                self.adb.swipe(540, 2000, 540, 200, 600)
+                time.sleep(0.5)
+                subprocess.run(["adb", "shell", "screencap", "-p", "/sdcard/_lf.png"], check=False, capture_output=True)
+                subprocess.run(["adb", "pull", "/sdcard/_lf.png", self._tmp_img], check=False, capture_output=True)
+                items = _ocr_texts(self._tmp_img)
+                ag = next((it for it in items if "동의(필수)" in it["text"]), None)
+            if not ag:
+                raise FlowError("lotte_tap_agreement: '동의(필수)' text 없음")
+            # text bbox 의 왼쪽 = checkbox 위치 (estimated -100~-150 from cx)
+            checkbox_x = max(50, ag["cx"] - ag["w"] // 2 - 30)
+            self.adb.tap(checkbox_x, ag["cy"])
+            self._log(f"  동의 checkbox tap ({checkbox_x},{ag['cy']})")
+            time.sleep(0.5)
+
+        elif kind == "input_pin_fixed_layout":
+            value = action.get("value")
+            if value is None:
+                key = action.get("var", "pin")
+                value = vars.get(key) if vars else None
+            if not value:
+                raise FlowError(f"input_pin_fixed_layout: value 없음")
+            delay = action.get("tap_delay_sec", 0.5)
+            tap_ok = action.get("tap_ok_after", True)
+            if not self.use_camera:
+                raise FlowError("input_pin_fixed_layout: camera mode 필수 (screencap 차단됨)")
+            self._log(f"input_pin_fixed_layout digits={len(value)} delay={delay}s")
+            from .ocr_keypad import _load_gcv
+            from google.cloud import vision
+            import json as _json, cv2 as _cv2, numpy as _np
+            # GCV OCR → digit cam 좌표 + ok button (row4 col3) 추정
+            self._cap()
+            client = _load_gcv()
+            with open(self._tmp_img, "rb") as f:
+                resp = client.text_detection(image=vision.Image(content=f.read()))
+            cam_digits = {}
+            for ann in resp.text_annotations[1:]:
+                t = ann.description
+                if t in ("0","1","2","3","4","5","6","7","8","9") and t not in cam_digits:
+                    verts = ann.bounding_poly.vertices
+                    cx = sum(v.x for v in verts) // 4
+                    cy = sum(v.y for v in verts) // 4
+                    if cy > 700:
+                        cam_digits[t] = (cx, cy)
+            # 키패드 grid 추정 — col_x cluster (3), row_y cluster (4) from 잡힌 digits
+            if len(cam_digits) < 7:
+                raise FlowError(f"input_pin_fixed_layout: OCR 숫자 {len(cam_digits)}개 잡힘 (≥7 필요)")
+            col_xs = sorted(self._cluster_centers([cx for cx,_ in cam_digits.values()], 3))
+            row_ys = sorted(self._cluster_centers([cy for _,cy in cam_digits.values()], 3))
+            if len(col_xs) != 3 or len(row_ys) < 3:
+                raise FlowError(f"input_pin_fixed_layout: col_xs={col_xs} row_ys={row_ys}")
+            # row4 (back, 0, ok) 추정 — row3 - row2 차이 만큼 row3 아래
+            row4_y = row_ys[2] + (row_ys[2] - row_ys[1])
+            # 고정 layout: 1=col0/row0, 2=col1/row0, 3=col2/row0, ..., 0=col1/row3, ok=col2/row3
+            keypad_cam = {
+                "1": (col_xs[0], row_ys[0]), "2": (col_xs[1], row_ys[0]), "3": (col_xs[2], row_ys[0]),
+                "4": (col_xs[0], row_ys[1]), "5": (col_xs[1], row_ys[1]), "6": (col_xs[2], row_ys[1]),
+                "7": (col_xs[0], row_ys[2]), "8": (col_xs[1], row_ys[2]), "9": (col_xs[2], row_ys[2]),
+                "0": (col_xs[1], row4_y),    "ok": (col_xs[2], row4_y),
+            }
+            # cam → phone matrix
+            cal = self._calib
+            src = _np.float32([cal["tl"], cal["tr"], cal["br"], cal["bl"]])
+            dst = _np.float32([[0,0],[cal["phone_w"],0],[cal["phone_w"],cal["phone_h"]],[0,cal["phone_h"]]])
+            M = _cv2.getPerspectiveTransform(src, dst)
+            def _to_phone(cx, cy):
+                pt = _np.array([[[cx, cy]]], dtype=_np.float32)
+                out = _cv2.perspectiveTransform(pt, M)[0][0]
+                return int(out[0]), int(out[1])
+            phone_keys = {k: _to_phone(*v) for k, v in keypad_cam.items()}
+            self._log(f"  keypad phone coords: {phone_keys}")
+            # 각 digit tap
+            for d in str(value):
+                if d not in phone_keys:
+                    raise FlowError(f"input_pin_fixed_layout: digit '{d}' phone coord 없음")
+                px, py = phone_keys[d]
+                self.adb.tap(px, py)
+                self._log(f"  tap '{d}' → phone=({px},{py})")
+                time.sleep(delay)
+            if tap_ok and "ok" in phone_keys:
+                px, py = phone_keys["ok"]
+                self.adb.tap(px, py)
+                self._log(f"  tap 'ok' → phone=({px},{py})")
+
         elif kind == "input_pin":
             value = action.get("value")
             if value is None:
