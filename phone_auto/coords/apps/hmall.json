@@ -79,6 +79,14 @@
     },
     "complete_ok": {"x": 540, "y": 2160}
   },
+  "samsung": {
+    "_note": "삼성카드 흐름 (2026-05-29 검증): hmall 결제하기 → 삼성카드 옵션페이지(monimo/오픈앱카드/다른결제/간편결제) → '간편결제' 우측 박스 → 'PAYCO' 박스 → PAYCO 앱(com.nhnent.payapp) → 결제하기 → 비번 셔플 Vision OCR + Row2 추정(NH와 동일 layout) → 137601 → 확인. monimo pay는 FLAG_SECURE+dump마스킹 완전차단으로 폐기.",
+    "easy_pay_box": {"x": 800, "y": 1230},
+    "payco_box": {"x": 540, "y": 570},
+    "payco_pay_btn": {"x": 796, "y": 1960},
+    "payco_pin_keypad_roi": [0, 1400, 1080, 2200],
+    "payco_complete_ok_red_btn_search_y_range": [1500, 1800]
+  },
   "nh": {
     "_note": "NH농협카드 흐름 (2026-05-29 검증): 결제하기 → '다른 결제' 탭 → 'PAYCO'(우측하단) → PAYCO앱 자동호출(com.nhnent.payapp) → '결제하기' → 비번 셔플 키패드 → 137601 → '확인' → 결제완료. 카드번호 4칸 일반결제 흐름은 misdirection으로 폐기.",
     "other_pay_tab": {"x": 810, "y": 380},
