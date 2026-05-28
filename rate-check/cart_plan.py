@@ -128,6 +128,7 @@ def make_cart_plan(
     exclude_codes: set[str] | None = None,
     last_resort_codes: set[str] | None = None,
     cap_per_combo: int | None = None,
+    max_per_product: dict[str, int] | None = None,
 ) -> dict[int, int]:
     """sort + tiered round-robin + 재고 OVERSTOCK 스킵. 반환: {조합번호(1-based): 수량}.
 
@@ -136,21 +137,21 @@ def make_cart_plan(
     Tier 분리 (5/28 추가):
     - `last_resort_codes` 포함 조합 = tier_b (보조). 미포함 = tier_a (주력).
     - tier_a 우선 round-robin (각 조합 `cap_per_combo` 까지) → 부족 시 tier_b 추가.
-    - 예: last_resort={d}, cap=3, tier_a 9개, N=36 → tier_a 9×3=27 + tier_b 9 = 36.
-    - `cap_per_combo` None 이면 무제한 (옛 동작 — tier_a 만으로 N 다 채움).
-    - 사용 이유: d profit=-359 적자(2026-05-26 기준) → d 포함 조합은 N 초과 시에만 보조 자원으로 사용.
+    - `max_per_product` (5/28 추가) — {code: max} 도달한 product 포함 조합은 skip (round-robin 다른 조합 시도).
+    - 예: last_resort={d}, cap=3, tier_a 9개, max={f:20}, N=36 → tier_a 채울 때 f cap 도달 시 해당 조합 건너뜀.
+
+    사용 이유:
+    - d profit=-359 적자 → d 포함 조합 보조 자원
+    - f 누적이 많은 조합 위주로 COMBOS 가 구성되어 있어 plan 의 f 본품 수가 과다해질 수 있음 → max f 로 상한.
     """
-    # 공급률 있는 조합만 후보 (rate is None = 데이터 누락 조합 제외)
     indexed = [i for i, rate in enumerate(channel_rates) if rate is not None]
-    # 판매중지 등 exclude_codes 포함 조합 사전 제외
     exc = exclude_codes or set()
     lr = last_resort_codes or set()
+    mpp = dict(max_per_product or {})
     if exc:
         indexed = [i for i in indexed if not has_excluded_code(combos[i], exc)]
-    # 가중 수익 점수 내림차순 정렬
     indexed.sort(key=lambda i: -_combo_score(combos[i]))
     available = [i for i in indexed if not is_overstocked(combos[i], stocks)]
-    # 다 스킵되면 정렬 순서대로 fallback
     if not available:
         available = indexed
     if not available:
@@ -158,31 +159,43 @@ def make_cart_plan(
 
     tier_a = [i for i in available if not has_excluded_code(combos[i], lr)]
     tier_b = [i for i in available if has_excluded_code(combos[i], lr)]
-    # last_resort 미지정 시 tier_a 가 전체, tier_b 빈 list → 기존 동작과 동일.
 
     cart: dict[int, int] = {}
+    running: dict[str, int] = {}
+
+    def _would_exceed_cap(idx: int) -> bool:
+        for code, q in combos[idx]:
+            if code in mpp and running.get(code, 0) + q > mpp[code]:
+                return True
+        return False
+
+    def _apply(idx: int):
+        cart[idx + 1] = cart.get(idx + 1, 0) + 1
+        for code, q in combos[idx]:
+            running[code] = running.get(code, 0) + q
 
     def _fill_tier(tier: list[int], remaining: int, cap: int | None) -> int:
-        """tier 안에서 round-robin. cap 도달 시 해당 조합 skip. 반환: 남은 slot."""
+        """tier round-robin. per-combo cap + per-product cap 둘 다 적용. 한 라운드 동안 아무것도 못 담으면 종료."""
         if not tier:
             return remaining
-        if cap is None:
-            # 무제한 round-robin (옛 동작)
-            for slot in range(remaining):
-                idx = tier[slot % len(tier)]
-                cart[idx + 1] = cart.get(idx + 1, 0) + 1
-            return 0
-        # cap 적용: 라운드별로 tier 순회, 각 라운드마다 한 조합 1씩 증가
-        for _ in range(cap):
+        rounds = cap if cap is not None else 10**6  # virtual unlimited (실질 round-robin)
+        for _ in range(rounds):
+            added = False
             for idx in tier:
                 if remaining <= 0:
                     return 0
-                cart[idx + 1] = cart.get(idx + 1, 0) + 1
+                if _would_exceed_cap(idx):
+                    continue
+                _apply(idx)
                 remaining -= 1
-        return remaining  # tier × cap 다 차도 N 남으면 양수 반환
+                added = True
+            if not added:
+                # 한 라운드 동안 모든 조합이 cap 초과 → 종료 (tier 더 진행 불가)
+                break
+        return remaining
 
     remaining = _fill_tier(tier_a, n, cap_per_combo)
-    # tier_a 만으로 N 부족 시 tier_b 추가 (cap 적용 X — 어쩔수없을 때만 들어가니 자유)
+    # tier_a 만으로 N 부족 시 tier_b 추가 (per-combo cap 적용 X — last-resort 라 자유)
     if remaining > 0:
         remaining = _fill_tier(tier_b, remaining, None)
     return cart
@@ -235,9 +248,21 @@ def main(argv=None) -> int:
                    help="보조 자원 코드 (콤마 구분). 포함 조합은 tier_b — N 초과 분만 추가. 기본 'd' (적자 코드, 5/28~)")
     p.add_argument("--cap-per-combo", type=int, default=3,
                    help="tier_a 조합당 최대 반복 회수 (기본 3 = 계정당 최대 3회 구매 제약 반영)")
+    p.add_argument("--max-product", default="",
+                   help="제품 상한 (콤마 구분, 예: 'f=20,d=10') — 누적 본품 수 초과 시 해당 조합 skip")
     args = p.parse_args(argv)
     exclude_codes = set(c.strip() for c in args.exclude.split(",") if c.strip())
     last_resort_codes = set(c.strip() for c in args.last_resort.split(",") if c.strip())
+    max_per_product: dict[str, int] = {}
+    for tok in args.max_product.split(","):
+        tok = tok.strip()
+        if not tok or "=" not in tok:
+            continue
+        code, val = tok.split("=", 1)
+        try:
+            max_per_product[code.strip()] = int(val.strip())
+        except ValueError:
+            pass
 
     gc = C.gs_client()
     sh = gc.open_by_key(C.RATE_SHEET_ID)
@@ -266,10 +291,13 @@ def main(argv=None) -> int:
         print(f"  ⊘ 제외 코드: {sorted(exclude_codes)} (포함 조합 스킵)")
     if last_resort_codes:
         print(f"  ▼ 보조(last-resort) 코드: {sorted(last_resort_codes)} — tier_a {args.cap_per_combo}회 cap 초과 분만 추가")
+    if max_per_product:
+        print(f"  ↧ 제품 상한: {max_per_product} — 누적 본품 cap 도달 조합 skip")
     cart = make_cart_plan(channel_rates, C.COMBOS, n, stocks,
                           exclude_codes=exclude_codes,
                           last_resort_codes=last_resort_codes,
-                          cap_per_combo=args.cap_per_combo)
+                          cap_per_combo=args.cap_per_combo,
+                          max_per_product=max_per_product)
     if not cart:
         print(f"❌ 공급률 데이터 없음 — Step 1 K2:M{1+len(C.COMBOS)} 비어있는지 확인")
         return 1
