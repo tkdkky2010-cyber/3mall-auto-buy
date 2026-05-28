@@ -86,35 +86,43 @@ def capture_portrait_frame(out_path: Optional[str] = None, zoom: float = 2.0,
     libdispatch.dispatch_queue_create.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
     libdispatch.dispatch_queue_create.restype = ctypes.c_void_p
 
-    class _FrameDelegate(NSObject):
-        def init(self):
-            self = objc.super(_FrameDelegate, self).init()
-            self.image_saved = False
-            self.skip = 0
-            return self
+    # ObjC class 는 module load 시 한 번만 register (재정의 시 objc runtime error)
+    # capture_portrait_frame 함수가 2회 이상 호출되어도 재정의 안 되도록 캐시.
+    _FrameDelegate = globals().get("_PortraitFrameDelegate")
+    if _FrameDelegate is None:
+        class _PortraitFrameDelegate(NSObject):
+            def init(self):
+                self = objc.super(_PortraitFrameDelegate, self).init()
+                self.image_saved = False
+                self.skip = 0
+                self.warmup = 30
+                self.out_path = ""
+                return self
 
-        def captureOutput_didOutputSampleBuffer_fromConnection_(self, output, sampleBuffer, connection):
-            if self.image_saved:
-                return
-            self.skip += 1
-            if self.skip < warmup_frames:
-                return
-            try:
-                pixbuf = CMSampleBufferGetImageBuffer(sampleBuffer)
-                if pixbuf is None:
+            def captureOutput_didOutputSampleBuffer_fromConnection_(self, output, sampleBuffer, connection):
+                if self.image_saved:
                     return
-                ci = CIImage.imageWithCVPixelBuffer_(pixbuf)
-                ctx = CIContext.contextWithOptions_(None)
-                cg = ctx.createCGImage_fromRect_(ci, ci.extent())
-                if cg is None:
+                self.skip += 1
+                if self.skip < self.warmup:
                     return
-                url = NSURL.fileURLWithPath_(out_path)
-                dest = CGImageDestinationCreateWithURL(url, "public.png", 1, None)
-                CGImageDestinationAddImage(dest, cg, None)
-                CGImageDestinationFinalize(dest)
-                self.image_saved = True
-            except Exception:
-                pass
+                try:
+                    pixbuf = CMSampleBufferGetImageBuffer(sampleBuffer)
+                    if pixbuf is None:
+                        return
+                    ci = CIImage.imageWithCVPixelBuffer_(pixbuf)
+                    ctx = CIContext.contextWithOptions_(None)
+                    cg = ctx.createCGImage_fromRect_(ci, ci.extent())
+                    if cg is None:
+                        return
+                    url = NSURL.fileURLWithPath_(self.out_path)
+                    dest = CGImageDestinationCreateWithURL(url, "public.png", 1, None)
+                    CGImageDestinationAddImage(dest, cg, None)
+                    CGImageDestinationFinalize(dest)
+                    self.image_saved = True
+                except Exception:
+                    pass
+        globals()["_PortraitFrameDelegate"] = _PortraitFrameDelegate
+        _FrameDelegate = _PortraitFrameDelegate
 
     session = AVF.AVCaptureSession.alloc().init()
     if session.canSetSessionPreset_(AVF.AVCaptureSessionPresetHigh):

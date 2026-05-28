@@ -280,24 +280,41 @@ class FlowRunner:
 
         elif kind == "close_popup_if_present":
             self._log("close_popup_if_present")
-            # 1. dump 기반 닫기 button
+            # 모든 카드사 광고 modal 공통 패턴 — OCR로 X/닫기/오늘 그만 보기 매칭 (메모리 [[feedback_card_app_popup_close]])
+            # 1. dump 기반 닫기 button (content-desc / text 매칭)
             btns = _dump_close_buttons(self.adb)
             if btns:
                 x, y = btns[0]
-                self._log(f"  close button @ ({x},{y})")
+                self._log(f"  close button (dump) @ ({x},{y})")
                 self.adb.tap(x, y)
                 time.sleep(0.8)
                 return
-            # 2. OCR 기반 '×'
+            # 2. OCR 기반 — close keyword 매칭. 사용자 정의 list + default 확장.
+            close_keywords = action.get("close_keywords") or [
+                "오늘 그만 보기", "오늘 하루 그만 보기", "오늘 그만",
+                "다시 보지 않기", "다시 보지", "다시는 보지",
+                "건너뛰기", "skip", "Skip",
+                "팝업 닫기", "닫기", "닫 기",
+                "×", "X", "x",  # icon-as-text fallback
+            ]
             self._cap()
             items = _ocr_texts(self._tmp_img)
-            for it in items:
-                if it["text"] in ("×", "x", "X") and it["w"] < 80:
-                    self._log(f"  OCR × @ ({it['cx']},{it['cy']})")
-                    self.adb.tap(it["cx"], it["cy"])
-                    time.sleep(0.8)
-                    return
-            # 3. hint 좌표
+            # 매칭 우선순위: long text > short text (정확도 위해)
+            sorted_kw = sorted(close_keywords, key=lambda s: -len(s))
+            for kw in sorted_kw:
+                for it in items:
+                    if kw == it["text"] or (len(kw) >= 3 and kw in it["text"]):
+                        # X / × / x 는 사이즈 가드 (큰 ImageView X 우선)
+                        if kw in ("×", "X", "x") and it["w"] > 200:
+                            continue
+                        # "앱 종료" / "혜택 더 보기" 같은 결말 button 회피 — 명시 거부
+                        if any(bad in it["text"] for bad in ("앱 종료", "혜택 더", "확인", "동의", "구매", "결제")):
+                            continue
+                        self._log(f"  OCR '{it['text']}' @ ({it['cx']},{it['cy']})")
+                        self.adb.tap(it["cx"], it["cy"])
+                        time.sleep(0.8)
+                        return
+            # 3. hint 좌표 fallback
             if "x" in action and "y" in action:
                 self._log(f"  hint @ ({action['x']},{action['y']})")
                 self.adb.tap(action["x"], action["y"])

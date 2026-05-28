@@ -86,11 +86,13 @@ CARD_CD_TO_NAME = {
 # cardCd → phone_auto/coords/apps/{name}.json 의 flow 매핑.
 # 7자리 코드 추출 성공 시 자동 호출. 향후 카드 추가 시 이 dict 만 갱신.
 CARD_CD_TO_PHONE_FLOW = {
-    "cardCd02": ("samsung_monimo", "flow_payment"),  # 삼성 → monimo PC결제
-    "cardCd04": ("hyundai_card",   "flow_payment"),  # 현대카드
-    "cardCd08": ("lotte_card",     "flow_payment"),  # 롯데카드
-    "cardCd10": ("hana_card",      "flow_payment"),  # 하나카드
-    "cardCd01": ("bc_paybook_isp", "flow_payment"),  # BC 페이북
+    # (coords_name, flow_key, use_camera)
+    # use_camera=True = FLAG_SECURE 화면 (screencap=검정) → Continuity 카메라 frame OCR
+    "cardCd02": ("samsung_monimo", "flow_payment", True),   # 삼성 monimo — FLAG_SECURE
+    "cardCd04": ("hyundai_card",   "flow_payment", False),  # 현대카드 — ADB screencap
+    "cardCd08": ("lotte_card",     "flow_payment", False),  # 롯데카드 — ADB
+    "cardCd10": ("hana_card",      "flow_payment", True),   # 하나카드 — FLAG_SECURE
+    "cardCd01": ("bc_paybook_isp", "flow_payment", False),  # BC 페이북 — ADB
     # cardCd03 KB / cardCd40 NH 는 좌표 미완 — 추후
 }
 
@@ -435,12 +437,21 @@ def do_checkout(page: Page) -> dict:
         print(f"    [INFO] 캐러셀 슬라이드 {len(slides)}개: {all_summary}")
 
         pick = pick_carousel_slide(slides, override=TODAY_BRAND_OVERRIDE)
+        modal_fallback = False
         if not pick:
             if TODAY_BRAND_OVERRIDE:
-                out["error"] = f"TODAY_BRAND='{TODAY_BRAND_OVERRIDE}' 캐러셀 슬라이드 매칭 실패 (결제수단변경 모달 fallback 미구현)"
+                # 결제수단변경 modal fallback — 캐러셀에 오늘 즉시할인 없는 카드 선택
+                print(f"    [INFO] 캐러셀에 '{TODAY_BRAND_OVERRIDE}' 없음 — 결제수단변경 modal fallback 시도")
+                pick = select_card_via_change_modal(page, TODAY_BRAND_OVERRIDE)
+                if pick:
+                    modal_fallback = True
+                    print(f"    [OK] modal fallback: '{TODAY_BRAND_OVERRIDE}' 선택 (cardCd={pick.get('cardCd')})")
+                else:
+                    out["error"] = f"TODAY_BRAND='{TODAY_BRAND_OVERRIDE}' 캐러셀+모달 fallback 모두 실패"
+                    return out
             else:
                 out["error"] = "슬라이드 선택 실패"
-            return out
+                return out
 
         cardcd = pick.get("cardCd", "")
         out["card_cd"] = cardcd
@@ -475,19 +486,23 @@ def do_checkout(page: Page) -> dict:
             out["manual_payment_needed"] = "kakao_pay"
             return out
 
-        # 캐러셀 슬라이드 click — 결제 페이지 진입 시 최적 카드(첫 슬라이드)가 자동 selected 상태.
-        # 자동 모드 (TODAY_BRAND 빈문자열) = pick 한 카드가 첫 슬라이드와 같으면 click X (toggle off 방지).
-        # override 모드 또는 다른 카드 pick 시에만 click.
-        already_selected = page.evaluate(f"""() => {{
-            const el = document.querySelector('div._32o920j:has(img[alt="{cardcd}"])');
-            return el ? (el.className || '').includes('selected') : false;
-        }}""")
-        if already_selected:
-            print(f"    [SKIP] cardCd={cardcd} 이미 selected 상태 — click 안 함 (한 번 더 누르면 toggle off)")
+        # modal fallback 으로 이미 선택된 경우 캐러셀 click 건너뜀
+        if modal_fallback:
+            print(f"    [SKIP] modal 로 카드 선택됨 — 캐러셀 click skip")
         else:
-            if not click_carousel_slide(page, cardcd):
-                out["error"] = "캐러셀 슬라이드 클릭 실패"
-                return out
+            # 캐러셀 슬라이드 click — 결제 페이지 진입 시 최적 카드(첫 슬라이드)가 자동 selected 상태.
+            # 자동 모드 (TODAY_BRAND 빈문자열) = pick 한 카드가 첫 슬라이드와 같으면 click X (toggle off 방지).
+            # override 모드 또는 다른 카드 pick 시에만 click.
+            already_selected = page.evaluate(f"""() => {{
+                const el = document.querySelector('div._32o920j:has(img[alt="{cardcd}"])');
+                return el ? (el.className || '').includes('selected') : false;
+            }}""")
+            if already_selected:
+                print(f"    [SKIP] cardCd={cardcd} 이미 selected 상태 — click 안 함 (한 번 더 누르면 toggle off)")
+            else:
+                if not click_carousel_slide(page, cardcd):
+                    out["error"] = "캐러셀 슬라이드 클릭 실패"
+                    return out
 
         # 4) 결제하기 클릭 (button.btn-confirm + "N원 결제하기" 형태 매칭)
         page.wait_for_timeout(800)
@@ -602,6 +617,39 @@ def detect_carousel_slides(page: Page) -> list[dict]:
         }
     """
     return page.evaluate(js) or []
+
+
+def select_card_via_change_modal(page: Page, card_name: str) -> dict | None:
+    """캐러셀에 즉시할인으로 안 떠있는 카드 선택 — 결제수단변경 modal 경로.
+    결제수단변경 → 신용카드 선택 dropdown → li[value="<card_name>"] click.
+    card_name 은 CARD_CD_TO_NAME 의 value 와 동일 (예: "비씨카드(페이북)", "현대카드").
+    Returns pick-like dict {cardCd, brand, percent=0, isCard=True, left=0} 또는 None.
+    """
+    try:
+        btn = page.get_by_text("결제수단변경", exact=False).first
+        if btn.count() == 0:
+            print(f"    [WARN] '결제수단변경' button 없음")
+            return None
+        btn.click()
+        page.wait_for_timeout(2200)
+        dd = page.get_by_text("신용카드 선택", exact=False).first
+        if dd.count() == 0:
+            print(f"    [WARN] '신용카드 선택' dropdown 없음")
+            return None
+        dd.click()
+        page.wait_for_timeout(1500)
+        li = page.locator(f'li[value="{card_name}"]').first
+        if li.count() == 0:
+            print(f"    [WARN] li[value=\"{card_name}\"] 없음 — dropdown 안 열렸거나 카드 미발견")
+            return None
+        li.click()
+        page.wait_for_timeout(1500)
+        name_to_cd = {v: k for k, v in CARD_CD_TO_NAME.items()}
+        cd = name_to_cd.get(card_name, "")
+        return {"cardCd": cd, "brand": card_name, "percent": 0, "isCard": True, "left": 0, "via": "modal"}
+    except Exception as e:
+        print(f"    [WARN] select_card_via_change_modal 예외: {e}")
+        return None
 
 
 def pick_carousel_slide(slides: list[dict], override: str = "") -> dict | None:
@@ -983,13 +1031,20 @@ def trigger_phone_payment(card_cd: str, code: str, timeout_sec: int = 180) -> di
     if not mapping:
         out["error"] = f"폰 자동화 flow 미정의 (cardCd={card_cd}) — CARD_CD_TO_PHONE_FLOW 에 추가 필요"
         return out
-    coords_name, flow_key = mapping
+    # 2-tuple (legacy) / 3-tuple 둘 다 지원 — 미지정 시 카메라 default
+    if len(mapping) == 3:
+        coords_name, flow_key, use_camera = mapping
+    else:
+        coords_name, flow_key = mapping
+        use_camera = True
     import subprocess
     py = os.environ.get("PYTHON_BIN") or "/opt/homebrew/bin/python3"
     cmd = [py, "-m", "phone_auto.flow_runner", coords_name, flow_key, f"--code={code}"]
-    print(f"  [PHONE] 자동 결제 호출: {coords_name}/{flow_key} code={code}")
-    # FLOW_USE_CAMERA=1 → flow_runner 가 카메라 OCR 모드 (FLAG_SECURE 화면 우회)
-    env = {**os.environ, "FLOW_USE_CAMERA": "1"}
+    print(f"  [PHONE] 자동 결제 호출: {coords_name}/{flow_key} code={code} camera={use_camera}")
+    # camera 모드 = FLAG_SECURE 키패드 → portrait frame OCR 필수
+    # (메모리 [[feedback_phone_landscape_mount_cam_portrait]] — 폰 가로 마운트 + rotation 90 = portrait 1080x1920)
+    env = {**os.environ, "FLOW_USE_CAMERA": "1" if use_camera else "0",
+           "FLOW_PORTRAIT": "1" if use_camera else "0"}
     try:
         result = subprocess.run(
             cmd, cwd=str(PROJECT_ROOT), env=env,
