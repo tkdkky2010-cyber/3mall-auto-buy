@@ -1023,114 +1023,34 @@ cards.forEach(function(p) {
 > ⚠️ **"구매하기"를 연속으로 2번 누르면 안 된다!** 첫 클릭 → 팝업(수량+장바구니) → 두 번째 클릭하면 팝업을 건너뛰고 주문 페이지로 넘어간다. 반드시 **1회 클릭 → 2초 대기 → 팝업 확인** 순서를 지킨다.
 > ⚠️ 팝업에 "장바구니" 버튼이 안 보이면 → 팝업이 아직 로딩 중이거나, 구매하기를 2번 눌러서 주문 페이지로 넘어간 것이다. 뒤로 가기 후 다시 1회만 클릭한다.
 
-### 9-3. 장바구니에서 조합 체크 + 수량 조정 + 구매하기 → 결제 페이지 진입
+### 9-3. 다음 조합 처리 — 카트 비우기 사이클 (★ 현재 검증된 흐름)
+
 **장바구니 URL**: `https://www.hmall.com/mo/odb/basktList`
 
-장바구니에서 원하는 조합의 상품만 체크하고 수량을 조합에 맞게 조정한 후, **구매하기**를 클릭해 결제 페이지로 진입한다.
+> ⚠️ **옛 흐름 폐기 (2026-05-28 사용자 결정)**: "장바구니에 b~h 한 번에 다 담아두고 cart 내 옵션변경(+/−/변경하기) 로 조합별 수량 조정 + 체크박스 토글" 방식은 폐기.
+> 이유: 옵션변경 클릭 시 cart 리로드 + 인덱스/체크박스 리셋이 발생해 매번 재 inspect 필요했고, 한 번의 sync 실패가 잘못된 상품 체크/잘못된 수량으로 이어져 오류 빈발.
+> 현재는 매 조합 사이클 시작 시 cart 비우고 본품만 add 하는 단순 흐름 사용. 속도는 cart-내 수량조정 대비 ~2배 느리지만 인덱스/체크 정합성 깨질 위험 없음.
 
-#### DOM 셀렉터 (사용자 확인됨)
-| 요소 | 셀렉터 | 비고 |
+#### 조합 N 처리 사이클 (rate-check/hmall.py — `process_combo`)
+
+1. **카트 비우기** (`clear_cart`) — 장바구니 URL 진입 → 전체선택 → 삭제 → 빈 카트 확인.
+2. **9-2 흐름으로 본품 add** — 조합에 들어가는 b~h 각 상품마다: 상품 URL 직진입 → 쿠폰받기 (auto) → 구매하기 → 옵션 (단일이면 skip / 여러개면 `span.choice-num.title` 의 "[선택 N]" 매칭) → 수량 `button.btn-plus` 로 +1 N-1회 → 장바구니 `button.btn-cart`.
+3. **장바구니 진입** → `label.chklabel` 안 `<span>일반상품</span>` 헤더 체크박스 클릭 (조합 본품 전체 선택) → `button.btn-purchase` "구매하기" 클릭.
+4. **체크아웃 페이지 카드 캐러셀** (§9-4) 자동 검출 → 당일 최대 할인율 카드 1장 brand/% / 미리보기 가격 추출 → 페이백 적용.
+5. 다음 조합 → step 1로 돌아감 (clear → add 사이클 반복).
+
+#### 사용 셀렉터 (현 흐름)
+
+| 단계 | 셀렉터 | 비고 |
 |---|---|---|
-| 상품 체크박스 | `input[name="backet"]` | name 속성 안정적, 클래스 변동에 영향 없음 |
-| 옵션변경 버튼 | `<button>옵션변경</button>` (cart item 안) | 클래스 hashed (변동 가능) → **텍스트 매칭 권장** |
-| 팝업 + (증가) | `<button class="_1qe59fg4">증가</button>` | 클래스 hashed → 텍스트 "증가" 매칭 |
-| 팝업 − (감소) | `<button class="_1qe59fg3">감소</button>` | 클래스 hashed → 텍스트 "감소" 매칭 |
-| 변경하기 | `<button class="change-btn">변경하기</button>` | `change-btn` 클래스 우선, 폴백으로 텍스트 매칭 |
+| 상품 상세 - 구매하기 | `button.btn-purchase` | 상품 URL 진입 직후 |
+| 옵션 라벨 | `span.choice-num.title` filter `"[선택 N]"` | 옵션 행 없으면 단일 상품 (skip) |
+| 수량 + | `button.btn-plus` | N-1회 클릭 |
+| 장바구니 담기 | `button.btn-cart` (visible, `.btn-linered` 제외) | "바로구매" sibling 우선 |
+| 카트 진입 후 헤더 체크 | `label.chklabel` 안 `<span>일반상품</span>` → 자식 `input[type="checkbox"]` | 전 상품 토글 |
+| 카트 구매하기 | `button.btn-purchase` filter `"구매하기"` (fallback: 텍스트 매칭) | 체크아웃 진입 |
 
-> ⚠️ **변경하기 클릭 후 cart 리로드되며 인덱스/체크박스 모두 리셋됨.** 따라서 **수량 조정 → 체크 순서**로 분리하고, 매번 inspect로 인덱스 재취득.
-
-#### 1단계: 수량 조정 (모든 조합 상품을 target qty로 맞춤)
-```javascript
-// 1-A. inspect — 모든 cart item 조회
-var cbs = document.querySelectorAll('input[name="backet"]');
-var items = Array.from(cbs).map(function(cb, idx) {
-  var item = cb.closest('li') || cb.parentElement;
-  // 상위 5단계까지 올라가며 옵션변경 button 있는 컨테이너 찾기
-  for (var lvl = 0; lvl < 6 && item; lvl++) {
-    if ((item.innerText || '').includes('옵션변경')) break;
-    item = item.parentElement;
-  }
-  var nameEl = item.querySelector('.prd-name, .txt-name, .product-name, a');
-  var qtyEl = item.querySelector('[class*="qty"], em.cnt, span[class*="count"]');
-  return {
-    idx: idx,
-    name: nameEl ? nameEl.textContent.trim() : '',
-    qty: qtyEl ? parseInt(qtyEl.textContent.replace(/\D/g, '')) || 1 : 1,
-  };
-});
-```
-
-```javascript
-// 1-B. 옵션변경 팝업 열기 (target item의 idx 사용)
-var cbs = document.querySelectorAll('input[name="backet"]');
-var item = cbs[targetIdx].closest('li') || cbs[targetIdx].parentElement;
-for (var lvl = 0; lvl < 6 && item; lvl++) {
-  var btns = item.querySelectorAll('button');
-  for (var b of btns) {
-    if (b.textContent.trim() === '옵션변경') { b.click(); break; }
-  }
-  item = item.parentElement;
-}
-// → 팝업 로딩 대기 (1.5초)
-```
-
-```javascript
-// 1-C. 팝업에서 +/- N회 클릭 (diff = target - current)
-var label = (diff > 0) ? '증가' : '감소';
-for (var i = 0; i < Math.abs(diff); i++) {
-  var btn = Array.from(document.querySelectorAll('button')).find(function(b) {
-    return b.textContent.trim() === label;
-  });
-  if (btn) btn.click();
-  // 각 클릭 사이 0.2초 대기
-}
-```
-
-```javascript
-// 1-D. 변경하기 클릭 → cart 리로드
-var btn = document.querySelector('button.change-btn')
-       || Array.from(document.querySelectorAll('button')).find(function(b) {
-            return b.textContent.trim() === '변경하기';
-          });
-if (btn) btn.click();
-// → cart 리로드 대기 (1.8초). 인덱스/체크 리셋되므로 다음 상품 작업 전 재 inspect 필수.
-```
-
-> **반복 흐름**: inspect → diff > 0인 첫 매칭 상품 처리 → diff = 0될 때까지 반복 (최대 ~15회)
-
-#### 2단계: 체크 (모든 수량 조정 완료 후)
-```javascript
-// 2-A. 모두 체크 해제
-var cbs = document.querySelectorAll('input[name="backet"]');
-cbs.forEach(function(cb) { if (cb.checked) cb.click(); });
-
-// 2-B. 재 inspect → 매칭 상품만 체크
-// targets = {'자음생2종': 2, '자음생크림리치': 1};
-var cbs2 = document.querySelectorAll('input[name="backet"]');
-cbs2.forEach(function(cb, idx) {
-  var item = cb.closest('li') || cb.parentElement;
-  var nameEl = item.querySelector('.prd-name, .txt-name, a');
-  if (!nameEl) return;
-  var name = nameEl.textContent.trim();
-  for (var t in targets) {
-    if (name.includes(t)) { if (!cb.checked) cb.click(); break; }
-  }
-});
-```
-
-> 상품명 매칭은 **부분 일치**로 한다. 예: "자음생2종" 키워드가 cart 상품명에 포함되면 체크.
-
-**2) 구매하기 버튼 클릭** (장바구니 하단의 구매하기 — `<p>구매하기</p>`를 포함한 button):
-```javascript
-var btns = document.querySelectorAll('button');
-for (var i = 0; i < btns.length; i++) {
-  var p = btns[i].querySelector('p');
-  var txt = p ? p.textContent.trim() : btns[i].textContent.trim();
-  if (txt === '구매하기') { btns[i].click(); break; }
-}
-```
-
-> ⚠️ 구매하기 클릭 후 **3초 대기** — 결제 페이지 로딩 + 카드 캐러셀 렌더링 시간.
+> 옵션변경/+/-/변경하기/`input[name="backet"]` 같은 cart 내 조작 셀렉터는 **현재 코드 사용 X**.
 
 ### 9-4. 결제 페이지 카드 캐러셀에서 카드별 즉시할인 금액 읽기
 
@@ -1208,42 +1128,31 @@ ws.update('A31:J41', summary_data)
 
 모든 조합을 동일한 방식으로 처리한다:
 
-### 반복 절차
-1. **장바구니** (`https://www.hmall.com/mo/odb/basktList`)로 이동
-2. 해당 조합에 필요한 상품이 장바구니에 없으면 URL 직접 이동으로 추가 (fallback: 검색)
-3. JavaScript로 (1) 옵션변경 팝업 → +/− → 변경하기로 **수량 먼저 조정** (변경 후 cart 리로드, 인덱스 리셋), (2) **모두 체크 해제 → 매칭 상품만 체크** (`input[name="backet"]`)
-4. **구매하기** 버튼 클릭 (`<p>구매하기</p>` 포함 button) → 3초 대기 → **결제 페이지 진입**
-5. 결제 페이지 카드 캐러셀 sections 파싱 → **카드별 즉시할인 후 금액** 추출 (`<strong class="_32o920a">` 또는 `section p strong`)
-6. **페이백 적용**: 즉시할인후 × 페이백계수 = 카드별 최종구매가
-7. 순구매가 = 최종구매가 - 총샘플가치 / 공급률 = 순구매가 / 소비자가
-8. Google Sheets 해당 조합 행에 입력 (조합번호 1~20 순)
+### 반복 절차 — 매 조합 (1~20) 동일 사이클
 
-> ⚠️ **결제 페이지에서 실제 결제는 하지 않는다.** 카드 캐러셀 금액만 읽고 뒤로 가서 다음 조합으로.
+> 조합 정의는 `rate-check/_common.py` `COMBOS` 상수 (20조합 단일소스). 이 가이드에 하드코딩 X.
 
-### 조합별 장바구니 체크 구성
+1. **카트 비우기** (`clear_cart`) — 장바구니 URL 진입 → 전체선택 → 삭제.
+2. 조합에 들어가는 본품 b~h 각각:
+   - 상품 URL 직진입 (`https://www.hmall.com/md/pda/itemPtc?slitmCd={코드}`) — 9-2 흐름.
+   - 구매하기 (`button.btn-purchase`) → 옵션 (단일 skip / 여러개면 `[선택 N]` 매칭) → 수량 +N (`button.btn-plus`) → 장바구니 (`button.btn-cart`).
+3. 카트 진입 → "일반상품" 헤더 체크박스 (`label.chklabel` 안 `<span>일반상품</span>`) 클릭 → 구매하기 → 체크아웃 진입.
+4. 체크아웃 카드할인 캐러셀 (`.tarvxz0` h2='카드할인') 자동 검출 → 당일 최대 할인 카드 brand/% / 미리보기 가격.
+5. 페이백 적용: 즉시할인후 × 페이백계수 = 카드별 최종구매가.
+6. 순구매가 = 최종구매가 − 총샘플가치 / 공급률 = 순구매가 / 소비자가.
+7. Google Sheets 해당 조합 행 입력 (조합번호 1~20 고정 순).
+8. 다음 조합 → step 1 (`clear_cart`) 사이클 반복.
 
-| 조합 | 장바구니에서 체크할 상품 | 수량 설정 |
-|------|---------------------|---------|
-| 1 | 자음생2종, 자음생크림리치세트 | 자음생2종×2, 크림리치×1 |
-| 2 | 본윤2종, 자음생2종 | 본윤2종×2, 자음생2종×2 |
-| 3 | 본윤2종, 탄력3종 | 본윤2종×4, 탄력3종×1 |
-| 4 | 탄력3종, 자음생크림리치세트 | 탄력3종×2, 크림리치×1 |
-| 5 | 윤조3종, 본윤2종 | 윤조3종×2, 본윤2종×2 |
-| 6 | 탄력3종, 윤조에센스90 | 탄력3종×2, 윤조에센스90×2 |
-| 7 | 자음2종, 자음생크림리치세트 | 자음2종×3, 크림리치×1 |
-| 8 | 자음2종, 본윤2종 | 자음2종×3, 본윤2종×2 |
-| 9 | 자음2종, 윤조에센스90 | 자음2종×1, 윤조에센스90×4 |
-| 10 | 자음2종, 윤조에센스90 | 자음2종×2, 윤조에센스90×3 |
-| 11 | 윤조에센스90 | 윤조에센스90×5 |
+> ⚠️ **결제 페이지에서 실제 결제는 하지 않는다.** 카드 캐러셀 가격만 읽고 다음 조합 사이클 (clear → add).
 
-> **수량 변경**: 장바구니에서 각 상품의 수량을 조합에 맞게 조절한다. 상품명 옆의 수량 +/- 버튼 또는 수량 입력란 사용.
+> **조합 구성은 _common.py COMBOS 참조** — 가이드 내 별도 표 유지 안 함 (옛 11조합 표 폐기, 5/18 20조합 layout 이후 코드 단일소스).
 
 ---
 
 ## 12. 주의사항 및 트러블슈팅
 
 ### 자주 발생하는 문제
-1. **"이미 장바구니에 담긴 상품입니다" 팝업**: 예를 눌러 장바구니로 이동 후 수량 조절
+1. **"이미 장바구니에 담긴 상품입니다" 팝업**: 현재 흐름은 매 조합 시작 시 `clear_cart` 하므로 정상적으론 발생 X. 발생 시 = clear 실패 → 카트 잔존 → 사이클 abort + 재시도.
 2. **구매하기 버튼 클릭 안됨**: 아래 "JavaScript 우선 사용 규칙" 참조 — `find`/ref 클릭 대신 항상 JavaScript로 클릭
 3. **장바구니 404 오류**: 모바일 URL(`/mo/odb/basktList`)을 사용할 것. `/md/od/odBskt`는 동작하지 않음
 4. **결제 페이지 카드 캐러셀이 안 보임**: 결제수단 영역 스크롤 필요. 또는 페이지 로딩 1~2초 추가 대기.
@@ -1262,33 +1171,11 @@ ws.update('A31:J41', summary_data)
 
 ### ★ JavaScript 우선 사용 규칙 (필수)
 
-> **장바구니 체크박스, 구매하기 버튼, 옵션변경 등 모든 UI 조작은 항상 JavaScript로 수행한다.**
+> **상품 페이지 / 카트 / 체크아웃 UI 조작은 항상 JavaScript로 수행한다.**
 > `find` 도구나 좌표 클릭(ref/coordinate)은 사용하지 않는다. JavaScript가 훨씬 빠르고 안정적이다.
+> ⚠️ 옵션변경(+/−/변경하기) + `input[name="backet"]` 체크 토글 같은 **cart 내 수량/체크 조작 패턴은 폐기** (§9-3 참조). 매 조합 사이클은 `clear_cart` 로 시작하므로 cart 내에서 다른 상품 잔존 처리할 일 없음.
 
-**1. 장바구니 체크박스 제어** (전체 해제 → 특정 상품만 체크):
-```javascript
-var cbs = document.querySelectorAll('input[name="backet"]');
-cbs.forEach(function(cb) { if(cb.checked) cb.click(); });
-setTimeout(function() {
-  // 원하는 인덱스만 체크 (인덱스는 매번 확인 필요)
-  cbs[0].click();
-  cbs[3].click();
-}, 300);
-```
-
-**2. 장바구니 아이템 인덱스 확인** (수량 변경 후 반드시 재확인):
-```javascript
-var cbs = document.querySelectorAll('input[name="backet"]');
-var result = [];
-cbs.forEach(function(cb, i) {
-  var li = cb.closest('li') || cb.closest('.item') || cb.closest('div');
-  var texts = li ? li.textContent.replace(/\s+/g, ' ').trim().substring(0, 60) : '';
-  result.push(i + ': ' + texts + ' | chk=' + cb.checked);
-});
-result.join('\n');
-```
-
-**3. 구매하기 버튼 클릭 (1회만! 팝업 대기 필수)**:
+**1. 구매하기 버튼 클릭 (1회만! 팝업 대기 필수)**:
 ```javascript
 // ⚠️ 이 코드를 1회만 실행한다. 연속 2회 실행하면 주문 페이지로 넘어간다.
 var buttons = document.querySelectorAll('button');
@@ -1298,14 +1185,14 @@ for (var i = 0; i < buttons.length; i++) {
 // 클릭 후 반드시 2초 대기 → screenshot으로 팝업 확인 → 팝업 좌측 "장바구니" 클릭
 ```
 
-**4. 장바구니에서 할인전 금액 읽기**:
+**2. 장바구니에서 할인전 금액 읽기**:
 ```javascript
 var priceEl = document.querySelector('div.total-price ins em');
 var price = priceEl ? priceEl.textContent.trim().replace(/,/g, '') : '0';
 console.log('할인전 금액: ' + price + '원');
 ```
 
-**5. 상품 페이지에서 카드 즉시할인 정보 읽기**:
+**3. 상품 페이지에서 카드 즉시할인 정보 읽기**:
 ```javascript
 var cards = document.querySelectorAll('#crdImdDlTagTmp .crdImdDlTagTmp_1 p');
 cards.forEach(function(p) {
@@ -1315,10 +1202,6 @@ cards.forEach(function(p) {
   console.log(name + ' ' + rate + unit);
 });
 ```
-
-**6. 옵션변경(수량변경) 팝업 열기**: `find` 도구로 해당 상품의 "옵션변경" 버튼을 찾은 후, 팝업 내 +/- 버튼과 "변경하기" 버튼은 JavaScript로 클릭한다.
-
-> **⚠️ 장바구니 인덱스는 수량 변경(옵션변경) 후 반드시 재확인해야 한다.** 수정된 상품이 인덱스 0으로 이동하고, 모든 체크박스가 리셋된다.
 
 
 ---
