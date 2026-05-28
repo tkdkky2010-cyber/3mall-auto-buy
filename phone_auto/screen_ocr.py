@@ -57,6 +57,107 @@ def capture_phone_screen(cam_idx: int = 0, warmup_frames: int = 10,
     return capture_frame(cam_idx, warmup_frames=warmup_frames, out_path=out_path)
 
 
+def capture_portrait_frame(out_path: Optional[str] = None, zoom: float = 2.0,
+                            warmup_frames: int = 30, timeout_sec: float = 15.0) -> Optional[str]:
+    """AVFoundation portrait 캡처 (method5_focus 이식).
+
+    폰 가로 마운트 + videoRotationAngle 90 → cam 1080x1920 portrait
+    (memory: feedback_phone_landscape_mount_cam_portrait). zoom + continuous AF.
+
+    cv2.VideoCapture (landscape, AF/zoom 없음) 와 달리 PIN 키패드 OCR 에 필요한
+    portrait 해상도/초점 확보. Returns 저장된 PNG path or None.
+    """
+    import objc
+    from Foundation import NSObject, NSURL, NSRunLoop, NSDate
+    import AVFoundation as AVF
+    from Quartz import CIImage, CIContext, CGImageDestinationCreateWithURL, \
+        CGImageDestinationAddImage, CGImageDestinationFinalize
+    from CoreMedia import CMSampleBufferGetImageBuffer
+    import Quartz
+    import ctypes, ctypes.util, time
+
+    if out_path is None:
+        tmp = PROJECT_ROOT / "phone_auto" / "_tmp"
+        tmp.mkdir(exist_ok=True)
+        out_path = str(tmp / "portrait.png")
+    out_path = str(out_path)
+
+    libdispatch = ctypes.CDLL(ctypes.util.find_library("System"))
+    libdispatch.dispatch_queue_create.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
+    libdispatch.dispatch_queue_create.restype = ctypes.c_void_p
+
+    class _FrameDelegate(NSObject):
+        def init(self):
+            self = objc.super(_FrameDelegate, self).init()
+            self.image_saved = False
+            self.skip = 0
+            return self
+
+        def captureOutput_didOutputSampleBuffer_fromConnection_(self, output, sampleBuffer, connection):
+            if self.image_saved:
+                return
+            self.skip += 1
+            if self.skip < warmup_frames:
+                return
+            try:
+                pixbuf = CMSampleBufferGetImageBuffer(sampleBuffer)
+                if pixbuf is None:
+                    return
+                ci = CIImage.imageWithCVPixelBuffer_(pixbuf)
+                ctx = CIContext.contextWithOptions_(None)
+                cg = ctx.createCGImage_fromRect_(ci, ci.extent())
+                if cg is None:
+                    return
+                url = NSURL.fileURLWithPath_(out_path)
+                dest = CGImageDestinationCreateWithURL(url, "public.png", 1, None)
+                CGImageDestinationAddImage(dest, cg, None)
+                CGImageDestinationFinalize(dest)
+                self.image_saved = True
+            except Exception:
+                pass
+
+    session = AVF.AVCaptureSession.alloc().init()
+    if session.canSetSessionPreset_(AVF.AVCaptureSessionPresetHigh):
+        session.setSessionPreset_(AVF.AVCaptureSessionPresetHigh)
+    # iPhone Continuity 는 ContinuityCamera type 으로 enumerate (External 아님 — macOS 버전별 다름)
+    dev_types = [AVF.AVCaptureDeviceTypeExternal, AVF.AVCaptureDeviceTypeBuiltInWideAngleCamera]
+    if hasattr(AVF, "AVCaptureDeviceTypeContinuityCamera"):
+        dev_types.insert(0, AVF.AVCaptureDeviceTypeContinuityCamera)
+    discovery = AVF.AVCaptureDeviceDiscoverySession.discoverySessionWithDeviceTypes_mediaType_position_(
+        dev_types, AVF.AVMediaTypeVideo, AVF.AVCaptureDevicePositionUnspecified,
+    )
+    devs = discovery.devices()
+    if not devs:
+        return None
+    device = next((d for d in devs if "iPhone" in d.localizedName()), devs[0])
+    ok, _ = device.lockForConfiguration_(None)
+    if ok:
+        max_zoom = device.activeFormat().videoMaxZoomFactor()
+        device.setVideoZoomFactor_(min(zoom, max_zoom))
+        if device.isFocusModeSupported_(AVF.AVCaptureFocusModeContinuousAutoFocus):
+            device.setFocusMode_(AVF.AVCaptureFocusModeContinuousAutoFocus)
+        if device.isExposureModeSupported_(AVF.AVCaptureExposureModeContinuousAutoExposure):
+            device.setExposureMode_(AVF.AVCaptureExposureModeContinuousAutoExposure)
+        device.unlockForConfiguration()
+    inp, _ = AVF.AVCaptureDeviceInput.deviceInputWithDevice_error_(device, None)
+    session.addInput_(inp)
+    output = AVF.AVCaptureVideoDataOutput.alloc().init()
+    output.setAlwaysDiscardsLateVideoFrames_(True)
+    session.addOutput_(output)
+    for conn in output.connections():
+        if conn.isVideoRotationAngleSupported_(90):
+            conn.setVideoRotationAngle_(90)
+    delegate = _FrameDelegate.alloc().init()
+    q_ptr = libdispatch.dispatch_queue_create(b"frame_q", None)
+    output.setSampleBufferDelegate_queue_(delegate, objc.objc_object(c_void_p=q_ptr))
+    session.startRunning()
+    end = time.time() + timeout_sec
+    while time.time() < end and not delegate.image_saved:
+        NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(0.1))
+    session.stopRunning()
+    return out_path if delegate.image_saved else None
+
+
 def ocr_text(img_path: str, languages: list[str] | None = None) -> list[dict]:
     """macOS Vision OCR — 한+영 모든 텍스트 + 카메라 좌표.
 

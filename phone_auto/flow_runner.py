@@ -111,7 +111,8 @@ class FlowError(Exception):
 
 class FlowRunner:
     def __init__(self, adb: ADB | None = None, verbose: bool = True,
-                 use_camera: bool | None = None, cam_idx: int = 0):
+                 use_camera: bool | None = None, cam_idx: int = 0,
+                 use_portrait: bool | None = None):
         self.adb = adb or ADB()
         self.verbose = verbose
         self._tmp_img = "/tmp/_flow.png"
@@ -127,6 +128,12 @@ class FlowRunner:
             else:
                 use_camera = False  # 기본 = ADB screencap (호환성)
         self.use_camera = use_camera
+        # portrait 캡처 모드 — 폰 가로 마운트 + cam rotation 90 = 1080x1920
+        # (memory: feedback_phone_landscape_mount_cam_portrait). FLAG_SECURE PIN 키패드용.
+        if use_portrait is None:
+            import os as _os
+            use_portrait = _os.environ.get("FLOW_PORTRAIT", "").lower() in ("1", "true", "yes")
+        self.use_portrait = use_portrait
         self.cam_idx = cam_idx
         self._calib = None
         if self.use_camera:
@@ -190,8 +197,10 @@ class FlowRunner:
         M_inv = np.linalg.inv(M)
         phone_corners = np.float32([[[0, 0]], [[1080, 0]], [[0, 2400]], [[1080, 2400]]])
         cam_corners = cv2.perspectiveTransform(phone_corners, M_inv)
+        # portrait 모드 = cam 1080x1920, landscape = 1920x1080
+        cam_w, cam_h = (1080, 1920) if self.use_portrait else (1920, 1080)
         new_calib = {
-            "cam_w": 1920, "cam_h": 1080,
+            "cam_w": cam_w, "cam_h": cam_h,
             "phone_w": 1080, "phone_h": 2400,
             "tl": [int(cam_corners[0][0][0]), int(cam_corners[0][0][1])],
             "tr": [int(cam_corners[1][0][0]), int(cam_corners[1][0][1])],
@@ -231,7 +240,12 @@ class FlowRunner:
         if self.verbose: print(f"[flow] {msg}")
 
     def _cap(self):
-        if self.use_camera:
+        if self.use_camera and self.use_portrait:
+            # portrait AVFoundation 캡처 (rotation 90 + zoom + AF). FLAG_SECURE 키패드용.
+            from .screen_ocr import capture_portrait_frame
+            if capture_portrait_frame(out_path=self._tmp_img, warmup_frames=30) is None:
+                raise FlowError("_cap: portrait 캡처 실패 (iPhone 카메라 미연결 — AVF device 0개)")
+        elif self.use_camera:
             # 카메라 frame 캡쳐 → /tmp/_flow.png 저장 (OCR 함수가 path 받음)
             from .screen_ocr import capture_phone_screen
             img = capture_phone_screen(self.cam_idx, warmup_frames=3)
@@ -455,9 +469,13 @@ class FlowRunner:
                 self._log(f"  배송정보 펼침 ({expand_arrow['cx']},{expand_arrow['cy']})")
                 time.sleep(0.5)
                 items = _ocr_now()
-            change_btn = next((it for it in items if "변경" in it["text"] and 600 < it["cy"] < 800), None)
+            # 주소 '변경 >' = 우측정렬 short text. '배송방법 변경(픽업서비스)' 와 구분 (실측 5/27).
+            cands = [it for it in items if "변경" in it["text"]
+                     and "배송방법" not in it["text"] and "픽업" not in it["text"]]
+            cands.sort(key=lambda it: -it["cx"])
+            change_btn = cands[0] if cands else None
             if not change_btn:
-                raise FlowError("lotte_change_address: '변경 >' button 없음")
+                raise FlowError("lotte_change_address: 주소 '변경 >' button 없음 (배송방법 변경 제외)")
             self.adb.tap(change_btn["cx"], change_btn["cy"])
             self._log(f"  변경 tap ({change_btn['cx']},{change_btn['cy']})")
             time.sleep(0.5)
@@ -492,44 +510,86 @@ class FlowRunner:
             section_hdr = next((it for it in items if coupon_section in it["text"]), None)
             if not section_hdr:
                 raise FlowError(f"lotte_apply_coupons: '{coupon_section}' section 없음")
-            self.adb.tap(section_hdr["cx"], section_hdr["cy"])
-            time.sleep(0.5)
-            items = _ocr_now()
-            change_btn = next((it for it in items if "변경" in it["text"] and abs(it["cy"] - section_hdr["cy"]) < 150), None)
+            # 변경 button = '변경 >' (우측정렬). 안내문 '변경 버튼을 클릭...'(cx 작음) 과 구분 — '버튼' 제외 (실측 5/27).
+            def _find_change(its):
+                cs = [it for it in its if "변경" in it["text"] and "버튼" not in it["text"]
+                      and abs(it["cy"] - section_hdr["cy"]) < 150]
+                cs.sort(key=lambda c: -c["cx"])
+                return cs[0] if cs else None
+            change_btn = _find_change(items)
             if not change_btn:
-                raise FlowError(f"lotte_apply_coupons: '{coupon_section}' 변경 button 없음")
+                # 미선택 → section tap 으로 선택. (이미 선택돼 '변경 >' 보이면 재탭 금지 = 선택해제 toggle)
+                self.adb.tap(section_hdr["cx"], section_hdr["cy"])
+                time.sleep(0.6)
+                items = _ocr_now()
+                change_btn = _find_change(items)
+            if not change_btn:
+                raise FlowError(f"lotte_apply_coupons: '{coupon_section}' '변경 >' button 없음")
             self.adb.tap(change_btn["cx"], change_btn["cy"])
-            self._log(f"  {coupon_section} 변경 tap")
-            time.sleep(0.5)
-            items = _ocr_now()
-            dropdowns = [it for it in items if "쿠폰을 선택해 주세요" in it["text"]]
+            self._log(f"  {coupon_section} 변경 tap @ ({change_btn['cx']},{change_btn['cy']})")
+            # 할인선택 화면 전환 대기 — 단일 0.5s 는 너무 빨라 dropdown 놓침 (실측 5/27). poll.
+            dropdowns = []
+            for _ in range(8):
+                time.sleep(0.5)
+                items = _ocr_now()
+                dropdowns = [it for it in items if "쿠폰을 선택해 주세요" in it["text"]]
+                if dropdowns:
+                    break
             self._log(f"  상품 dropdown {len(dropdowns)}개")
-            import re
+            if not dropdowns:
+                raise FlowError(f"lotte_apply_coupons: '{coupon_section}' 할인선택 dropdown 미검출 (화면 전환 실패?)")
+            def _pct(t):
+                m = re.search(r"(\d+)\s*%", t)
+                return int(m.group(1)) if m else -1
+            def _close_btn(its):
+                return next((it for it in its if it["text"].strip() == "닫기"), None)
             for idx, dd in enumerate(dropdowns):
                 self._log(f"  [{idx+1}/{len(dropdowns)}] dropdown @ ({dd['cx']},{dd['cy']})")
                 self.adb.tap(540, dd["cy"])
-                time.sleep(0.5)
-                items_p = _ocr_now()
-                pre_total = _get_total(items_p)
-                cands = [it for it in items_p if "%" in it["text"] and 800 < it["cy"] < 1600]
-                cands.sort(key=lambda c: c["cy"])
-                picked = False
-                for c in cands:
-                    is_inactive_mark = c["text"].lstrip().startswith(("()", ")"))
-                    if is_inactive_mark:
-                        self._log(f"    skip 비활성 mark: '{c['text'][:30]}'")
-                        continue
-                    self.adb.tap(540, c["cy"])
-                    time.sleep(0.5)
-                    items_v = _ocr_now()
-                    post_total = _get_total(items_v)
-                    if not verify_change or post_total != pre_total:
-                        self._log(f"    ✓ tap '{c['text'][:30]}' total {pre_total}→{post_total}")
-                        picked = True
+                # ★ 모달 완전히 열릴 때까지 대기 (닫기 등장). 0.5s 고정은 너무 빨라 underlying 행을
+                #   옵션으로 오인 (이미 적용된 다른 상품의 % 라벨 = 같은 텍스트). 실측 5/27.
+                modal_items = None
+                for _ in range(8):
+                    time.sleep(0.4)
+                    its = _ocr_now()
+                    if _close_btn(its):
+                        modal_items = its
                         break
-                    self._log(f"    no change → 다음 옵션")
-                if not picked:
-                    raise FlowError(f"lotte_apply_coupons: 상품 {idx+1} 활성 쿠폰 못 찾음")
+                if not modal_items:
+                    raise FlowError(f"lotte_apply_coupons: 상품 {idx+1} 쿠폰 모달 안 열림")
+                close_y = _close_btn(modal_items)["cy"]
+                pre_total = _get_total(modal_items)
+                # 옵션 = 닫기 button 위쪽의 '<n>%' 행 (모달 영역 = underlying 행 가림). 최고 % 선택.
+                cands = [it for it in modal_items if _pct(it["text"]) > 0 and it["cy"] < close_y - 30
+                         and not it["text"].lstrip().startswith(("()", ")"))]
+                cands.sort(key=lambda c: (-_pct(c["text"]), c["cy"]))
+                # % 값별 1개만 시도 (모달에 같은 % 가 여러 개 — 중복 tap 낭비 방지)
+                seen, uniq = set(), []
+                for c in cands:
+                    p = _pct(c["text"])
+                    if p not in seen:
+                        seen.add(p); uniq.append(c)
+                if not uniq:
+                    raise FlowError(f"lotte_apply_coupons: 상품 {idx+1} 쿠폰 옵션 없음")
+                # ★ 최고 % 부터 시도. 모달 닫힘 = 적용 성공. 모달 유지 = 미적용(다른 상품용) → 다음 % .
+                #   (본윤2종은 15/14% 적용불가, 12% 만 적용 — 실측 5/27)
+                applied = False
+                for c in uniq:
+                    self.adb.tap(540, c["cy"])
+                    time.sleep(0.8)
+                    its2 = _ocr_now()
+                    if _close_btn(its2):
+                        self._log(f"    {_pct(c['text'])}% 미적용(모달 유지) → 다음 %")
+                        continue
+                    post_total = _get_total(its2)
+                    self._log(f"    ✓ {_pct(c['text'])}% 적용 합계 {pre_total}→{post_total}")
+                    applied = True
+                    break
+                if not applied:
+                    cb = _close_btn(_ocr_now())
+                    if cb:
+                        self.adb.tap(cb["cx"], cb["cy"])
+                    raise FlowError(f"lotte_apply_coupons: 상품 {idx+1} 적용가능 쿠폰 없음 (시도 {[_pct(c['text']) for c in uniq]})")
             items = _ocr_now()
             ok_btn = next((it for it in items if it["text"].strip() == "선택완료"), None)
             if ok_btn:
@@ -538,7 +598,15 @@ class FlowRunner:
                 time.sleep(0.5)
 
         elif kind == "lotte_change_card":
-            card_name = action.get("card_name", "삼성카드")
+            # ★ card_name 해석: action.card_name > vars[card_name_var]. silent default 금지
+            #   (이전 '삼성카드' 하드 default = 잘못된 카드 결제 위험 — memory: feedback_lotte_daily_discount_card)
+            card_name = action.get("card_name")
+            if not card_name and action.get("card_name_var"):
+                card_name = (vars or {}).get(action["card_name_var"])
+            if not card_name:
+                raise FlowError(
+                    "lotte_change_card: card_name 미지정. vars['daily_discount_card'] 또는 "
+                    "action.card_name 필요 (당일 banner 자동검출은 미구현 — 실제 banner 샘플 필요)")
             self._log(f"lotte_change_card target='{card_name}'")
             import subprocess
             def _ocr_now():
@@ -857,6 +925,146 @@ class FlowRunner:
                 self.adb.tap(x, y)
                 time.sleep(delay)
 
+        elif kind == "launch":
+            pkg = action.get("package")
+            if not pkg:
+                raise FlowError("launch: 'package' 필요")
+            self._log(f"launch {pkg}")
+            self.adb._shell("monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1")
+            time.sleep(action.get("post_sleep_sec", 0.5))
+
+        elif kind == "swipe":
+            if "from_xy" in action:
+                x1, y1 = action["from_xy"]; x2, y2 = action["to_xy"]
+            elif "from" in action:
+                x1, y1 = action["from"]; x2, y2 = action["to"]
+            else:
+                raise FlowError("swipe: 'from_xy'+'to_xy' 필요")
+            dur = action.get("duration_ms", 300)
+            self._log(f"swipe ({x1},{y1})→({x2},{y2}) {dur}ms")
+            self.adb.swipe(x1, y1, x2, y2, dur)
+            time.sleep(action.get("post_sleep_sec", 0.3))
+
+        elif kind == "dismiss_alert_if_present":
+            # 팝업(동의 미체크 alert 등) 즉시 닫기 — '확인'/'닫기' button. dump 우선, OCR fallback.
+            import xml.etree.ElementTree as ET
+            labels = action.get("labels", ["확인", "닫기", "예"])
+            BOUNDS = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
+            tmp = "/tmp/_alert.xml"
+            tapped = False
+            try:
+                self.adb.dump_ui(tmp)
+                root = ET.parse(tmp).getroot()
+            except Exception:
+                root = None
+            if root is not None:
+                for n in root.iter():
+                    t = (n.attrib.get("text", "") or "").strip()
+                    if t in labels and n.attrib.get("clickable", "") == "true":
+                        m = BOUNDS.match(n.attrib.get("bounds", ""))
+                        if m:
+                            x1, y1, x2, y2 = map(int, m.groups())
+                            self.adb.tap((x1 + x2) // 2, (y1 + y2) // 2)
+                            self._log(f"  alert(dump) '{t}' tap")
+                            tapped = True
+                            break
+            if not tapped:
+                # WebView alert 은 dump 빈약 → OCR fallback (체크아웃 화면 = screencap OK)
+                self._cap()
+                items = _ocr_texts(self._tmp_img)
+                hit = next((it for it in items if it["text"].strip() in labels), None)
+                if hit:
+                    if self.use_camera:
+                        from .screen_ocr import camera_to_phone
+                        px, py = camera_to_phone(hit["cx"], hit["cy"], self._calib)
+                    else:
+                        px, py = hit["cx"], hit["cy"]
+                    self.adb.tap(px, py)
+                    self._log(f"  alert(OCR) '{hit['text']}' tap @ ({px},{py})")
+                    tapped = True
+            if not tapped:
+                self._log("  팝업 없음, skip")
+            time.sleep(action.get("post_sleep_sec", 0.5))
+
+        elif kind == "lotte_cart_select_all":
+            # 장바구니 '일반 (n/m)' 그룹 전체선택 체크박스 tap (전체 상품 주문 필수).
+            # 체크박스 = 헤더 행 좌측 끝 절대 x≈60 ('(n/m)' 텍스트가 폭 변동 → 상대 offset 불가, 실측 5/27).
+            # (n/m) 카운트로 self-verify + retry. WebView 체크아웃 = FLAG_SECURE 아님 → screencap OCR.
+            def _hdr():
+                self.adb.screencap(self._tmp_img)
+                its = _ocr_texts(self._tmp_img)
+                return next((it for it in its if "일반" in it["text"] and it["cy"] < 900), None)
+            def _sel_state(h):
+                m = re.search(r"\((\d+)\s*/\s*(\d+)\)", h["text"])
+                return (int(m.group(1)), int(m.group(2))) if m else (None, None)
+            hdr = _hdr()
+            if not hdr:
+                raise FlowError("lotte_cart_select_all: '일반' 그룹 헤더 없음 (빈 장바구니/미진입?)")
+            checkbox_x = action.get("checkbox_x", 60)
+            for attempt in range(2):
+                sel, tot = _sel_state(hdr)
+                if sel is not None and tot and sel == tot:
+                    self._log(f"  ✓ 전체선택됨 ({sel}/{tot})")
+                    return
+                self.adb.tap(checkbox_x, hdr["cy"])
+                self._log(f"  전체선택 tap ({checkbox_x},{hdr['cy']}) '{hdr['text']}' (attempt {attempt+1})")
+                time.sleep(action.get("post_sleep_sec", 0.6))
+                hdr = _hdr()
+                if not hdr:
+                    raise FlowError("lotte_cart_select_all: tap 후 헤더 재검출 실패")
+            sel, tot = _sel_state(hdr)
+            if not (tot and sel == tot):
+                raise FlowError(f"lotte_cart_select_all: 전체선택 실패 ('{hdr['text']}')")
+            self._log(f"  ✓ 전체선택됨 ({sel}/{tot})")
+
+        elif kind == "tap_then_expect":
+            # 단일 tap 보장 + 화면 전환 검증 + 팝업 자동 닫기.
+            #   expect_text 있음 → tap 후 등장 확인, 미전환 시 alert dismiss + 1회 재tap (두번 결제 방지)
+            #   expect_text 없음 → 1회 tap 후 팝업만 즉시 닫음 (결제하기처럼 다음 화면 미지정)
+            target = action.get("text")
+            if not target:
+                raise FlowError("tap_then_expect: 'text' 필요")
+            expect = action.get("expect_text")
+            dismiss_labels = action.get("dismiss_labels", ["확인", "닫기"])
+            settle = action.get("post_sleep_sec", 3.0)
+
+            def _ocr_now():
+                self._cap()
+                return _ocr_texts(self._tmp_img)
+
+            def _to_phone(it):
+                if self.use_camera:
+                    from .screen_ocr import camera_to_phone
+                    return camera_to_phone(it["cx"], it["cy"], self._calib)
+                return it["cx"], it["cy"]
+
+            for attempt in range(2):
+                items = _ocr_now()
+                if expect and any(expect in it["text"] for it in items):
+                    self._log(f"  이미 '{expect}' 도달 — '{target}' tap 생략")
+                    return
+                tgt = next((it for it in items if target in it["text"]), None)
+                if not tgt:
+                    raise FlowError(f"tap_then_expect: '{target}' OCR 미발견 (attempt {attempt+1})")
+                px, py = _to_phone(tgt)
+                self.adb.tap(px, py)
+                self._log(f"  tap '{target}' @ ({px},{py}) (attempt {attempt+1})")
+                if not expect:
+                    # 다음 화면 미지정 — tap 후 팝업만 즉시 닫고 종료
+                    time.sleep(settle)
+                    self.run_action({"action": "dismiss_alert_if_present", "labels": dismiss_labels})
+                    return
+                deadline = time.time() + settle
+                while time.time() < deadline:
+                    if any(expect in it["text"] for it in _ocr_now()):
+                        self._log(f"  ✓ '{expect}' 도달 — 전환 성공")
+                        time.sleep(0.5)
+                        return
+                    time.sleep(0.7)
+                self._log(f"  '{expect}' 미도달 — alert dismiss 후 재시도")
+                self.run_action({"action": "dismiss_alert_if_present", "labels": dismiss_labels})
+            raise FlowError(f"tap_then_expect: '{target}' tap 후 '{expect}' 전환 실패 (2회)")
+
         else:
             raise FlowError(f"unknown action: {kind}")
 
@@ -891,6 +1099,7 @@ def _main():
     for a in args[2:]:
         if a.startswith("--pin="): vars["pin"] = a.split("=",1)[1]
         elif a.startswith("--code="): vars["code"] = a.split("=",1)[1]
+        elif a.startswith("--card="): vars["daily_discount_card"] = a.split("=",1)[1]
     runner = FlowRunner()
     runner.run(flow, vars)
 
