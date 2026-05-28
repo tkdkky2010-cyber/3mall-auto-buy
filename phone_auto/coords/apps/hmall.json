@@ -65,6 +65,20 @@
       "7": [131, 1988], "8": [403, 1988], "9": [675, 1988], "0": [947, 1988]
     }
   },
+  "lotte": {
+    "_note": "롯데카드 흐름 (2026-05-29 검증): 결제하기 → 롯데카드 페이지(WebView) → '로카페이(앱카드)' 박스의 '결제하기' → 로카앱(com.lcacApp) 자동호출 → '결제하기' (PayRequestActivity) → 비번 셔플 4×3 → 4엔진 OCR 137601 → 자동 '결제 요청되었습니다' → '확인' → hmall 영수증.",
+    "lokapay_pay_btn": {"x": 539, "y": 782},
+    "loca_app_pay_btn": {"x": 540, "y": 2118},
+    "loca_pin_keypad_roi_y_frac": [0.40, 0.80],
+    "loca_pin_grid": {
+      "_note": "키패드 4행 × 3열, 셔플. 4엔진 OCR (easyocr+tesseract+vision+gcv) → vote_digits. Row4 = ←/숫자/완료.",
+      "rows_y": [1604, 1792, 1980, 2170],
+      "cols_x": [180, 540, 900],
+      "back_btn": [180, 2170],
+      "done_btn": [900, 2170]
+    },
+    "complete_ok": {"x": 540, "y": 2160}
+  },
   "nh": {
     "_note": "NH농협카드 흐름 (2026-05-29 검증): 결제하기 → '다른 결제' 탭 → 'PAYCO'(우측하단) → PAYCO앱 자동호출(com.nhnent.payapp) → '결제하기' → 비번 셔플 키패드 → 137601 → '확인' → 결제완료. 카드번호 4칸 일반결제 흐름은 misdirection으로 폐기.",
     "other_pay_tab": {"x": 810, "y": 380},
