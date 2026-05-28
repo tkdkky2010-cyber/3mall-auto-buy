@@ -53,6 +53,12 @@ CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
 # Phase 3-A 안전장치: 결제하기 클릭 후 7자리 코드만 추출하고 폰 결제는 수동 (또는 Phase 3-B)
 DRY_PAYMENT = os.environ.get("DRY_PAYMENT", "true").lower() == "true"
 
+# CART_ONLY: 계정별로 plan 의 모든 상품을 장바구니에 누적 담기만 하고 checkout/결제는 안 함.
+# (쿠폰 받기는 add_to_cart 안에서 auto_coupon 시 그대로 수행) — 카카오페이 등 사용자 수동 결제일 때.
+# 계정당 clear_cart 1회 후 전 상품 add → 재시도 시에도 중복 없이 plan 그대로 재구성.
+CART_ONLY = os.environ.get("CART_ONLY", "false").lower() == "true"
+CART_ONLY_DELAY_SEC = int(os.environ.get("CART_ONLY_DELAY_SEC", "20"))  # cart-only 계정 간 대기(결제 없어 추적위험 낮음)
+
 # 캐러셀 <img alt="cardCdXX"> → 내부 brand 코드
 CARD_CD_TO_BRAND = {
     "cardCd01": "BC",
@@ -318,14 +324,20 @@ def add_to_cart(page: Page, product_id: str, info: dict, qty: int) -> bool:
         return False
     page.wait_for_timeout(1500)
 
+    # 구매하기 후 옵션 레이어 판별: 옵션 행이 없으면 단일 상품(선택 불필요),
+    # 여러 개면 option_index([선택 N], 기본 1=최상단) 선택. 라벨 못 찾으면 최상단 fallback.
     option_idx = info.get("option_index") or 1
     try:
-        opt = page.locator("span.choice-num.title").filter(has_text=f"[선택 {option_idx}]").first
-        if opt.count() > 0:
+        choices = page.locator("span.choice-num.title")
+        if choices.count() == 0:
+            print(f"    [opt] 단일 옵션 — 선택 불필요")
+        else:
+            opt = choices.filter(has_text=f"[선택 {option_idx}]").first
+            if opt.count() == 0:
+                print(f"    [opt] [선택 {option_idx}] 라벨 못 찾음 → 최상단 옵션 선택")
+                opt = choices.first
             opt.click()
             page.wait_for_timeout(700)
-        else:
-            print(f"    [WARN] [선택 {option_idx}] 옵션 라벨 못 찾음")
     except Exception as e:
         print(f"    [WARN] 옵션 클릭 실패: {e}")
 
@@ -1020,6 +1032,22 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
         page.close()
         return (0, len(items), False, None)
 
+    if CART_ONLY:
+        # cart-only: clear 1회 → plan 전 상품 누적 담기 (checkout/결제 없음). 결제는 사용자가 수동.
+        clear_cart(page)
+        success = 0
+        for ci, entry in enumerate(items, 1):
+            print(f"\n  ── #{idx} (cart-only) {ci}/{len(items)} — product {entry['product_id']} x{entry['qty']} ──")
+            if add_to_cart(page, entry["product_id"], entry["info"], entry["qty"]):
+                success += 1
+            else:
+                print(f"  [SKIP] #{idx} {ci}번째 add_to_cart 실패")
+            if ci < len(items):
+                page.wait_for_timeout(3000)
+        print(f"  ✓ #{idx} {account['id']} cart-only 담기 {success}/{len(items)}")
+        page.close()
+        return (success, len(items), True, None)
+
     success = 0
     last_checkout_result: dict | None = None
     for ci, entry in enumerate(items, 1):
@@ -1173,7 +1201,7 @@ def _run_with_browser(browser, accounts, target_indices, account_plan, summary) 
             except Exception as e:
                 print(f"  [FATAL] #{idx} {account['id']}: {e}")
                 local_results[idx] = (idx, account["id"], 0, len(items), False, None)
-            time.sleep(ACCOUNT_DELAY_SEC)
+            time.sleep(CART_ONLY_DELAY_SEC if CART_ONLY else ACCOUNT_DELAY_SEC)
         return local_results
 
     # 1차 pass

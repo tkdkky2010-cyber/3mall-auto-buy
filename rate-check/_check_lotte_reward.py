@@ -27,7 +27,7 @@ opts = uc.ChromeOptions()
 opts.add_argument(f"--user-data-dir={PROFILE}")
 opts.add_argument("--lang=ko-KR")
 opts.add_argument("--window-size=1280,900")
-driver = uc.Chrome(options=opts, headless=False, use_subprocess=True)
+driver = uc.Chrome(options=opts, headless=False, use_subprocess=True, version_main=148)
 
 
 def block_dialogs():

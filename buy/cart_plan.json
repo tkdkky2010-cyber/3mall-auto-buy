@@ -1,42 +1,14 @@
 {
-  "date": "2026-05-25",
-  "_comment": "#1 완료, #2 완료, #3 #16 완료, #4 #16 완료. #3 #4 의 #17 = 미진행.",
+  "date": "2026-05-28",
+  "_comment": "cart-only (카카오페이 수동결제일). accounts = hmall_config.json 1-based 순서. CART_ONLY=true 로 실행.",
   "items": [
-    {
-      "product": 16,
-      "accounts": [
-        5
-      ],
-      "qty": 4
-    },
-    {
-      "product": 17,
-      "accounts": [
-        14,
-        15,
-        16,
-        17,
-        18,
-        19,
-        7,
-        6,
-        5,
-        4,
-        3
-      ],
-      "qty": 2
-    },
-    {
-      "product": 25,
-      "accounts": [
-        13,
-        12,
-        11,
-        10,
-        9,
-        8
-      ],
-      "qty": 2
-    }
+    { "product": 28, "accounts": [1, 2, 3, 4, 5],                       "qty": 1 },
+    { "product": 30, "accounts": [1, 2, 3, 4, 5],                       "qty": 2 },
+    { "product": 32, "accounts": [1, 2, 3],                             "qty": 1 },
+    { "product": 11, "accounts": [1, 2, 3, 4, 5],                       "qty": 1 },
+    { "product": 17, "accounts": [6, 7, 8, 9, 10, 11, 12, 13, 14],      "qty": 2 },
+    { "product": 25, "accounts": [15, 16, 17, 18, 19],                  "qty": 2 },
+    { "product": 16, "accounts": [4],                                   "qty": 3 },
+    { "product": 16, "accounts": [5, 6, 7, 8],                          "qty": 4 }
   ]
 }

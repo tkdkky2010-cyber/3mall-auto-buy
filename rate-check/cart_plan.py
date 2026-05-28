@@ -103,6 +103,11 @@ def is_overstocked(combo: list[tuple[str, int]], stocks: dict[str, int]) -> bool
     return any(stocks.get(code, 0) > OVERSTOCK_THRESHOLD for code, _ in combo)
 
 
+def has_excluded_code(combo: list[tuple[str, int]], exclude: set[str]) -> bool:
+    """판매중지 등 사용자 지정 제외 코드 포함 시 True."""
+    return any(code in exclude for code, _ in combo)
+
+
 def _combo_score(combo: list[tuple[str, int]]) -> int:
     """조합의 가중 수익 점수 = Σ (PRODUCT_PROFIT[c] × PRODUCT_VELOCITY[c] × qty).
 
@@ -120,6 +125,7 @@ def make_cart_plan(
     combos: list[list[tuple[str, int]]],
     n: int,
     stocks: dict[str, int],
+    exclude_codes: set[str] | None = None,
 ) -> dict[int, int]:
     """sort + round-robin + 재고 OVERSTOCK 스킵. 반환: {조합번호(1-based): 수량}.
 
@@ -130,6 +136,10 @@ def make_cart_plan(
     """
     # 공급률 있는 조합만 후보 (rate is None = 데이터 누락 조합 제외)
     indexed = [i for i, rate in enumerate(channel_rates) if rate is not None]
+    # 판매중지 등 exclude_codes 포함 조합 사전 제외
+    exc = exclude_codes or set()
+    if exc:
+        indexed = [i for i in indexed if not has_excluded_code(combos[i], exc)]
     # 가중 수익 점수 내림차순 정렬 (공급률 자체는 정렬에 무관)
     indexed.sort(key=lambda i: -_combo_score(combos[i]))
     available = [i for i in indexed if not is_overstocked(combos[i], stocks)]
@@ -187,7 +197,10 @@ def main(argv=None) -> int:
     p.add_argument("--n", type=int,
                    help=f"override 채널별 디폴트 N {CHANNEL_DEFAULT_N}")
     p.add_argument("--tab", help="시트 탭 override (기본: today, M.DD)")
+    p.add_argument("--exclude", default="",
+                   help="제외 코드 (콤마 구분, 예: 'c,d' 판매중지 시)")
     args = p.parse_args(argv)
+    exclude_codes = set(c.strip() for c in args.exclude.split(",") if c.strip())
 
     gc = C.gs_client()
     sh = gc.open_by_key(C.RATE_SHEET_ID)
@@ -212,7 +225,9 @@ def main(argv=None) -> int:
     if over:
         print(f"  ⚠️ 재고 > {OVERSTOCK_THRESHOLD}: {over} → 해당 코드 포함 조합 스킵")
 
-    cart = make_cart_plan(channel_rates, C.COMBOS, n, stocks)
+    if exclude_codes:
+        print(f"  ⊘ 제외 코드: {sorted(exclude_codes)} (포함 조합 스킵)")
+    cart = make_cart_plan(channel_rates, C.COMBOS, n, stocks, exclude_codes=exclude_codes)
     if not cart:
         print(f"❌ 공급률 데이터 없음 — Step 1 K2:M{1+len(C.COMBOS)} 비어있는지 확인")
         return 1

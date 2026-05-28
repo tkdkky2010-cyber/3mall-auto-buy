@@ -142,7 +142,7 @@ def read_combo_quantities(rows: list[list[str]], suffix: str) -> dict[int, dict[
         if not m:
             continue
         idx = int(m.group(1))
-        if not (1 <= idx <= 16):
+        if not (1 <= idx <= len(C.COMBOS)):
             continue
         code = row[1].strip()
         try:
