@@ -1,5 +1,5 @@
 {
-  "date": "2026-05-28",
+  "date": "2026-05-29",
   "account_used": "tkdkky2002",
   "products": [
     {
@@ -7,30 +7,30 @@
       "name": "이너플로라",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2154750833",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         }
       ],
@@ -138,30 +138,30 @@
       "name": "이경제 더힘찬녹용 30포",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2240802022&ordpreview=true",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         }
       ],
@@ -185,23 +185,12 @@
       "name": "라메종드미엘 프랑스 라벤더 천연꿀 8병",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2246845189&sectId=3059445",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 매일 10%적립",
+      "phrase": "매일 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        },
-        {
-          "prmo": "P202605197954",
+          "prmo": "P202605197962",
           "name": "매일 10%적립",
-          "event_end": "5.28 23:59",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 1,
@@ -211,17 +200,12 @@
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59 / 5.28 23:59",
+      "max_reward": "10,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        },
         {
           "min_won": 1,
           "max_won": 100000,
@@ -248,30 +232,30 @@
       "name": "갱년기 다이어트 리얼퀸 3병",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847&sectId=3059445",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         }
       ],
@@ -295,30 +279,30 @@
       "name": "GRN 핑크 초록이",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847&sectId=3059445",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         }
       ],
@@ -343,30 +327,30 @@
       "name": "GRN 곰돌이",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847&sectId=3059445",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         }
       ],
@@ -519,21 +503,16 @@
         "member_price": 46350,
         "card_slides": [
           {
-            "alt": "토스페이 최대 15,000원 혜택!",
-            "text": "토스페이 최대 15,000원 혜택! 5/1~5/31 동안, 선착순 혜택",
-            "percent": null,
-            "price": 15000
-          },
-          {
-            "alt": "네이버페이 최대 3%적립",
-            "text": "네이버페이 최대 3%적립 기본 적립 + 추가적립 (5/1~5/31)",
-            "percent": null,
-            "price": null
+            "alt": "현대홈쇼핑 현대카드 Ed2",
+            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
+            "percent": 7,
+            "price": null,
+            "discount_type": "청구할인"
           }
         ],
         "kakao_price": 46350,
         "kakao_reward_pt": 3000,
-        "kakao_final_cost": 43350,
+        "kakao_final_cost": 40106,
         "paybacks": {},
         "optimal_tier": {
           "qty": 1,
@@ -576,23 +555,12 @@
       "name": "데이즈온 원데이 알파 18개",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2247036059&sectId=3059445",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 매일 10%적립",
+      "phrase": "매일 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        },
-        {
-          "prmo": "P202605197954",
+          "prmo": "P202605197962",
           "name": "매일 10%적립",
-          "event_end": "5.28 23:59",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 1,
@@ -602,17 +570,12 @@
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59 / 5.28 23:59",
+      "max_reward": "10,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        },
         {
           "min_won": 1,
           "max_won": 100000,
@@ -639,30 +602,30 @@
       "name": "바디랩 유기농 레몬즙 1박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244671296&sectId=3059445",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         }
       ],
@@ -686,30 +649,30 @@
       "name": "올바른건강식품 와이 9박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244934734&sectId=3059445",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         }
       ],
@@ -746,23 +709,23 @@
       "name": "유기농 석류젤리 9박(90개)",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 매일 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립 / 매일 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         },
         {
-          "prmo": "P202605197954",
+          "prmo": "P202605197962",
           "name": "매일 10%적립",
-          "event_end": "5.28 23:59",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 1,
@@ -772,15 +735,15 @@
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59 / 5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59 / 5.29 23:59",
       "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         },
         {
@@ -812,9 +775,9 @@
       "phrase": "매일 10%적립",
       "events": [
         {
-          "prmo": "P202605197954",
+          "prmo": "P202605197962",
           "name": "매일 10%적립",
-          "event_end": "5.28 23:59",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 1,
@@ -825,7 +788,7 @@
       ],
       "tiers": [],
       "max_reward": "10,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "event_end": "5.29 23:59",
       "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
@@ -856,30 +819,30 @@
       "name": "스키니랩 시서스 다이어트 11박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202464603&sectId=3059445",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         }
       ],
@@ -903,23 +866,23 @@
       "name": "아이클타임 키성장 에프지오 6박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2237140367",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 매일 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립 / 매일 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         },
         {
-          "prmo": "P202605197954",
+          "prmo": "P202605197962",
           "name": "매일 10%적립",
-          "event_end": "5.28 23:59",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 1,
@@ -929,15 +892,15 @@
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59 / 5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59 / 5.29 23:59",
       "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         },
         {
@@ -966,30 +929,30 @@
       "name": "올바른 파로 효소 골드 30포 10박스 (총 300포)",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244523957",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         }
       ],
@@ -1013,30 +976,30 @@
       "name": "닥터린 알파CD 원데이 핏 6박스",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2245068818",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         }
       ],
@@ -1060,30 +1023,30 @@
       "name": "셀게이트 엑스트라버진 올리브오일 그리스 30포 6박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244447362",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605228866",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "5.28 23:59",
+          "prmo": "P202605280070",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "5.29 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "5.28 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "5.29 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
-          "min_won": 50000,
-          "max_won": 10000000,
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         }
       ],

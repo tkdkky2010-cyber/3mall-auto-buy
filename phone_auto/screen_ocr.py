@@ -156,6 +156,8 @@ def capture_portrait_frame(out_path: Optional[str] = None, zoom: float = 2.0,
         if conn.isVideoRotationAngleSupported_(90):
             conn.setVideoRotationAngle_(90)
     delegate = _FrameDelegate.alloc().init()
+    delegate.out_path = out_path
+    delegate.warmup = warmup_frames
     q_ptr = libdispatch.dispatch_queue_create(b"frame_q", None)
     output.setSampleBufferDelegate_queue_(delegate, objc.objc_object(c_void_p=q_ptr))
     session.startRunning()

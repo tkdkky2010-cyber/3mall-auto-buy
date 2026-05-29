@@ -379,8 +379,10 @@ class FlowRunner:
                     root = ET.parse(tmp).getroot()
                 except Exception:
                     time.sleep(0.5); continue
+                exact = action.get("exact", False)
                 for n in root.iter():
-                    if target in (n.attrib.get("text", "") or ""):
+                    nt = (n.attrib.get("text", "") or "")
+                    if (nt == target) if exact else (target in nt):
                         m = BOUNDS.match(n.attrib.get("bounds", ""))
                         if m:
                             x1, y1, x2, y2 = map(int, m.groups())
@@ -470,6 +472,30 @@ class FlowRunner:
             if not found:
                 raise FlowError(f"verify_text fail: '{text}' not seen on screen")
             self._log(f"verify_text ✓ '{text}'")
+
+        elif kind == "verify_selected":
+            # 라디오/결제수단 선택 상태 검증 (페이북머니 가드 [[feedback_paybook_card_payment]]).
+            # text: selected=true 여야 함. forbid_text: selected=true 면 결제 중단.
+            import xml.etree.ElementTree as ET
+            want_text = action.get("text")
+            forbid = action.get("forbid_text")
+            tmp = "/tmp/_vsel.xml"
+            self.adb.dump_ui(tmp)
+            try:
+                root = ET.parse(tmp).getroot()
+            except Exception:
+                raise FlowError("verify_selected: dump 파싱 실패")
+            ok = want_text is None
+            for n in root.iter():
+                t = (n.attrib.get("text", "") or "")
+                sel = n.attrib.get("selected", "") == "true"
+                if forbid and forbid in t and sel:
+                    raise FlowError(f"verify_selected: 금지 결제수단 '{forbid}' 선택됨 — 결제 중단")
+                if want_text and want_text in t and sel:
+                    ok = True
+            if not ok:
+                raise FlowError(f"verify_selected: '{want_text}' selected=true 아님")
+            self._log(f"verify_selected ✓ '{want_text}'=selected, '{forbid}' not selected")
 
         elif kind == "lotte_change_address":
             target_keyword = action.get("address_keyword", "화곡동 890")
@@ -757,6 +783,12 @@ class FlowRunner:
                 raise FlowError(f"input_pin: value 없음 (kind={action.get('kind')})")
             # 페이싱: 카드사 PIN/결제코드 매 tap 사이 1.2초 (셔플 재배열 애니메이션 완료 wait)
             delay = action.get("tap_delay_sec", 1.2)
+            # step 별 use_camera override — BC 같이 mixed (PIN=ADB, 7자리/결제PIN=camera) 카드 지원
+            # 예: {"action":"input_pin", "kind":"bc_login6", "use_camera": false} → 이 step 만 ADB screencap
+            _saved_use_camera = self.use_camera
+            if "use_camera" in action:
+                self.use_camera = bool(action["use_camera"])
+                self._log(f"input_pin use_camera override → {self.use_camera}")
             # 카메라 모드 = 카메라 frame 전체에서 OCR (y_min/y_max 무시)
             # ADB screencap 모드 = 폰 좌표 기준 키패드 영역 필터
             if self.use_camera:
@@ -778,15 +810,22 @@ class FlowRunner:
 
             # 4엔진 voting OCR — kind 기반 preset 자동 매핑 (samsung_7digit_shuffle → samsung_code7 등)
             preset_name = action.get("preset")
-            if not preset_name and self.use_camera:
+            if not preset_name:
                 kind_str = action.get("kind", "")
                 # samsung_7digit_shuffle → samsung_code7, samsung_6digit_shuffle → samsung_pin6
                 if "samsung_7digit" in kind_str or "samsung_login_6digit" in kind_str:
                     preset_name = "samsung_code7"
                 elif "samsung_6digit" in kind_str:
                     preset_name = "samsung_pin6"
+                # BC paybook — bc_code7 (FLAG_SECURE 7자리 fixed) / bc_pin6 (6자리 셔플 결제 비번) / bc_login6 (셔플 앱 로그인)
+                elif "bc_7digit" in kind_str or "bc_code7" in kind_str:
+                    preset_name = "bc_code7"
+                elif "bc_6digit_login" in kind_str or "bc_login6" in kind_str:
+                    preset_name = "bc_login6"
+                elif "bc_6digit" in kind_str or "bc_pin6" in kind_str:
+                    preset_name = "bc_pin6"
             preset = None
-            if preset_name and self.use_camera:
+            if preset_name:
                 from .ocr_keypad import KEYPAD_PRESETS
                 preset = KEYPAD_PRESETS.get(preset_name)
                 if preset:
@@ -903,6 +942,26 @@ class FlowRunner:
                 else:
                     pass  # 완전 매핑 OK
 
+            # ADB(screencap) 모드 셔플 키패드: single-pass 4-engine vote_digits.
+            # 셔플은 화면 로드시 1회뿐 → 매 키 재OCR 금지([[feedback_shuffle_keypad_ocr_once]]).
+            # 단일엔진 _ocr_digits는 '0' 등 누락(5/29 BC 7/10) → vote_digits 4엔진. 결과=이미 phone 픽셀 좌표.
+            if not digits_cache and not self.use_camera and preset:
+                from .ocr_keypad import vote_digits
+                need = set(value)
+                for va in range(action.get("vote_retry", 4)):
+                    self._cap()
+                    vd = vote_digits(self._tmp_img, flip_h=preset.get("flip_h", False),
+                                     roi_y_frac=preset.get("roi_y_frac"), allow_partial=True) or {}
+                    if need.issubset(vd.keys()):
+                        digits_cache = dict(vd)
+                        digits_cache["__phone_coord__"] = (0, 0)  # phone 좌표 → cam→phone 변환 skip
+                        self._log(f"  [adb vote] {len(vd)}/10 ✓ need={sorted(need)} (attempt {va+1})")
+                        break
+                    self._log(f"  [adb vote] attempt {va+1}: got {sorted(vd.keys())}, need {sorted(need)} — retry")
+                    time.sleep(0.5)
+                if not digits_cache:
+                    raise FlowError(f"input_pin(adb): vote_digits가 PIN digit 전부 못잡음 (need {sorted(set(value))})")
+
             cache_is_phone_coord = digits_cache.pop("__phone_coord__", None) is not None
             for i, d in enumerate(value, 1):
                 if digits_cache:
@@ -941,6 +1000,8 @@ class FlowRunner:
                 self._log(f"  [{i}/{len(value)}] tap '{d}' @ phone({x},{y})")
                 self.adb.tap(x, y)
                 time.sleep(delay)
+            # use_camera step-override 복원 (저장만 하고 복원 안 하던 버그 fix)
+            self.use_camera = _saved_use_camera
 
         elif kind == "launch":
             pkg = action.get("package")
