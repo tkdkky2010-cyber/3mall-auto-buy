@@ -93,7 +93,8 @@ CARD_CD_TO_PHONE_FLOW = {
     "cardCd08": ("lotte_card",     "flow_payment", False),  # 롯데카드 — ADB
     "cardCd10": ("hana_card",      "flow_payment", False),  # 하나카드 — ADB screencap (5/29 nFilter screencap 읽힘 확인, FLAG_SECURE 아님. 카메라/미러/portrait 불필요)
     "cardCd01": ("bc_paybook_isp", "flow_payment", False),  # BC 페이북 — ADB screencap (nf_key_serial, FLAG_SECURE 아님, 5/29 검증). 카메라 불필요
-    # cardCd03 KB / cardCd40 NH 는 좌표 미완 — 추후
+    "cardCd03": ("kb_kbpay",       "flow_payment", False),  # KB국민카드 — KB Pay 앱, FLAG_SECURE 비번(dump 모드, screencap/카메라 불필요). ⚠️DRAFT 라이브 미검증
+    # cardCd40 NH 는 좌표 미완 — 추후
 }
 
 # 오늘의 결제수단 강제 지정 — 비우면 캐러셀 자동 판독
