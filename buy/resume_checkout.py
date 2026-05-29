@@ -12,9 +12,26 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "buy"))
 os.environ["FLOW_USE_CAMERA"] = "1"
 
-from buy.run import do_checkout, trigger_phone_payment, DRY_PAYMENT, CDP_ENDPOINT
+from buy.run import (
+    do_checkout,
+    trigger_phone_payment,
+    apply_beauty_point_on_order_complete,
+    DRY_PAYMENT,
+    CDP_ENDPOINT,
+)
 
 from patchright.sync_api import sync_playwright
+
+
+def _beauty_point_account_idx() -> int | None:
+    raw = os.environ.get("BEAUTY_POINT_ACCOUNT_IDX", "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        print(f"[WARN] BEAUTY_POINT_ACCOUNT_IDX invalid: {raw!r}")
+        return None
 
 
 def main():
@@ -44,6 +61,11 @@ def main():
                 print(f"  error: {phone['error']}")
             if phone.get("log_tail"):
                 print(f"  log tail:\n{phone['log_tail']}")
+            if phone.get("success"):
+                beauty = apply_beauty_point_on_order_complete(page, account_idx=_beauty_point_account_idx())
+                print(f"\n[INFO] beauty point result: success={beauty['success']} clicked={beauty['clicked']}")
+                if beauty.get("error"):
+                    print(f"  error: {beauty['error']}")
         return 0
 
 

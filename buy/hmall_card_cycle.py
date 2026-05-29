@@ -75,6 +75,7 @@ def main():
     # buy.run 은 import 시점에 TODAY_BRAND / DRY_PAYMENT 읽음 — env 세팅 후 import
     from buy.run import (
         clear_cart, add_to_cart, do_checkout, trigger_phone_payment,
+        apply_beauty_point_on_order_complete,
         ACCOUNTS_FILE, CDP_ENDPOINT,
     )
     from playwright.sync_api import sync_playwright
@@ -134,6 +135,10 @@ def main():
         phone_res = trigger_phone_payment(result["card_cd"], result["code"], timeout_sec=300)
         print("[PHONE RESULT]")
         print(json.dumps(phone_res, ensure_ascii=False, indent=2))
+        if phone_res.get("success"):
+            beauty = apply_beauty_point_on_order_complete(page, account_idx=args.account)
+            print("[BEAUTY POINT RESULT]")
+            print(json.dumps(beauty, ensure_ascii=False, indent=2))
         page.close()
         # 결제 끝나든 실패하든 stale tab 정리 (사용자 가드레일 — 안 헷갈리게)
         _close_stale_payment_tabs(ctx)

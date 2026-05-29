@@ -1017,6 +1017,313 @@ def apply_hpoint(page: Page, prmoNo: str) -> dict:
     return out
 
 
+def _load_beauty_point_config() -> dict:
+    path = PROJECT_ROOT / "secrets" / "beauty_point.json"
+    try:
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"    [BEAUTY] config load warn: {e}")
+    return {}
+
+
+def _load_beauty_point_state() -> dict:
+    path = PROJECT_ROOT / "secrets" / "beauty_point_state.json"
+    try:
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"    [BEAUTY] state load warn: {e}")
+    return {"hmall": {}}
+
+
+def _save_beauty_point_state(state: dict) -> None:
+    path = PROJECT_ROOT / "secrets" / "beauty_point_state.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        try:
+            os.chmod(path, 0o600)
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"    [BEAUTY] state save warn: {e}")
+
+
+def _active_beauty_profile(cfg: dict) -> tuple[str | None, dict | None]:
+    key = cfg.get("active_profile")
+    profile = (cfg.get("profiles") or {}).get(key) if key else None
+    if not key or not profile:
+        return None, None
+    return key, profile
+
+
+def _beauty_reauth_needed(account_idx: int | None, cfg: dict, state: dict) -> bool:
+    active_key, _profile = _active_beauty_profile(cfg)
+    if not active_key or account_idx is None:
+        return os.environ.get("BEAUTY_POINT_FORCE_REAUTH", "").lower() == "true"
+    if os.environ.get("BEAUTY_POINT_FORCE_REAUTH", "").lower() == "true":
+        return True
+    hmall_cfg = cfg.get("hmall") or {}
+    targets = hmall_cfg.get("reauth_accounts") or []
+    if targets and account_idx not in set(int(x) for x in targets):
+        return False
+    acct_state = (state.get("hmall") or {}).get(str(account_idx)) or {}
+    return acct_state.get("active_profile") != active_key
+
+
+def _mark_beauty_reauth(account_idx: int | None, active_key: str | None, profile: dict | None) -> None:
+    if account_idx is None or not active_key:
+        return
+    state = _load_beauty_point_state()
+    state.setdefault("hmall", {})[str(account_idx)] = {
+        "active_profile": active_key,
+        "name": (profile or {}).get("name"),
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    }
+    _save_beauty_point_state(state)
+
+
+def _click_text_button(page: Page, text: str, timeout: int = 1000) -> bool:
+    patterns = [
+        page.get_by_role("button", name=re.compile(rf"^{re.escape(text)}$")).first,
+        page.get_by_text(text, exact=True).first,
+    ]
+    for loc in patterns:
+        try:
+            if loc.count() > 0 and loc.is_visible(timeout=timeout):
+                loc.click()
+                page.wait_for_timeout(600)
+                return True
+        except Exception:
+            pass
+    try:
+        return bool(page.evaluate("""
+            (label) => {
+                const visible = el => {
+                    const r = el.getBoundingClientRect();
+                    const s = getComputedStyle(el);
+                    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
+                };
+                const els = Array.from(document.querySelectorAll('button,a,[role="button"],div,span'));
+                const target = els.find(el => visible(el) && (el.innerText || el.textContent || '').trim() === label);
+                if (target) { target.click(); return true; }
+                return false;
+            }
+        """, text))
+    except Exception:
+        return False
+
+
+def _fill_beauty_point_auth(page: Page, profile: dict) -> dict:
+    out = {"success": False, "error": None}
+    name = str(profile.get("name") or "").strip()
+    card_parts = [str(x).strip() for x in (profile.get("card_parts") or [])]
+    if not name or len(card_parts) != 4 or any(not p for p in card_parts):
+        out["error"] = "beauty_point profile name/card_parts invalid"
+        return out
+
+    try:
+        _click_text_button(page, "재인증", timeout=800)
+        page.wait_for_timeout(1200)
+        filled_result = page.evaluate("""
+            ({name, parts}) => {
+                const visible = el => {
+                    const r = el.getBoundingClientRect();
+                    const s = getComputedStyle(el);
+                    return r.width > 0 && r.height > 0 && !el.disabled && !el.readOnly &&
+                           s.visibility !== 'hidden' && s.display !== 'none';
+                };
+                const inputs = Array.from(document.querySelectorAll('input')).filter(visible);
+                const attr = (el) => [
+                    el.getAttribute('placeholder') || '',
+                    el.getAttribute('aria-label') || '',
+                    el.getAttribute('title') || '',
+                    el.getAttribute('name') || '',
+                    el.id || ''
+                ].join(' ');
+                let nameInput = inputs.find(el => /이름|성명|name/i.test(attr(el)));
+                if (!nameInput) {
+                    nameInput = inputs.find(el => {
+                        const type = (el.getAttribute('type') || 'text').toLowerCase();
+                        return type === 'text' || type === '';
+                    });
+                }
+                if (!nameInput) return {ok:false, reason:'name input not found', count:inputs.length};
+
+                const setValue = (el, value) => {
+                    el.focus();
+                    el.value = value;
+                    el.dispatchEvent(new Event('input', {bubbles:true}));
+                    el.dispatchEvent(new Event('change', {bubbles:true}));
+                };
+                setValue(nameInput, name);
+
+                const cardInputs = inputs
+                    .filter(el => el !== nameInput)
+                    .filter(el => {
+                        const a = attr(el);
+                        const type = (el.getAttribute('type') || '').toLowerCase();
+                        const max = parseInt(el.getAttribute('maxlength') || el.maxLength || '0', 10);
+                        return /카드|번호|card|point|tel|num/i.test(a) ||
+                               type === 'tel' || type === 'number' || max === 4 || el.inputMode === 'numeric';
+                    })
+                    .sort((a, b) => {
+                        const ar = a.getBoundingClientRect();
+                        const br = b.getBoundingClientRect();
+                        return (ar.top - br.top) || (ar.left - br.left);
+                    })
+                    .slice(0, 4);
+                if (cardInputs.length < 4) return {ok:false, reason:'card inputs not found', count:cardInputs.length};
+                for (let i = 0; i < 4; i++) setValue(cardInputs[i], parts[i]);
+                return {ok:true};
+            }
+        """, {"name": name, "parts": card_parts})
+        filled = bool(filled_result.get("ok")) if isinstance(filled_result, dict) else bool(filled_result)
+        if not filled:
+            reason = filled_result.get("reason") if isinstance(filled_result, dict) else None
+            out["error"] = f"뷰티포인트 고객인증 입력칸 자동 입력 실패: {reason or filled_result}"
+            return out
+        page.wait_for_timeout(500)
+        if not _click_text_button(page, "확인", timeout=1200):
+            out["error"] = "뷰티포인트 고객인증 확인 버튼 미발견"
+            return out
+        page.wait_for_timeout(1800)
+        out["success"] = True
+        print("    [BEAUTY] 뷰티포인트 재인증 완료")
+        return out
+    except Exception as e:
+        out["error"] = f"{e}"
+        return out
+
+
+def apply_beauty_point_on_order_complete(page: Page, account_idx: int | None = None, timeout_ms: int = 15000) -> dict:
+    """주문완료 페이지의 '뷰티포인트 적립 신청' 버튼 클릭.
+
+    결제 완료 직후 hmall 주문완료 화면에 있을 때만 가능한 후처리라,
+    마이페이지 검증처럼 다른 URL로 이동하기 전에 호출해야 한다.
+    """
+    out = {"success": False, "clicked": False, "reauth": False, "error": None}
+    cfg = _load_beauty_point_config()
+    state = _load_beauty_point_state()
+    active_key, profile = _active_beauty_profile(cfg)
+    need_reauth = _beauty_reauth_needed(account_idx, cfg, state)
+    deadline = time.time() + timeout_ms / 1000
+
+    def _candidate_pages():
+        pages = []
+        try:
+            if not page.is_closed():
+                pages.append(page)
+        except Exception:
+            pass
+        try:
+            for pg in page.context.pages:
+                if pg not in pages and not pg.is_closed() and "hmall.com" in pg.url:
+                    pages.append(pg)
+        except Exception:
+            pass
+        return pages
+
+    while time.time() < deadline:
+        for pg in _candidate_pages():
+            try:
+                body = pg.inner_text("body", timeout=1200)
+            except Exception:
+                continue
+            if "뷰티포인트 적립 신청" not in body and "주문이 완료" not in body and "주문완료" not in body:
+                continue
+            try:
+                pg.bring_to_front()
+            except Exception:
+                pass
+            try:
+                pg.evaluate("() => window.scrollTo(0, 0)")
+            except Exception:
+                pass
+
+            if need_reauth and profile:
+                auth = _fill_beauty_point_auth(pg, profile)
+                out["reauth"] = auth["success"]
+                if not auth["success"]:
+                    out["error"] = auth["error"]
+                    print(f"    [BEAUTY] 재인증 실패: {auth['error']}")
+                    return out
+                _mark_beauty_reauth(account_idx, active_key, profile)
+
+            clicked = False
+            for _ in range(4):
+                try:
+                    btn = pg.get_by_role("button", name=re.compile(r"뷰티포인트\s*적립\s*신청")).first
+                    if btn.count() > 0 and btn.is_visible(timeout=800):
+                        btn.click()
+                        clicked = True
+                        break
+                except Exception:
+                    pass
+                try:
+                    clicked = bool(pg.evaluate("""
+                        () => {
+                            const visible = el => {
+                                const r = el.getBoundingClientRect();
+                                const s = getComputedStyle(el);
+                                return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
+                            };
+                            const els = Array.from(document.querySelectorAll('button,a,[role="button"],div,span'));
+                            const target = els.find(el => visible(el) && (el.innerText || el.textContent || '').trim() === '뷰티포인트 적립 신청');
+                            if (target) { target.click(); return true; }
+                            return false;
+                        }
+                    """))
+                    if clicked:
+                        break
+                except Exception:
+                    pass
+                try:
+                    pg.mouse.wheel(0, 500)
+                except Exception:
+                    pass
+                pg.wait_for_timeout(400)
+
+            if not clicked:
+                continue
+
+            out["clicked"] = True
+            pg.wait_for_timeout(1500)
+            body_after_click = ""
+            try:
+                if not pg.is_closed():
+                    body_after_click = pg.inner_text("body", timeout=1200)
+            except Exception:
+                body_after_click = ""
+            if profile and "뷰티포인트 고객인증" in body_after_click:
+                auth = _fill_beauty_point_auth(pg, profile)
+                out["reauth"] = auth["success"]
+                if auth["success"]:
+                    _mark_beauty_reauth(account_idx, active_key, profile)
+                else:
+                    out["error"] = auth["error"]
+                    print(f"    [BEAUTY] 재인증 실패: {auth['error']}")
+                    return out
+            for txt in ("확인", "예", "신청"):
+                try:
+                    ok = pg.locator("button").filter(has_text=txt).first
+                    if ok.count() > 0 and ok.is_visible(timeout=500):
+                        ok.click()
+                        pg.wait_for_timeout(700)
+                        break
+                except Exception:
+                    pass
+            out["success"] = True
+            print("    [BEAUTY] 뷰티포인트 적립 신청 클릭 완료")
+            return out
+        time.sleep(0.5)
+
+    out["error"] = "주문완료 페이지에서 '뷰티포인트 적립 신청' 버튼 미발견"
+    print(f"    [BEAUTY] {out['error']}")
+    return out
+
+
 # ───────────── 폰 자동 결제 brige ─────────────
 
 
@@ -1130,6 +1437,8 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
                     )
                     checkout_result["phone_result"] = phone_res
                     if phone_res["success"]:
+                        # 주문완료 화면에서만 가능한 아모레퍼시픽 뷰티포인트 적립 신청.
+                        checkout_result["beauty_point_result"] = apply_beauty_point_on_order_complete(page, account_idx=idx)
                         # hmall 측 결제 완료 verify — mypage 결제완료 count 갱신 확인
                         page.wait_for_timeout(8000)
                         post_count = _read_mypage_paid_count(page)
