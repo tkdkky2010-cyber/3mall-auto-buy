@@ -53,6 +53,20 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "n_digits_pin": 6,
         "description": "현대카드 6자리 결제 비밀번호 (현대 PIN)",
     },
+    "hyundai_hmall_pin6": {
+        "flip_h": False,
+        "roi_y_frac": (0.33, 0.58),  # 5/29 ADB screencap 실측 10/10 (화면 중앙 키패드). 0.34~0.56 코어.
+        "layout": "fixed_3x4",       # 1-9 + 0(row4 중앙). 셔플 X — 좌표만 OCR로 확정([[feedback_phone_coord_no_estimate]]).
+        "n_digits_pin": 6,
+        "description": "현대몰(Hmall) PIN번호 결제 6자리 (고정 키패드, ADB screencap, 카메라 X)",
+    },
+    "hyundai_hmall_pw4": {
+        "flip_h": False,
+        "roi_y_frac": (0.35, 0.61),  # 5/29 ADB screencap 실측 10/10 (본인인증 카드비번, PIN보다 살짝 아래).
+        "layout": "fixed_3x4",       # 1-9 + 0(row4 중앙). 셔플 X.
+        "n_digits_pin": 4,
+        "description": "현대몰(Hmall) 본인인증 카드비밀번호 4자리 (고정 키패드, ADB screencap, 카메라 X)",
+    },
     "hana_code7": {
         "flip_h": False,
         "roi_y_frac": (0.50, 0.95),
