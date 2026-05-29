@@ -1,44 +1,39 @@
 {
   "package": "com.lcacApp",
   "screen": {"w": 1080, "h": 2400},
-  "captured_at": "2026-05-22",
-  "main": {
-    "pay_top":         {"x": 775, "y": 156, "note": "상단 '금융' 오른쪽 PAY (바코드 모양 gif). 종모양 왼쪽"},
-    "menu_loan":       {"x": 130, "y": 465, "note": "고유가지원"},
-    "menu_card_mgr":   {"x": 358, "y": 465, "note": "카드매니저"},
-    "menu_split":      {"x": 578, "y": 465, "note": "분할납부"},
-    "menu_benefit":    {"x": 798, "y": 465, "note": "혜택플러스"},
-    "menu_instant":    {"x": 1018, "y": 465, "note": "즉시결제"}
-  },
-  "pay_screen": {
-    "title_loca_pay":  {"x": 168, "y": 154},
-    "settings_top":    {"x": 843, "y": 154},
-    "close_top":       {"x": 978, "y": 154},
-    "card_selected":   {"x": 539, "y": 595, "note": "LOCA Professional 2224 선택됨"},
-    "tab_field_pay":   {"x": 235, "y": 1089, "note": "현장결제"},
-    "tab_qr_scan":     {"x": 536, "y": 1089, "note": "QR스캔"},
-    "tab_num_code":    {"x": 841, "y": 1089, "note": "숫자 코드 ← 사용자 flow target"}
-  },
-  "num_code_screen": {
-    "title":           {"x": 540, "y": 1274, "note": "'숫자코드 입력' 헤더"},
-    "keypad_dump_required": "셔플 키패드 — 매 진입마다 dump해서 숫자→좌표 매핑 재추출 필요",
-    "keypad_sample_layout": {
-      "comment": "이번 dump 기준 (셔플이라 매번 다름). 사용 시 dump 후 desc 파싱",
-      "row1_y": 1607, "row2_y": 1795, "row3_y": 1983, "row4_y": 2171,
-      "col_x": [180, 540, 900],
-      "special": {"삭제": "(180,2171)", "입력완료": "(900,2171)"}
-    }
+  "captured_at": "2026-05-29",
+  "flow_payment_note": "5/29 라이브 END-TO-END 검증 완료 (주문번호 20260529075522, 사용자 취소). hmall-driven (기존 standalone 롯데앱 숫자코드 모델 폐기). 흐름: 장바구니→구매하기→주문결제→결제수단변경→카드탭/신용카드선택 드롭다운→롯데카드→'{금액}원 결제하기'→롯데 결제방식화면 '로카페이(앱카드) 결제하기'→롯데앱(com.lcacApp) 자동이동 로카페이 결제요청 '결제하기'→간편번호 6자리(137601)→'결제 요청되었습니다' '확인'→hmall 복귀→자동 주문완료. ⚠️간편번호 키패드=셔플이지만 content-desc 로 dump 노출 → input_pin source=dump (OCR/카메라 불필요, 셔플 배열 매번 달라도 정확). ⚠️hmall 복귀 시 '결제완료' 버튼 없이 자동 주문완료 → 마지막 결제완료 step 은 ignore_fail=true skip 이 정상. 자동완주 검증=원결제하기(step11)부터(롯데 이미선택). 카드선택 step(결제수단변경~롯데) 은 수동탐색 코드화 → 다음 정상구매 때 전체 검증. 좌표 Galaxy S21+ 1080x2400.",
+  "ref_standalone_DEPRECATED": {
+    "note": "구 standalone 모델(롯데앱 직접 PAY→숫자코드) 참고용. hmall-driven 에선 미사용.",
+    "num_code_keypad": {"row1_y": 1607, "row2_y": 1795, "row3_y": 1983, "row4_y": 2171, "col_x": [180, 540, 900]}
   },
   "flow_payment": [
-    {"action": "tap", "target": "home_apps.롯데카드"},
-    {"action": "sleep_ms": 3500},
+    {"action": "tap", "xy": [1012, 151], "name": "장바구니 아이콘", "note": "전제: hmall 메인 foreground + 상품 장바구니에 담김"},
+    {"action": "sleep_ms", "ms": 2500, "note": "장바구니 로딩"},
     {"action": "close_popup_if_present"},
-    {"action": "tap", "xy": [775, 156], "name": "상단 PAY"},
-    {"action": "sleep_ms": 2000},
-    {"action": "tap", "xy": [841, 1089], "name": "숫자 코드"},
-    {"action": "sleep_ms": 2000},
-    {"action": "input_pin", "kind": "lotte_7digit_shuffle", "value": "<7자리 결제비번>", "completion_btn": "입력완료"},
-    {"action": "tap", "name": "결제하기", "TODO": "코드 입력 후 화면 dump 필요"},
-    {"action": "input_pin", "kind": "lotte_6digit_shuffle", "value": "137601"}
+    {"action": "tap_dump_text", "text": "구매하기", "exact": true, "timeout_sec": 8, "note": "장바구니 '구매하기'"},
+    {"action": "sleep_ms", "ms": 3500, "note": "주문·결제 페이지 로딩"},
+    {"action": "tap_dump_text", "text": "결제수단변경", "timeout_sec": 8, "note": "롯데카드 강제선택 시작 (자동선택이 뭐든 무관). ※주문페이지 close_popup 금지"},
+    {"action": "sleep_ms", "ms": 2000, "note": "결제수단 모달 ('카드' 탭 기본선택)"},
+    {"action": "tap_dump_text", "text": "신용카드 선택", "timeout_sec": 8, "note": "신용카드 드롭다운 열기"},
+    {"action": "sleep_ms", "ms": 1500, "note": "카드 목록 드롭다운"},
+    {"action": "tap_dump_text", "text": "롯데카드", "exact": true, "timeout_sec": 8, "note": "롯데카드 선택 → 모달 자동 반영/닫힘"},
+    {"action": "sleep_ms", "ms": 2500, "note": "주문·결제 페이지 (롯데카드 일시불 반영)"},
+    {"action": "tap_dump_text", "text": "원 결제하기", "timeout_sec": 8, "note": "'{금액}원 결제하기' substring(금액 가변)"},
+    {"action": "sleep_ms", "ms": 4000, "note": "롯데카드 결제방식 화면 (로카페이 앱카드 '추천')"},
+    {"action": "tap_dump_text", "text": "결제하기", "exact": true, "timeout_sec": 8, "note": "로카페이(앱카드) '결제하기'(파란 버튼). L.PAY/N pay/다른결제 아님"},
+    {"action": "wait_for_activity", "activity": "com.lcacApp", "timeout_sec": 15, "note": "롯데카드 앱 자동 이동 (PayRequestActivity)"},
+    {"action": "sleep_ms", "ms": 2500, "note": "로카페이 결제 요청 화면 (LOCA Professional 신용카드 기본)"},
+    {"action": "tap_dump_text", "text": "결제하기", "exact": true, "timeout_sec": 8, "note": "로카페이 결제요청 '결제하기' (신용카드 결제 — 노란 '잔액'/로카머니 아님)"},
+    {"action": "wait_for_activity", "activity": "SimpleNumberAuth", "timeout_sec": 12, "note": "간편번호 입력 화면 (SimpleNumberAuthActivity)"},
+    {"action": "sleep_ms", "ms": 1500, "note": "셔플 키패드 로드 (1회뿐)"},
+    {"action": "input_pin", "source": "dump", "value": "137601", "tap_delay_sec": 0.5,
+     "note": "간편번호 6자리 — 셔플이지만 content-desc 로 dump 노출 → 1회 dump 후 좌표 연속탭(OCR/카메라 불필요). 6자리 후 자동제출"},
+    {"action": "sleep_ms", "ms": 3000, "note": "인증 → '결제 요청되었습니다' 화면"},
+    {"action": "tap_dump_text", "text": "확인", "exact": true, "timeout_sec": 8, "note": "로카페이 '확인' → hmall 복귀"},
+    {"action": "wait_for_activity", "activity": "hmallapp", "timeout_sec": 15, "note": "hmall 복귀"},
+    {"action": "sleep_ms", "ms": 3000, "note": "hmall 결제 처리 ('진행 중인 결제화면에서 결제완료 버튼' 안내대로)"},
+    {"action": "tap_dump_text", "text": "결제완료", "timeout_sec": 8, "ignore_fail": true, "note": "hmall '결제완료' 버튼(있으면). 자동 완료/팝업이면 미발견 → ignore_fail skip. ⚠️정상 1회 주문 시 정확 동작 재검증"},
+    {"action": "sleep_ms", "ms": 6000, "note": "주문완료"}
   ]
 }

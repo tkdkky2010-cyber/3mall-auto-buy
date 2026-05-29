@@ -789,6 +789,30 @@ class FlowRunner:
             if "use_camera" in action:
                 self.use_camera = bool(action["use_camera"])
                 self._log(f"input_pin use_camera override → {self.use_camera}")
+            # source=="dump": content-desc 기반 키패드 (롯데 로카페이 간편번호 등).
+            # 셔플이어도 uiautomator dump 의 content-desc 로 숫자 위치 정확 — OCR/카메라 불필요.
+            # 셔플은 화면 로드시 1회뿐([[feedback_shuffle_keypad_ocr_once]]) → 1회 dump 후 value 연속탭.
+            if action.get("source") == "dump":
+                import subprocess as _sp, xml.etree.ElementTree as _ET, re as _re2
+                _sp.run(["adb","exec-out","uiautomator","dump","--compressed","/sdcard/_kp.xml"], capture_output=True)
+                _sp.run(["adb","pull","/sdcard/_kp.xml","/tmp/_kp.xml"], capture_output=True)
+                _BD = _re2.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
+                ks = {}
+                for n in _ET.parse("/tmp/_kp.xml").getroot().iter():
+                    dd = (n.attrib.get("content-desc","") or "")
+                    if dd.isdigit() and len(dd) == 1:
+                        mm = _BD.match(n.attrib.get("bounds",""))
+                        if mm:
+                            x1,y1,x2,y2 = map(int, mm.groups()); ks[dd] = ((x1+x2)//2, (y1+y2)//2)
+                need = set(value)
+                if not need.issubset(ks.keys()):
+                    raise FlowError(f"input_pin(dump): content-desc 키패드 부족 (got {sorted(ks)}, need {sorted(need)})")
+                self._log(f"input_pin(dump) content-desc {len(ks)}/10 매핑 → {len(value)}자리 연속탭 (셔플 무관)")
+                for _i, _d in enumerate(value, 1):
+                    _x, _y = ks[_d]; self.adb.tap(_x, _y)
+                    self._log(f"  [{_i}/{len(value)}] tap '{_d}' @ ({_x},{_y})"); time.sleep(delay)
+                self.use_camera = _saved_use_camera
+                return
             # 카메라 모드 = 카메라 frame 전체에서 OCR (y_min/y_max 무시)
             # ADB screencap 모드 = 폰 좌표 기준 키패드 영역 필터
             if self.use_camera:
