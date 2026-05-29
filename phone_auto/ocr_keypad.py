@@ -550,6 +550,44 @@ def vote_digits(
     return digit_map
 
 
+# ─── 하나 nFilter: 숫자 1~0 순서 고정 + 로고 decoy 2개 (OCR 숫자값 불필요) ───
+# 사용자 5/29: "셔플이지만 위에서부터 1234567890 순서로 채워짐 (로고 2개만 랜덤)".
+# OCR 로 숫자값을 읽으면 8↔0 혼동(하나 보안폰트) → 대신 로고칸만 검출하고 순서로 채움.
+# 로고칸 = 회색 하나페이 로고(검정 숫자 없음) → ROI 최소밝기 > dark_thresh. 숫자칸 = 검정 숫자(min~17).
+HANA_NFILTER_CELLS = [
+    (135, 1620), (405, 1620), (675, 1620), (945, 1620),  # row1
+    (135, 1788), (405, 1788), (675, 1788), (945, 1788),  # row2
+    (135, 1954), (405, 1954), (675, 1954), (945, 1954),  # row3
+]
+
+
+def map_sequential_logo(image_path, cells=None, seq: str = "1234567890",
+                        dark_thresh: int = 100) -> Optional[dict[str, tuple[int, int]]]:
+    """숫자 순서 고정 + 로고 decoy 키패드(하나 nFilter) 매핑.
+
+    각 칸 ROI 최소밝기로 로고칸(검정 숫자 없음=min>=dark_thresh) 제외 →
+    나머지(숫자칸)에 seq('1234567890') 순서대로 좌표 할당.
+    OCR 숫자값을 안 읽으므로 8↔0 혼동 무관. 5/29 두 셔플 캡처로 검증.
+    숫자칸 수 != len(seq) 면 None(안전 — 탭 금지)."""
+    import cv2
+    cells = cells or HANA_NFILTER_CELLS
+    img = cv2.imread(str(image_path))
+    if img is None:
+        return None
+    h, w = img.shape[:2]
+    num_cells = []
+    for x, y in cells:
+        roi = img[max(0, y - 55):min(h, y + 55), max(0, x - 110):min(w, x + 110)]
+        if roi.size == 0:
+            continue
+        g = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        if int(g.min()) < dark_thresh:   # 검정 숫자 픽셀 존재 → 숫자칸
+            num_cells.append((x, y))
+    if len(num_cells) != len(seq):
+        return None
+    return {seq[k]: num_cells[k] for k in range(len(seq))}
+
+
 def capture_frame(cam_idx: int = 0, warmup_frames: int = 10,
                   out_path: str | Path | None = None) -> Optional[str]:
     """웹캠 1프레임 캡처 (자동초점 안정화 위해 warmup_frames 만큼 throwaway).

@@ -813,6 +813,22 @@ class FlowRunner:
                     self._log(f"  [{_i}/{len(value)}] tap '{_d}' @ ({_x},{_y})"); time.sleep(delay)
                 self.use_camera = _saved_use_camera
                 return
+            # source=="sequential_logo": 숫자 1~0 순서 고정 + 로고 decoy 키패드 (하나 nFilter).
+            # 로고칸만 밝기로 검출, 나머지 칸에 순서대로 매핑 — OCR 숫자값 안 읽음(8↔0 혼동 회피).
+            if action.get("source") == "sequential_logo":
+                from .ocr_keypad import map_sequential_logo
+                self._cap()
+                mp = map_sequential_logo(self._tmp_img, cells=action.get("cells"))
+                if mp is None:
+                    raise FlowError("input_pin(sequential_logo): 숫자칸 수 불일치(로고 검출 실패) — 탭 중단")
+                if not set(value).issubset(mp.keys()):
+                    raise FlowError(f"input_pin(sequential_logo): {sorted(set(value)-set(mp))} 매핑 실패")
+                self._log(f"input_pin(sequential_logo) 로고칸 검출 → 순서매핑 {len(value)}자리 (8↔0 OCR 무관)")
+                for _i, _d in enumerate(value, 1):
+                    _x, _y = mp[_d]; self.adb.tap(_x, _y)
+                    self._log(f"  [{_i}/{len(value)}] tap '{_d}' @ ({_x},{_y})"); time.sleep(delay)
+                self.use_camera = _saved_use_camera
+                return
             # 카메라 모드 = 카메라 frame 전체에서 OCR (y_min/y_max 무시)
             # ADB screencap 모드 = 폰 좌표 기준 키패드 영역 필터
             if self.use_camera:
