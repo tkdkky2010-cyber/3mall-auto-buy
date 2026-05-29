@@ -76,10 +76,10 @@ KEYPAD_PRESETS: dict[str, dict] = {
     },
     "hana_pin6": {
         "flip_h": False,
-        "roi_y_frac": (0.70, 0.95),
-        "layout": "shuffled_4x3_with_logos",  # 4 cols × 3 rows, 12 cells 중 2개는 회색 하나 로고 (랜덤).
+        "roi_y_frac": (0.62, 0.95),  # 5/29 실측: 키패드 3행 y≈1619/1787/1953 (frac 0.675~0.815) + 4행 재배열. 4엔진 10/10.
+        "layout": "shuffled_4x3_with_logos",  # 4 cols × 3 rows, 12 cells 중 2개는 회색 하나페이 로고 decoy(숫자 없음).
         "n_digits_pin": 6,
-        "description": "하나카드 6자리 결제 비밀번호 (앱 비밀번호, 로고 2개 셔플)",
+        "description": "하나몰(Hmall) 하나Pay 간편결제 6자리 (com.hanaskcard.paycla nFilter, screencap 읽힘=ADB, 카메라 X)",
     },
     "nh_pin6": {
         "flip_h": False,
@@ -240,8 +240,12 @@ def _ocr_tesseract(img_path: str) -> list[tuple[str, int, int, float]]:
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray_2x = cv2.resize(gray, (gray.shape[1] * 2, gray.shape[0] * 2),
                          interpolation=cv2.INTER_CUBIC)
+    # numpy array 직접 전달 시 pytesseract↔py3.13 에서 'utf-8 0x89'(PNG) UnicodeDecodeError 발생 →
+    # 임시 PNG 파일 경로로 우회 (5/29 fix). 4엔진 voting 복구용.
+    _tmp2x = "/tmp/_tess_gray2x.png"
+    cv2.imwrite(_tmp2x, gray_2x)
     data = pt.image_to_data(
-        gray_2x,
+        _tmp2x,
         config="--psm 11 -c tessedit_char_whitelist=0123456789",
         output_type=pt.Output.DICT,
     )
@@ -429,15 +433,16 @@ def vote_digits(
     dist_threshold: int = 60,
     engines: tuple[str, ...] = ("easyocr", "tesseract", "vision", "gcv"),
     min_width: int = 720,
-    flip_h: bool = True,
+    flip_h: bool = False,
     roi_y_frac: Optional[tuple[float, float]] = None,
     verbose: bool = False,
     allow_partial: bool = False,
 ) -> Optional[dict[str, tuple[int, int]]]:
     """4엔진 union voting. 0~9 distinct cluster 매핑 성공 시 dict, 실패 시 None.
 
-    flip_h=True (default): Continuity Camera 의 미러 라이브 미리보기가 캡쳐에 그대로
-    포함되는 케이스 대응 — OCR 전 좌우 반전. Camo Studio 같은 raw UVC 캡쳐는 False.
+    flip_h=False (default): ADB screencap(폰 인앱 결제) = 미러 없음, 반전 안 함.
+    Continuity Camera 의 미러 라이브 미리보기를 OCR 할 때만 True (좌우 반전).
+    현재 전 카드 ADB screencap 이라 flip_h=False 가 정상. (preset 도 전부 flip_h=False)
 
     Auto-upscale: image width < min_width 면 2배 업스케일 후 OCR (저해상도 보강).
     좌표는 원본(또는 flip 적용 후) 좌표공간으로 반환.
