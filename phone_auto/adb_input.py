@@ -23,6 +23,7 @@ CLI:
 """
 from __future__ import annotations
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -53,6 +54,9 @@ def list_devices() -> list[str]:
 
 
 def pick_device(prefer_wifi: bool = True) -> str:
+    env = os.environ.get("ANDROID_SERIAL")   # 호출측이 고정한 기기 우선 (USB/무선 일관 타겟)
+    if env:
+        return env
     devs = list_devices()
     if not devs:
         raise ADBError("ADB 연결된 device 없음. `adb devices` 확인")

@@ -988,19 +988,30 @@ class FlowRunner:
             if not digits_cache and not self.use_camera and preset:
                 from .ocr_keypad import vote_digits
                 need = set(value)
-                for va in range(action.get("vote_retry", 4)):
-                    self._cap()
-                    vd = vote_digits(self._tmp_img, flip_h=preset.get("flip_h", False),
-                                     roi_y_frac=preset.get("roi_y_frac"), allow_partial=True) or {}
-                    if need.issubset(vd.keys()):
-                        digits_cache = dict(vd)
-                        digits_cache["__phone_coord__"] = (0, 0)  # phone 좌표 → cam→phone 변환 skip
-                        self._log(f"  [adb vote] {len(vd)}/10 ✓ need={sorted(need)} (attempt {va+1})")
+                # 엔진 사다리: preset engines(현대=vision+gcv, 0.6s) 먼저 → need 못 잡으면 4엔진 승급.
+                # 10/10(=need 전부) 못 잡으면 결제 실패라 4엔진을 여분으로 항상 남겨둠.
+                FULL4 = ("easyocr", "tesseract", "vision", "gcv")
+                primary = tuple(preset["engines"]) if preset.get("engines") else FULL4
+                ladder = [primary] + ([FULL4] if set(primary) != set(FULL4) else [])
+                for engines in ladder:
+                    for va in range(action.get("vote_retry", 3)):
+                        self._cap()
+                        vd = vote_digits(self._tmp_img, flip_h=preset.get("flip_h", False),
+                                         roi_y_frac=preset.get("roi_y_frac"), allow_partial=True,
+                                         engines=engines) or {}
+                        if need.issubset(vd.keys()):
+                            digits_cache = dict(vd)
+                            digits_cache["__phone_coord__"] = (0, 0)  # phone 좌표 → cam→phone 변환 skip
+                            self._log(f"  [adb vote] {len(vd)}/10 ✓ engines={engines} need={sorted(need)} (attempt {va+1})")
+                            break
+                        self._log(f"  [adb vote] {engines} attempt {va+1}: got {sorted(vd.keys())}, need {sorted(need)} — retry")
+                        time.sleep(0.5)
+                    if digits_cache:
                         break
-                    self._log(f"  [adb vote] attempt {va+1}: got {sorted(vd.keys())}, need {sorted(need)} — retry")
-                    time.sleep(0.5)
+                    if len(ladder) > 1 and engines is primary:
+                        self._log(f"  [adb vote] 2엔진 {primary} 실패 → 4엔진 승급")
                 if not digits_cache:
-                    raise FlowError(f"input_pin(adb): vote_digits가 PIN digit 전부 못잡음 (need {sorted(set(value))})")
+                    raise FlowError(f"input_pin(adb): 2엔진+4엔진 모두 PIN digit 못잡음 (need {sorted(set(value))})")
 
             cache_is_phone_coord = digits_cache.pop("__phone_coord__", None) is not None
             for i, d in enumerate(value, 1):

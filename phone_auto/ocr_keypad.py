@@ -58,6 +58,9 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.33, 0.58),  # 5/29 ADB screencap 실측 10/10 (화면 중앙 키패드). 0.34~0.56 코어.
         "layout": "fixed_3x4",       # 1-9 + 0(row4 중앙). 셔플 X — 좌표만 OCR로 확정([[feedback_phone_coord_no_estimate]]).
         "n_digits_pin": 6,
+        # 깨끗한 ADB screencap → vision+gcv 2엔진이면 10/10 (5/30 bench: 0.6s vs 4엔진 8s).
+        # easyocr/tesseract 제외 — union 으로도 vision 단독 '0' 누락 / gcv 단독 '8,9' 누락 상호보완.
+        "engines": ("vision", "gcv"),
         "description": "현대몰(Hmall) PIN번호 결제 6자리 (고정 키패드, ADB screencap, 카메라 X)",
     },
     "hyundai_hmall_pw4": {
@@ -65,6 +68,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.35, 0.61),  # 5/29 ADB screencap 실측 10/10 (본인인증 카드비번, PIN보다 살짝 아래).
         "layout": "fixed_3x4",       # 1-9 + 0(row4 중앙). 셔플 X.
         "n_digits_pin": 4,
+        "engines": ("vision", "gcv"),  # PW4 는 단일엔진 누락 발생 → vision+gcv union 필수 (5/30 bench).
         "description": "현대몰(Hmall) 본인인증 카드비밀번호 4자리 (고정 키패드, ADB screencap, 카메라 X)",
     },
     "hana_code7": {
