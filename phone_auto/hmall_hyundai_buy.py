@@ -71,7 +71,7 @@ BC_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "bc_paybook_isp.json"  # BC(
 # 카드사 → '카드 선택' 그리드 표기명 (카드할인 행 토큰은 키, 그리드명은 값). 결제 SDK 있는 카드만 활성.
 CARD_GRID_NAME = {"현대": "현대카드", "롯데": "롯데카드", "하나": "하나카드", "KB": "KB국민카드",
                   "삼성": "삼성카드", "NH": "NH농협카드", "BC": "비씨카드"}
-CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC")   # SDK 코드화 카드 (BC=포팅 후 라이브검증 대기). 나머지는 SDK 추가 시 확장
+CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC", "삼성")   # SDK 코드화 카드 (삼성=PAYCO 라이브검증중). 나머지는 SDK 추가 시 확장
 
 # 카드할인 캐러셀 OCR 토큰 → 카드키 별칭.
 # 근거(실측): 현대 할인날 캐러셀 = "현대 5% 즉시할인" + "<금액>원"(별 item). 금액은 카트 합계에 따라 매번
@@ -686,6 +686,44 @@ def pay_bc() -> dict:
     return out
 
 
+def pay_samsung() -> dict:
+    """삼성카드 SDK (PAYCO 경유, 라이브검증 2026-05-31 #2 주문 20260531113065) — **삼성카드 선택된 주문서에서 호출**.
+    원결제하기(OCR) → 간편결제 'PAYCO,삼성페이'(OCR) → PAYCO 박스(>)(OCR) → PAYCO 결제하기(OCR)
+    → 결제비밀번호 4x3 셔플(137601, screencap 2엔진 OCR `payco_pin6`) → ⚠️'확인'(쇼핑몰 복귀=결제확정) → hmall 주문완료.
+    ⚠️ PAYCO는 PIN 후 '주문 중이던 쇼핑몰로 이동하면 결제가 완료됩니다'의 **'확인'을 눌러야** hmall 복귀+결제 확정.
+    ⚠️ 삼성카드 PAYCO 사전등록 전제(결제수단변경 그리드 삼성카드 선택만으로 PAYCO에 잡힘). PIN 셔플은 화면당 1회(재배열 X)."""
+    out = {"step": "samsung"}
+    if not ocr_tap("결제하기", contains=True):              # 1) 원 결제하기 (hmall WebView OCR)
+        out["err"] = "원결제하기 실패"; return out
+    if not wait_text("PAYCO", timeout=12):                  # 2) 간편결제 selector (PAYCO,삼성페이)
+        out["err"] = "간편결제 selector 미도달"; return out
+    if not ocr_tap("PAYCO", contains=True):                 # 'PAYCO, 삼성페이' 선택
+        out["err"] = "PAYCO 옵션 선택 실패"; return out
+    if not wait_text("다시 선택하기", timeout=10):           # 3) 간편결제 PAYCO 박스 화면
+        out["err"] = "PAYCO 박스 화면 미도달"; return out
+    ocr_tap("PAYCO", contains=True); time.sleep(0.5)        # PAYCO 박스(>) 탭 → PAYCO 결제 진입
+    out["step"] = "payco_confirm"
+    if not wait_text("PAYCO 간편결제", timeout=12):          # 4) PAYCO 결제 확인화면 (금액·삼성카드)
+        out["err"] = "PAYCO 결제확인 미도달"; return out
+    if not ocr_tap("결제하기", contains=True):              # PAYCO 결제하기 → PIN
+        out["err"] = "PAYCO 결제하기 실패"; return out
+    if not wait_text("결제 비밀번호", timeout=10):           # 5) 결제비밀번호 화면 (4x3 셔플)
+        out["err"] = "PIN 화면 미도달"; return out
+    out["step"] = "pin"
+    try:                                                    # 4x3 셔플 137601 (screencap 2엔진 OCR)
+        FlowRunner(use_camera=False).run_action(
+            {"action": "input_pin", "preset": "payco_pin6", "value": "137601",
+             "tap_delay_sec": 0.6, "use_camera": False})
+    except Exception as e:
+        out["err"] = f"PIN 입력 실패: {e}"; return out
+    if not wait_text("결제가 완료됩니다", timeout=12):        # 6) ⚠️ '확인' 눌러야 완료 (쇼핑몰 복귀)
+        out["err"] = "PAYCO 완료확인 화면 미도달"; return out
+    if not ocr_tap("확인", contains=True):
+        out["err"] = "PAYCO 확인(완료) 탭 실패"; return out
+    out["ok"] = True
+    return out
+
+
 def detect_card() -> str | None:
     """주문서에서 '카드할인' 섹션까지 **스크롤하며** 금액행 카드사 토큰 추출 ('현대 5% 즉시할인'→'현대').
     구매하기 직후 주문서 상단엔 상품정보뿐 → 카드할인은 아래라 스크롤 필수(#4 실측). 없으면 None."""
@@ -906,6 +944,11 @@ def buy_one(idx: int, card: str | None = None) -> dict:
         res["pay"] = bp_
         if not bp_.get("ok"):
             res["status"] = f"BC_FAIL@{bp_.get('step')}:{bp_.get('err')}"; return res
+    elif use_card == "삼성":
+        sp = pay_samsung()
+        res["pay"] = sp
+        if not sp.get("ok"):
+            res["status"] = f"SAMSUNG_FAIL@{sp.get('step')}:{sp.get('err')}"; return res
     lap(f"{use_card} 결제 → 주문완료")
     # 주문완료 확인 (공통, 전 카드): orderComplete 렌더 대기 = ① beauty 타이밍 확보(KB) ② 거절 감지(BC 한도초과)
     oc = wait_order_complete(timeout=20)

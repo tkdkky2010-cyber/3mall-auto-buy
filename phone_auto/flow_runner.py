@@ -988,10 +988,11 @@ class FlowRunner:
             if not digits_cache and not self.use_camera and preset:
                 from .ocr_keypad import vote_digits
                 need = set(value)
-                # 엔진 사다리: preset engines(현대=vision+gcv, 0.6s) 먼저 → need 못 잡으면 4엔진 승급.
+                # 엔진 사다리: 2엔진(vision=macOS + gcv, ~0.6s) 먼저 → need 못 잡으면 4엔진 승급.
+                # ★ 전 카드 공통 기본=2엔진 (engines 미지정 시). preset에 engines 명시하면 그것 우선.
                 # 10/10(=need 전부) 못 잡으면 결제 실패라 4엔진을 여분으로 항상 남겨둠.
                 FULL4 = ("easyocr", "tesseract", "vision", "gcv")
-                primary = tuple(preset["engines"]) if preset.get("engines") else FULL4
+                primary = tuple(preset["engines"]) if preset.get("engines") else ("vision", "gcv")
                 ladder = [primary] + ([FULL4] if set(primary) != set(FULL4) else [])
                 for engines in ladder:
                     for va in range(action.get("vote_retry", 3)):

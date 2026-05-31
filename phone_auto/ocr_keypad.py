@@ -148,6 +148,13 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "n_digits_pin": 6,
         "description": "BC 카드 결제 6자리 비밀번호 (보라 배경, 셔플) — 로그인 비번 별도 (bc_login6)",
     },
+    "payco_pin6": {
+        "flip_h": False,
+        "roi_y_frac": (0.64, 0.90),  # 삼성 PAYCO 결제비번 키패드 y≈1613/1859/2105 (실측 2026-05-31)
+        "layout": "shuffled_4x3",     # 4 cols × 3 rows (BC PIN6 와 동일 구조), screencap 읽힘 → 2엔진 OCR
+        "n_digits_pin": 6,
+        "description": "삼성카드 PAYCO 간편결제 6자리 결제 비밀번호 (셔플 4x3, FLAG_SECURE 아님=screencap)",
+    },
     "lotte_code7": {
         "flip_h": False,
         "roi_y_frac": (0.62, 0.95),
