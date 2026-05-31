@@ -66,10 +66,12 @@ PIN_DOT = (540, 660)         # PIN 동그라미 영역 — 탭하면 고정 키�
 BP_PATH = ROOT / "secrets" / "beauty_point.json"
 LOTTE_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "lotte_card.json"   # 검증된 롯데 결제흐름(5/29)
 KB_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "kb_kbpay.json"        # KB 결제흐름(DRAFT, 라이브검증중)
+HANA_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "hana_card.json"     # 하나 결제흐름(5/29 nFilter검증, flow[16:]=하나앱)
+BC_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "bc_paybook_isp.json"  # BC(페이북) 결제흐름(드래프트, flow[6:]=KCP다음~페이북앱)
 # 카드사 → '카드 선택' 그리드 표기명 (카드할인 행 토큰은 키, 그리드명은 값). 결제 SDK 있는 카드만 활성.
 CARD_GRID_NAME = {"현대": "현대카드", "롯데": "롯데카드", "하나": "하나카드", "KB": "KB국민카드",
                   "삼성": "삼성카드", "NH": "NH농협카드", "BC": "비씨카드"}
-CARDS_SUPPORTED = ("현대", "롯데", "KB")   # SDK 코드화 카드 (KB=라이브 검증중). 나머지는 SDK 추가 시 확장
+CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC")   # SDK 코드화 카드 (BC=포팅 후 라이브검증 대기). 나머지는 SDK 추가 시 확장
 
 # 카드할인 캐러셀 OCR 토큰 → 카드키 별칭.
 # 근거(실측): 현대 할인날 캐러셀 = "현대 5% 즉시할인" + "<금액>원"(별 item). 금액은 카트 합계에 따라 매번
@@ -489,14 +491,15 @@ def _pick_card_from_grid(grid_name: str = "현대카드") -> bool:
         return False
     _adb().tap(op["cx"], op["cy"]); time.sleep(1.8)
     its2 = _ocr_texts(cap())
-    if not any(it["text"].strip() == grid_name for it in its2):   # 신용카드 선택 드롭다운 한 단계 더
+    if not any(it["text"].strip().startswith(grid_name) for it in its2):   # 신용카드 선택 드롭다운 한 단계 더
         sc = next((it for it in its2 if "신용카드 선택" in it["text"]), None)
         if sc:
             _adb().tap(sc["cx"], sc["cy"]); time.sleep(1.5)
     # '카드 선택' 그리드는 카드 많아 길 수 있음 → grid_name 안 보이면 그리드 영역 스크롤하며 탐색
     hd = None
     for _ in range(5):
-        hd = next((it for it in _ocr_texts(cap()) if it["text"].strip() == grid_name), None)
+        # startswith: 'BC'→'비씨카드'가 그리드엔 '비씨카드(페이북)'로 뜸(접미사) 대응. 정확매칭의 상위집합.
+        hd = next((it for it in _ocr_texts(cap()) if it["text"].strip().startswith(grid_name)), None)
         if hd:
             break
         _adb().swipe(540, 1750, 540, 1050, 400); time.sleep(0.8)   # 그리드 스크롤 다운
@@ -585,6 +588,29 @@ def _wait_app(pkg: str, timeout: float = 15) -> bool:
     return False
 
 
+# 주문완료(orderComplete) / 결제거절 OCR 마커 (주문서 단계엔 없는 토큰만 → 오탐 방지)
+ORDER_DONE_MARKERS = ("주문이 완료", "주문번호", "재인증")          # orderComplete 페이지에만 등장
+ORDER_FAIL_MARKERS = ("승인 요청 실패", "한도초과", "승인 실패", "결제 실패", "실패하였습니다")  # KCP/카드 거절
+
+
+def wait_order_complete(timeout: float = 20) -> dict:
+    """결제 직후 hmall orderComplete 렌더를 폴링 (전 카드 공통). 두 목적:
+      ① 주문완료 마커 확인 → beauty가 너무 일찍 돌아 '재인증' 못 찾는 타이밍버그 해결(KB #1 실측).
+      ② 거절 마커 감지 → 'hmall 복귀=성공' 오보고 방지(BC 한도초과 CC61 실측).
+    완료=ok:True, 거절=ok:False+reason, 타임아웃=ok:False."""
+    end = time.time() + timeout
+    while time.time() < end:
+        txt = " ".join(it["text"] for it in _ocr_texts(cap()))
+        for fm in ORDER_FAIL_MARKERS:
+            if fm in txt:
+                return {"ok": False, "reason": f"결제거절:{fm}"}
+        for dm in ORDER_DONE_MARKERS:
+            if dm in txt:
+                return {"ok": True, "reason": dm}
+        time.sleep(0.8)
+    return {"ok": False, "reason": "주문완료 미확인(timeout — 거절/지연 가능)"}
+
+
 def pay_kb() -> dict:
     """KB국민카드 SDK (라이브검증 2026-05-31 #1, 주문 20260531079448). KB국민카드 선택된 주문서에서.
     원결제하기(OCR) → 'KB Pay 결제' 박스(OCR, 노란 앱카드) → KB앱(com.kbcard.cxh.appcard) 결제하기(dump)
@@ -612,6 +638,51 @@ def pay_kb() -> dict:
     if not _wait_app("com.hmallapp", timeout=15):                    # 4) hmall 복귀
         out["err"] = "hmall 복귀 실패"; return out
     out["ok"] = True
+    return out
+
+
+def pay_hana() -> dict:
+    """하나카드 SDK — **하나카드 선택된 주문서에서 호출**. 주문완료까지. (롯데와 동일 패턴: hmall-side OCR + 카드앱 flow재사용)
+    hmall-side(원결제하기·'하나Pay 하나카드 결제' 박스)=OCR. 하나앱(com.hanaskcard.paycla) 네이티브=hana_card.json flow[16:] 재사용.
+    ⚠️ 하나 nFilter 키패드 = content-desc 마스킹(dump 불가)이나 **screencap 읽힘(FLAG_SECURE 아님)** → `input_pin source=sequential_logo`
+       (로고 decoy칸 검출로 1~0 순서매핑, 8↔0 OCR혼동 회피). KB/롯데(dump)와 다름 — json이 알아서 처리.
+    ⚠️ 방치 시 하나 보안앱 '재실행' 경고 → 빠른 완주 필수(flow에 sleep만, 추가 지체 금지)."""
+    out = {"step": "hana"}
+    if not ocr_tap("결제하기", contains=True):           # 1) 원 결제하기 (hmall WebView OCR)
+        out["err"] = "원결제하기 실패"; return out
+    if not wait_text("하나카드 결제", timeout=15):        # 2) 하나카드 결제방식 화면(로딩 느려 여유)
+        out["err"] = "하나 결제방식 화면 미도달"; return out
+    if not ocr_tap("하나카드 결제", contains=True):       # '하나Pay 하나카드 결제' 박스 (MG+/간편결제/SMS/일반 아님)
+        out["err"] = "하나Pay 하나카드 결제 박스 실패"; return out
+    lap("하나: 하나Pay 박스 → 하나앱 진입")
+    # 3) 하나앱(com.hanaskcard.paycla) 자동이동 → 검증흐름 재사용 (flow[16]=wait_for_activity hanaskcard부터)
+    flow = json.loads(HANA_FLOW.read_text(encoding="utf-8"))["flow_payment"]
+    try:
+        FlowRunner(use_camera=False).run(flow[16:], {})  # 하나앱 대기→다음→nFilter6(OCR sequential_logo)→hmall복귀
+        out["ok"] = True
+    except Exception as e:
+        out["err"] = f"하나앱 SDK 실패: {e}"
+    return out
+
+
+def pay_bc() -> dict:
+    """BC카드(페이북/KCP) SDK — **비씨카드 선택된 주문서에서 호출**. 주문완료까지. (롯데/하나와 동일 패턴)
+    hmall-side(원결제하기)=OCR. 이후 KCP '다음'→페이북앱(kvp.jjy.MispAndroid320)=bc_paybook_isp.json **flow[6:]** 재사용.
+    ⚠️⚠️ **페이북앱 기본 결제수단='페이북 머니'(현금/포인트)** — flow[10]에서 반드시 '카드 결제' 선택 + flow[12] verify_selected
+       하드가드(페이북머니 selected면 FlowError로 결제중단)가 내장. **페이북머니로 결제 절대금지.**
+    ⚠️ BC 결제비번 키패드 = 셔플, FLAG_SECURE 아님(screencap) → `input_pin kind=bc_pin6`(4엔진 vote_digits 매핑). dump 아님.
+    ⚠️ 미검증 드래프트(2026-05-22 캡처) — 첫 라이브에서 KCP '다음'(dump vs OCR)·결제수단시트 문구 조정 가능."""
+    out = {"step": "bc"}
+    if not ocr_tap("결제하기", contains=True):       # 1) 원 결제하기 (hmall WebView OCR; hmall이 비씨카드 적용)
+        out["err"] = "원결제하기 실패"; return out
+    lap("BC: 원결제하기 → KCP/페이북")
+    # 2) KCP '다음' → 페이북앱 → 카드결제(가드) → 결제하기 → PIN6 → hmall복귀 (flow[6]=sleep4000부터)
+    flow = json.loads(BC_FLOW.read_text(encoding="utf-8"))["flow_payment"]
+    try:
+        FlowRunner(use_camera=False).run(flow[6:], {})
+        out["ok"] = True
+    except Exception as e:
+        out["err"] = f"BC/페이북앱 SDK 실패: {e}"
     return out
 
 
@@ -825,7 +896,22 @@ def buy_one(idx: int, card: str | None = None) -> dict:
         res["pay"] = kp
         if not kp.get("ok"):
             res["status"] = f"KB_FAIL@{kp.get('step')}:{kp.get('err')}"; return res
+    elif use_card == "하나":
+        hp = pay_hana()
+        res["pay"] = hp
+        if not hp.get("ok"):
+            res["status"] = f"HANA_FAIL@{hp.get('step')}:{hp.get('err')}"; return res
+    elif use_card == "BC":
+        bp_ = pay_bc()
+        res["pay"] = bp_
+        if not bp_.get("ok"):
+            res["status"] = f"BC_FAIL@{bp_.get('step')}:{bp_.get('err')}"; return res
     lap(f"{use_card} 결제 → 주문완료")
+    # 주문완료 확인 (공통, 전 카드): orderComplete 렌더 대기 = ① beauty 타이밍 확보(KB) ② 거절 감지(BC 한도초과)
+    oc = wait_order_complete(timeout=20)
+    res["order_complete"] = oc
+    if not oc.get("ok"):
+        res["status"] = f"ORDER_NOT_COMPLETE:{use_card}:{oc.get('reason')}"; return res
     close_home_popup()   # 주문완료 화면에도 광고 팝업이 떠 '재인증' 버튼을 가림 → 닫기 (실측 #5)
     # 뷰티포인트 재인증
     prof_cfg = json.loads(BP_PATH.read_text(encoding="utf-8"))
