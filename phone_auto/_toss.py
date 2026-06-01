@@ -77,6 +77,26 @@ def main() -> int:
         time.sleep(1.0)
         print("[back]", flush=True)
         shot(serial)
+    elif cmd == "tapt":  # OCR 텍스트로 찾아 탭 (화면 적응)
+        q = "".join(a[1:]).replace(" ", "")
+        BLOCK = {"지금변경하기"}  # 실수로라도 누르면 안 되는 버튼
+        if q in BLOCK:
+            print(f"[tapt] 차단 버튼 '{q}' 거부", flush=True); return 3
+        path = os.path.join(TMP, "_toss_now.png")
+        with open(path, "wb") as f:
+            subprocess.run([hw.ADB, "-s", serial, "exec-out", "screencap", "-p"], stdout=f)
+        cand = [t for t in m._ocr_texts(path) if q in t["text"].replace(" ", "")]
+        if not cand:
+            print(f"[tapt] '{q}' 못 찾음", flush=True); shot(serial); return 2
+        t = cand[0]
+        subprocess.run([hw.ADB, "-s", serial, "shell", "input", "tap", str(t["cx"]), str(t["cy"])])
+        time.sleep(1.3)
+        print(f"[tapt '{q}'] @ ({t['cx']},{t['cy']})", flush=True)
+        shot(serial)
+    elif cmd == "type":  # adb input text (argv 전달 → 셸 미경유, 특수문자 안전)
+        subprocess.run([hw.ADB, "-s", serial, "shell", "input", "text", a[1]])
+        time.sleep(0.6)
+        print(f"[type {len(a[1])}자]", flush=True)
     else:
         print("unknown cmd"); return 2
     return 0
