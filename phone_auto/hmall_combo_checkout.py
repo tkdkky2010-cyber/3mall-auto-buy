@@ -4,7 +4,7 @@
 비었으면 skip(이미 완료) → 로그아웃 → 다음.
 
 전제: 폰 hmall 앱 + adb 연결. 카트는 PC(first_cart)로 사전 세팅됨. 현대카드가 결제수단 기본.
-실돈 — DRY 없음. 결제 후 PAY_DELAY(기본 7분, 본사 추적 회피).
+실돈 — DRY 없음. 설화수(콤보)는 계정 간 대기 없음(PAY_DELAY 기본 0). 7분 추적회피 정책은 Hmall 식품 buy/run.py 전용.
 
 CLI:
     python3 -m phone_auto.hmall_combo_checkout            # 전체 plan
@@ -24,8 +24,8 @@ from phone_auto import hmall_webview as hw
 
 PY = os.environ.get("PYTHON_BIN", "/usr/bin/python3")
 PLAN = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-PAY_DELAY = int(os.environ.get("PAY_DELAY_SEC", "420"))   # 결제 후 (본사 추적 회피)
-SKIP_DELAY = int(os.environ.get("SKIP_DELAY_SEC", "8"))
+PAY_DELAY = int(os.environ.get("PAY_DELAY_SEC", "0"))   # 설화수 = 계정 간 대기 없음 (7분은 Hmall 식품 전용)
+SKIP_DELAY = int(os.environ.get("SKIP_DELAY_SEC", "0"))
 
 
 def run_hyundai(serial: str) -> tuple[int, str]:

@@ -30,6 +30,36 @@ from run import CART_URL, CDP_ENDPOINT, login, clear_cart, add_to_cart  # type: 
 import _common as C
 from chrome_launcher import ensure_chrome
 
+
+def _pick_cdp_backend(endpoint: str):
+    """CDP connect 백엔드 선택 — patchright 우선. Chrome 147+ 에서 patchright connect_over_cdp 가
+    행(무한대기)/에러 가능(run.py 와 동일 이슈) → 12s 프로브로 확인, 실패/행이면 plain playwright fallback.
+    (2026-06-01 step1 Hmall 이 patchright connect 에서 15분 무한대기한 사건 재발방지.)"""
+    import signal
+    try:
+        from patchright.sync_api import sync_playwright as _patch
+    except ImportError:
+        from playwright.sync_api import sync_playwright as _plain
+        return _plain
+
+    def _on_alarm(_s, _f):
+        raise TimeoutError("patchright connect_over_cdp 12s 초과 (행 의심)")
+    old = signal.signal(signal.SIGALRM, _on_alarm)
+    try:
+        signal.alarm(12)
+        with _patch() as pw:
+            pw.chromium.connect_over_cdp(endpoint, timeout=10000).close()
+        signal.alarm(0)
+        print("[INFO] CDP backend: patchright")
+        return _patch
+    except Exception as e:
+        signal.alarm(0)
+        print(f"[WARN] patchright CDP 연결 실패/행 ({str(e)[:100]}) → plain playwright fallback")
+        from playwright.sync_api import sync_playwright as _plain
+        return _plain
+    finally:
+        signal.signal(signal.SIGALRM, old)
+
 IDS = json.load(open(ROOT / "hsmaster" / "config" / "sulwhasoo-ids.json"))["ids"]
 
 # 캐러셀 카드명 → 페이백계수
@@ -232,15 +262,11 @@ def main(argv=None):
         combos = [(i, c) for i, c in combos if i == only_idx]
     print(f"[INFO] 처리 조합 {len(combos)}개")
 
-    try:
-        from patchright.sync_api import sync_playwright
-    except ImportError:
-        from playwright.sync_api import sync_playwright
-
     results: list[dict] = []
     ensure_chrome(C.CDP_PORT)
+    sync_playwright = _pick_cdp_backend(CDP_ENDPOINT)   # patchright 우선, Chrome 147+ 행/에러 시 plain playwright (12s 프로브)
     with sync_playwright() as pw:
-        browser = pw.chromium.connect_over_cdp(CDP_ENDPOINT)
+        browser = pw.chromium.connect_over_cdp(CDP_ENDPOINT, timeout=20000)
         context = browser.contexts[0] if browser.contexts else browser.new_context()
         page = context.new_page()
         page.set_default_timeout(25000)

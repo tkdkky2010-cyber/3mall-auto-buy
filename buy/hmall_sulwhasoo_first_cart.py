@@ -28,7 +28,7 @@ except Exception:
 IDS = json.loads((ROOT / "hsmaster" / "config" / "sulwhasoo-ids.json").read_text(encoding="utf-8"))["ids"]
 ACCOUNTS = json.loads(Path(hmall.ACCOUNTS_FILE).read_text(encoding="utf-8"))["accounts"]
 
-ACCOUNT_DELAY_SEC = 20
+ACCOUNT_DELAY_SEC = 0  # 설화수 = 계정 간 대기 없음 (7분 추적회피 정책은 Hmall 식품 buy/run.py 전용)
 
 COMBOS: dict[str, list[tuple[str, int]]] = {
     "2": [("d", 1), ("f", 1), ("g", 2)],
