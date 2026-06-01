@@ -23,6 +23,7 @@ CLI:
 from __future__ import annotations
 import json
 import os
+import shutil
 import subprocess
 import time
 import urllib.request
@@ -31,7 +32,8 @@ from pathlib import Path
 import websocket  # websocket-client
 
 ROOT = Path(__file__).resolve().parent.parent
-ADB = os.environ.get("ADB_BIN", "/Users/jasonkim/platform-tools/adb")
+# adb 위치: ① ADB_BIN 환경변수 → ② PATH 자동검색(맥미니=homebrew /opt, 맥북에어=~/platform-tools) → ③ 폴백
+ADB = os.environ.get("ADB_BIN") or shutil.which("adb") or "/Users/jasonkim/platform-tools/adb"
 LOCAL_PORT = int(os.environ.get("HMALL_CDP_PORT", "9223"))
 CART_URL = "https://www.hmall.com/mo/odb/basktList"
 ACCOUNTS_FILE = Path(os.environ.get("HMALL_CONFIG_PATH") or (ROOT / "hmall_config.json"))

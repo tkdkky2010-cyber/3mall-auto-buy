@@ -71,7 +71,8 @@ BC_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "bc_paybook_isp.json"  # BC(
 # 카드사 → '카드 선택' 그리드 표기명 (카드할인 행 토큰은 키, 그리드명은 값). 결제 SDK 있는 카드만 활성.
 CARD_GRID_NAME = {"현대": "현대카드", "롯데": "롯데카드", "하나": "하나카드", "KB": "KB국민카드",
                   "삼성": "삼성카드", "NH": "NH농협카드", "BC": "비씨카드"}
-CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC", "삼성")   # SDK 코드화 카드 (삼성=PAYCO 라이브검증중). 나머지는 SDK 추가 시 확장
+CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC", "삼성", "NH")   # 7개 전부 라이브검증 완료 (NH=PAYCO 경유, 2026-06-01)
+# ⏳ 토스페이(간편결제 채널) 미구현 — 레포 루트 TOSS_PAY_NOTES.md 참고. PIN=dump 셔플(source=dump, 137601, FLAG_SECURE). 토스 할인날 라이브 작성+검증 권장. 카카오페이=타 폰 사용중이라 제외.
 
 # 카드할인 캐러셀 OCR 토큰 → 카드키 별칭.
 # 근거(실측): 현대 할인날 캐러셀 = "현대 5% 즉시할인" + "<금액>원"(별 item). 금액은 카트 합계에 따라 매번
@@ -666,12 +667,13 @@ def pay_hana() -> dict:
 
 
 def pay_bc() -> dict:
-    """BC카드(페이북/KCP) SDK — **비씨카드 선택된 주문서에서 호출**. 주문완료까지. (롯데/하나와 동일 패턴)
+    """BC카드(페이북/KCP) SDK (라이브검증 2026-06-01 #3 주문 20260601059538, 490,000원 비씨카드 일시불 + 뷰티 적립완료)
+    — **비씨카드 선택된 주문서에서 호출**. 주문완료까지. (롯데/하나와 동일 패턴)
     hmall-side(원결제하기)=OCR. 이후 KCP '다음'→페이북앱(kvp.jjy.MispAndroid320)=bc_paybook_isp.json **flow[6:]** 재사용.
     ⚠️⚠️ **페이북앱 기본 결제수단='페이북 머니'(현금/포인트)** — flow[10]에서 반드시 '카드 결제' 선택 + flow[12] verify_selected
        하드가드(페이북머니 selected면 FlowError로 결제중단)가 내장. **페이북머니로 결제 절대금지.**
     ⚠️ BC 결제비번 키패드 = 셔플, FLAG_SECURE 아님(screencap) → `input_pin kind=bc_pin6`(4엔진 vote_digits 매핑). dump 아님.
-    ⚠️ 미검증 드래프트(2026-05-22 캡처) — 첫 라이브에서 KCP '다음'(dump vs OCR)·결제수단시트 문구 조정 가능."""
+    ✅ 라이브검증(2026-06-01): KCP '다음'=tap_dump_text·페이북앱 flow[6:] 그대로 통과. 단 카트가 BC 거래한도 이하여야(이전 CC61 한도초과 거절)."""
     out = {"step": "bc"}
     if not ocr_tap("결제하기", contains=True):       # 1) 원 결제하기 (hmall WebView OCR; hmall이 비씨카드 적용)
         out["err"] = "원결제하기 실패"; return out
@@ -717,6 +719,52 @@ def pay_samsung() -> dict:
     except Exception as e:
         out["err"] = f"PIN 입력 실패: {e}"; return out
     if not wait_text("결제가 완료됩니다", timeout=12):        # 6) ⚠️ '확인' 눌러야 완료 (쇼핑몰 복귀)
+        out["err"] = "PAYCO 완료확인 화면 미도달"; return out
+    if not ocr_tap("확인", contains=True):
+        out["err"] = "PAYCO 확인(완료) 탭 실패"; return out
+    out["ok"] = True
+    return out
+
+
+def pay_nh() -> dict:
+    """NH농협카드 SDK (PAYCO 경유, 라이브검증 2026-06-01 #3 주문 20260601062093, NH농협카드 일시불 + 뷰티 적립완료)
+    — **NH농협카드 선택된 주문서에서 호출**. 주문완료까지.
+    ⚠️ 농협 결제앱(NH앱)은 무선/USB 디버깅 전부 차단 → NH앱 직결 불가. 대신 PAYCO 우회(NH카드 PAYCO 사전등록).
+       → 농협카드 팝업에서 **우측상단 '다른 결제' → 우측하단 'PAYCO'** (이 팝업/PAYCO 화면은 FLAG_SECURE 아님, OCR 정상 실측).
+    경로: 원결제하기(OCR) → 농협카드 팝업 '다른 결제'(OCR) → 'PAYCO'(OCR)
+    → [삼성과 동일] PAYCO 결제확인 → 결제하기 → PIN 4x3 셔플(payco_pin6, 137601) → '확인'(쇼핑몰 복귀=결제확정).
+    ⚠️ PIN: 2엔진(vision,gcv)이 셔플키패드를 고정 1-9로 오독→실패, **4엔진 승급으로 성공**(실측). 박스('다시 선택하기') 단계 없음."""
+    out = {"step": "nh"}
+    if not ocr_tap("결제하기", contains=True):           # 1) 원 결제하기 → 농협카드 팝업
+        out["err"] = "원결제하기 실패"; return out
+    lap("NH: 원결제하기 → 농협 팝업")
+    if not wait_text("다른 결제", timeout=12):            # 2) 농협카드 팝업 우측상단 '다른 결제'
+        out["err"] = "농협 팝업 '다른 결제' 미도달(화면 FLAG_SECURE 가능)"; return out
+    if not ocr_tap("다른 결제", contains=True):
+        out["err"] = "'다른 결제' 탭 실패"; return out
+    out["step"] = "other_pay"
+    if not wait_text("PAYCO", timeout=12):                # 3) 다른 결제 탭 우측하단 'PAYCO'
+        out["err"] = "다른결제 탭 PAYCO 미도달"; return out
+    if not ocr_tap("PAYCO", contains=True):
+        out["err"] = "PAYCO 선택 실패"; return out
+    time.sleep(0.5)
+    if wait_text("다시 선택하기", timeout=5):             # (삼성 패턴) PAYCO 박스 화면 끼면 박스 한번 더 탭
+        ocr_tap("PAYCO", contains=True); time.sleep(0.5)
+    out["step"] = "payco"
+    if not wait_text("PAYCO 간편결제", timeout=12):       # 4) PAYCO 결제확인 (금액·NH카드) — 이하 삼성과 동일
+        out["err"] = "PAYCO 결제확인 미도달"; return out
+    if not ocr_tap("결제하기", contains=True):            # PAYCO 결제하기 → PIN
+        out["err"] = "PAYCO 결제하기 실패"; return out
+    if not wait_text("결제 비밀번호", timeout=10):        # 5) 결제비밀번호 (4x3 셔플)
+        out["err"] = "PIN 화면 미도달"; return out
+    out["step"] = "pin"
+    try:                                                  # 4x3 셔플 137601 (screencap 2엔진 OCR)
+        FlowRunner(use_camera=False).run_action(
+            {"action": "input_pin", "preset": "payco_pin6", "value": "137601",
+             "tap_delay_sec": 0.6, "use_camera": False})
+    except Exception as e:
+        out["err"] = f"PIN 입력 실패: {e}"; return out
+    if not wait_text("결제가 완료됩니다", timeout=12):     # 6) ⚠️ '확인' 눌러야 완료 (쇼핑몰 복귀)
         out["err"] = "PAYCO 완료확인 화면 미도달"; return out
     if not ocr_tap("확인", contains=True):
         out["err"] = "PAYCO 확인(완료) 탭 실패"; return out
@@ -949,6 +997,11 @@ def buy_one(idx: int, card: str | None = None) -> dict:
         res["pay"] = sp
         if not sp.get("ok"):
             res["status"] = f"SAMSUNG_FAIL@{sp.get('step')}:{sp.get('err')}"; return res
+    elif use_card == "NH":
+        np_ = pay_nh()
+        res["pay"] = np_
+        if not np_.get("ok"):
+            res["status"] = f"NH_FAIL@{np_.get('step')}:{np_.get('err')}"; return res
     lap(f"{use_card} 결제 → 주문완료")
     # 주문완료 확인 (공통, 전 카드): orderComplete 렌더 대기 = ① beauty 타이밍 확보(KB) ② 거절 감지(BC 한도초과)
     oc = wait_order_complete(timeout=20)
