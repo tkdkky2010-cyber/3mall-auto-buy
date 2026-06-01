@@ -41,3 +41,8 @@ lotte-dialog-blocker.pem
 # GCP Vision API key (gitignored)
 gcp-vision-key.json
 mall-ocr-*.json
+
+# 파이썬 캐시 / 임시 / MCP 산출물 (전 디렉토리 — 자동 재생성, 추적 불필요)
+__pycache__/
+_tmp/
+.playwright-mcp/
