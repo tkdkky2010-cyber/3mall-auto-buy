@@ -12,8 +12,8 @@ hmall pay_lotte 와 동일 → lotte_card.json flow_payment[14:22] 재사용.
   - E: nested-scroll 동의(_box_scroll + 동의함 fresh-OCR 탭) 해결. F: 삼성 경로엔 안 뜸 → 보통 no-op.
   - G: ★상품번호(숫자) 검색으로 한글입력 한계 우회(#10 검증). goods_no 없으면 최근검색어 폴백.
 
-검증된 결제설정 순서 (★ 쿠폰이 적립금/L.POINT 를 리셋 → 포인트는 반드시 쿠폰 다 끝낸 뒤 마지막):
-  할인쿠폰(10%×n) → 플러스쿠폰(최고%) → 적립금/L.POINT(전액) → 현금영수증 → 주소 → 카드 → 동의 → 결제하기
+검증된 결제설정 순서 (★쿠폰이 적립금/L.POINT 리셋→포인트는 쿠폰 뒤 / ★카드가 현금영수증 리셋→cash 는 카드 뒤):
+  주소 → 할인쿠폰(10%×n) → 플러스쿠폰(최고%, 비활성제외) → 적립금/L.POINT(전액) → 카드 → 현금영수증 → 동의 → 결제하기
 
 CLI:
     python3 -m phone_auto.lotte_homeshopping_buy 5          # #5 라이브 (로그아웃→#5 로그인→구매)
@@ -28,6 +28,8 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+from PIL import Image      # 쿠폰 활성/비활성 픽셀밝기 판별용
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -264,16 +266,30 @@ def _coupon_change_btn(sec):
     return max(chgs, key=lambda it: it["cx"]) if chgs else None
 
 
-def _submodal_items():
+def _submodal_items(shot=None):
     """열린 쿠폰 dropdown(하위모달 '할인선택') 안의 OCR 항목만 (하위 '할인선택'~'닫기' 사이).
-    메인모달의 이미 적용된 상품 행을 오탭하지 않기 위함."""
-    its = _ocr_texts(cap())
+    메인모달의 이미 적용된 상품 행을 오탭하지 않기 위함. shot=같은 스크린샷 재사용(밝기판별과 cy 정합)."""
+    its = _ocr_texts(shot or cap())
     heads = [it for it in its if "할인선택" in it["text"]]
     close = next((it for it in its if it["text"].strip() == "닫기"), None)
     if not heads or not close:
         return []
     top = max(h["cy"] for h in heads)            # 아래쪽 '할인선택' = 하위모달 헤더
     return [it for it in its if top < it["cy"] < close["cy"]]
+
+
+def _coupon_enabled(gimg, cy: int, x0: int = 110, x1: int = 720, band: int = 16, thr: int = 120) -> bool:
+    """드롭다운 쿠폰옵션의 활성 여부 = 텍스트밴드에 '진한 글자획'(어두운 픽셀) 존재 여부.
+    ★같은 쿠폰을 다른 제품이 이미 점유하면 회색(비활성) 처리됨 → OCR 텍스트는 동일, 글자색만 다름.
+    실측(2026-06-02 #11 라이브): 활성 글자 최소밝기≈20, 비활성(회색)≈154 → 임계 120 분리.
+    gimg=PIL Image(L모드, 옵션 OCR과 같은 스크린샷). 라디오(x<x0) 제외한 텍스트영역에 thr보다 어두운 픽셀 있으면 활성."""
+    px = gimg.load(); W, H = gimg.size
+    x1 = min(x1, W)
+    for y in range(max(0, cy - band), min(H, cy + band + 1)):
+        for x in range(x0, x1):
+            if px[x, y] < thr:
+                return True
+    return False
 
 
 def _scroll_to(text: str, contains: bool = True, max_scroll: int = 8, down: bool = True):
@@ -308,9 +324,13 @@ def set_discount_coupons() -> dict:
         if not ph:
             break
         _adb().tap(985, ph["cy"]); time.sleep(1.5)           # dropdown 열기
-        opt = next((it for it in _submodal_items() if "10%" in it["text"] and "할인" in it["text"]), None)
-        if not opt:
+        # ★비활성(회색) 쿠폰 제외 — 같은 쿠폰을 다른 제품이 이미 점유하면 회색 처리됨(밝기로 판별).
+        shot = cap(); gimg = Image.open(shot).convert("L")
+        cands = [it for it in _submodal_items(shot)
+                 if "10%" in it["text"] and "할인" in it["text"] and _coupon_enabled(gimg, it["cy"])]
+        if not cands:
             ocr_tap("닫기", retries=1); break
+        opt = min(cands, key=lambda it: it["cy"])            # 활성 중 가장 위
         _adb().tap(opt["cx"], opt["cy"]); time.sleep(1.3)
         out["applied"] += 1
     ocr_tap("선택완료", retries=2) or ocr_tap("적용", retries=1) or ocr_tap("확인", retries=1)
@@ -337,14 +357,17 @@ def set_plus_coupons() -> dict:
         if not ph:
             break
         _adb().tap(985, ph["cy"]); time.sleep(1.5)
+        # ★비활성(회색) 쿠폰 제외 후 활성 중 최고% 선택 (2026-06-02 #11: 같은 14%가 비활성+활성 2장일 때
+        #   OCR 텍스트가 동일해 비활성 14%를 탭→적용실패→제품 미적용→'선택완료'서 '할인혜택 초기화' 팝업).
+        shot = cap(); gimg = Image.open(shot).convert("L")
         pcts = []
-        for it in _submodal_items():
+        for it in _submodal_items(shot):
             m = re.search(r"(\d+)\s*%", it["text"])
-            if m and "쿠폰" in it["text"]:
+            if m and "쿠폰" in it["text"] and _coupon_enabled(gimg, it["cy"]):
                 pcts.append((int(m.group(1)), it))
         if not pcts:
             ocr_tap("닫기", retries=1); break
-        pcts.sort(key=lambda x: x[0], reverse=True)       # 최고% (옵션은 %내림차순이라 보통 최상단)
+        pcts.sort(key=lambda x: (-x[0], x[1]["cy"]))      # 활성 중 최고% → 같은%면 최상단
         best = pcts[0]
         _adb().tap(best[1]["cx"], best[1]["cy"]); time.sleep(1.3)
         out["applied"] += 1; out["pcts"].append(best[0])
@@ -392,11 +415,14 @@ def set_cash_receipt() -> dict:
         its = _ocr_texts(cap())
         return any(it["text"].strip() in ("다음", "0") for it in its) or \
                any(re.fullmatch(r"[1-9]", it["text"].strip()) for it in its)
+    # ★카드 뒤 위치에선 지출증빙이 화면 하단 → 사업자 라벨이 뷰 밖. 먼저 스크롤로 노출 (2026-06-02 #11 재정렬).
+    if not _scroll_to("사업자", max_scroll=4):
+        out["err"] = "사업자 등록번호 라벨 미발견"; return out
     focused = False
     for dy in (122, 95, 150):
         lab = ocr_find("사업자", contains=True) or ocr_find("등록번호", contains=True)
         if not lab:
-            out["err"] = "사업자 등록번호 라벨 미발견"; return out
+            out["err"] = "사업자 등록번호 라벨 사라짐"; return out
         _adb().tap(lab["cx"] - 14, lab["cy"] + dy); time.sleep(1.2)   # 칸1 포커스 (탭 시 자동스크롤)
         if screen_has("입력해주세요"):        # 빈칸 확인 팝업 → '확인'(이게 필드 포커스+키패드 띄움)
             ocr_tap("확인", retries=2); time.sleep(1.0)
@@ -487,31 +513,50 @@ def detect_card_lotte() -> dict:
 
 
 def select_card_lotte(day: str | None = None) -> dict:
-    """당일 할인카드를 **자동감지(detect_card_lotte)** 후 결제수단으로 선택. (롯데 하드코딩 제거 — 2026-06-02)
-    선택 = '최근 사용한 결제수단' 퀵버튼(예: 삼성카드/롯데카드/KB국민카드), 없으면 결제수단변경→신용카드→카드선택 dropdown.
-    day 지정 시 감지 생략(상위에서 Step1 당일카드 주입 가능). 반환 {ok, card, pct, via}."""
+    """당일 할인카드를 **자동감지(detect_card_lotte)** 후 '신용카드' 결제수단으로 선택. (당일카드 하드코딩 없음)
+    ★2026-06-02 #11 라이브 매핑: 롯데 결제수단 UI가 그리드로 변경 → 검증된 **단일 루트(카드 무관, 목록 카드명만 다름)**:
+      detect → '다른 결제수단'(라디오, 결제수단 그리드 펼침) → '신용카드'(그리드 버튼)
+      → '카드 선택' 드롭다운(행 우측 chevron) → 카드목록 팝업서 **당일카드** 탭
+      (목록: 롯데/신한/비씨/현대/삼성/KB국민/우리/하나/NH농협카드). 롯데·삼성 등 어느 카드든 동일 루트.
+    ⚠️ 카드 선택이 **현금영수증(지출증빙)을 리셋** → 상위(buy_one)에서 cash 는 반드시 card 뒤에 호출.
+    day 지정 시 감지 생략(상위에서 당일카드 주입 가능). 반환 {ok, card, pct, via}."""
     out = {}
     det = detect_card_lotte() if day is None else {"ok": True, "card": day, "pct": None}
     if not det.get("ok"):
         out["err"] = det.get("err", "당일카드 감지 실패"); return out
     card = det["card"]; out["card"] = card; out["pct"] = det.get("pct")
-    grid_name = CARD_GRID_NAME.get(card, card + "카드")     # '삼성'→'삼성카드'
-    # 1) '최근 사용한 결제수단' 퀵버튼 (정확매칭)
-    _scroll_to("결제수단", max_scroll=8)
-    quick = next((it for it in _ocr_texts(cap()) if it["text"].strip() == grid_name), None)
-    if quick:
-        _adb().tap(quick["cx"], quick["cy"]); time.sleep(1.5)
-        out["via"] = "quick"; out["ok"] = True; return out
-    # 2) 결제수단변경/다른결제수단 → 신용카드 → '카드 선택' dropdown → 당일카드
-    if not (ocr_tap("결제수단변경", contains=True, retries=2) or
-            ocr_tap("다른 결제수단", contains=True, retries=2)):
-        ocr_tap("신용카드", contains=True, retries=2)
+    target = CARD_GRID_NAME.get(card, card + "카드")        # 목록 카드명 ('삼성'→'삼성카드', 'KB'→'KB국민카드')
+    # 1) 결제수단 영역 — '다른 결제수단' 라디오 (detect 후 위치 불정 → 아래/위 양방향 스캔) 선택
+    db = None
+    for _ in range(6):                                      # 아래로
+        db = ocr_find("다른 결제수단", contains=True)
+        if db:
+            break
+        _adb().swipe(540, 1700, 540, 800, 400); time.sleep(0.6)
+    if not db:
+        for _ in range(8):                                 # 못 찾으면 위로
+            _adb().swipe(540, 800, 540, 1700, 400); time.sleep(0.6)
+            db = ocr_find("다른 결제수단", contains=True)
+            if db:
+                break
+    if not db:
+        out["err"] = "'다른 결제수단' 미발견"; return out
+    _adb().tap(db["cx"], db["cy"]); time.sleep(1.5)         # 라디오 선택(그리드 활성, 라디오라 멱등)
+    # 2) '신용카드' 그리드 버튼 → '카드 선택'/'할부 선택' 드롭다운 노출
+    if not ocr_tap("신용카드", retries=4):
+        out["err"] = "'신용카드' 버튼 탭 실패"; return out
     time.sleep(1.5)
-    ocr_tap("신용카드 선택", contains=True, retries=2); time.sleep(1.2)
-    if not ocr_tap(grid_name, retries=4):
-        out["err"] = f"{grid_name} 선택 실패"; return out
+    # 3) '카드 선택' 드롭다운(행 우측 chevron x≈987) → 카드목록 팝업.
+    #    ★exact 매칭 필수 — contains 면 안내문 '...비씨카드 선택 시...'의 '카드 선택' 부분문자열을 오매칭(2026-06-02 #11 버그).
+    lab = _scroll_to("카드 선택", contains=False, max_scroll=4)
+    if not lab:
+        out["err"] = "'카드 선택' 드롭다운 미발견"; return out
+    _adb().tap(987, lab["cy"]); time.sleep(1.8)
+    # 4) 카드목록 팝업서 당일카드 탭 (OCR 라디오 글리프 '_'/'•' 접두 대비 contains 매칭)
+    if not ocr_tap(target, contains=True, retries=4):
+        out["err"] = f"카드목록 '{target}' 선택 실패"; return out
     time.sleep(2.0)
-    out["via"] = "dropdown"; out["ok"] = True
+    out["via"] = "다른결제수단>신용카드>카드선택"; out["ok"] = True
     return out
 
 
@@ -901,22 +946,22 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None) -> d
     cs = goto_cart_select_all()
     if not cs.get("ok"):
         res["status"] = f"CART_FAIL:{cs.get('err')}"; return res
-    # 결제설정 — 주문서 위→아래 순. ★쿠폰이 적립금/L.POINT 리셋 → 포인트는 반드시 쿠폰 뒤.
-    # 주소(최상단) → 할인쿠폰 → 플러스쿠폰 → 포인트(전액) → 현금영수증 → 카드 → 동의
+    # 결제설정 순서 (★쿠폰이 적립금/L.POINT 리셋 → 포인트는 쿠폰 뒤 / ★카드가 현금영수증 리셋 → cash 는 카드 뒤):
+    # 주소(최상단) → 할인쿠폰 → 플러스쿠폰 → 포인트(전액) → 카드 → 현금영수증 → 동의
     res["addr"] = set_address()
     if not res["addr"].get("ok"):
         res["status"] = f"ADDR_FAIL:{res['addr'].get('err')}"; return res
     res["dc"] = set_discount_coupons()
     res["pc"] = set_plus_coupons()
     res["pts"] = use_all_points()
-    res["cash"] = set_cash_receipt()
-    # 당일 할인카드 자동감지 + 선택 (★하드코딩 제거 — 청구할인 배너 최고%)
+    # 당일 할인카드 자동감지 + 선택 (★하드코딩 제거 — 청구할인 배너 최고%). ★cash 보다 먼저(카드가 지출증빙 리셋).
     sc = select_card_lotte(day=card)
     res["card"] = sc
     if not sc.get("ok"):
         res["status"] = f"CARD_FAIL:{sc.get('err')}"; return res
     use_card = sc["card"]
     print(f"[#{idx}] 당일카드 감지/선택 = {use_card} ({sc.get('pct')}%) via {sc.get('via')}", flush=True)
+    res["cash"] = set_cash_receipt()        # ★카드 선택 직후 (카드가 현금영수증 지출증빙을 리셋하므로 여기서)
     agree_required()
     # 카드별 결제경로 분기: 롯데=LOCA(137601) / 삼성=PAYCO(137601+ARS). 그 외=라이브 검증 필요(false-auto 금지).
     print(f"[#{idx}] ⚠️ 결제 실행 ({use_card})", flush=True)
