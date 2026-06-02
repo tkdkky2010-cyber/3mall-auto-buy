@@ -231,11 +231,42 @@ def _normalize(s: str) -> str:
     return s.lower()
 
 
+# 샘플 단가 = 재고현황 시트(SoT)에서 동적 로드 (s코드→단가). SAMPLE_TABLE 은 이름→s코드
+# 매칭(별칭 포함)에만 사용하고, *단가는 시트가 우선*. (하드코딩 drift 방지 — 2026-06-02)
+INVENTORY_STATUS_TAB = "재고현황"
+INVENTORY_PRICE_RANGE = "A55:E91"   # A=s코드, E=단가
+_SHEET_SAMPLE_PRICES: dict[str, int] | None = None
+
+
+def sample_prices_from_sheet(force: bool = False) -> dict[str, int]:
+    """재고현황 시트에서 {s코드: 단가} 로드 (1회 캐시). 실패 시 빈 dict → SAMPLE_TABLE 폴백."""
+    global _SHEET_SAMPLE_PRICES
+    if _SHEET_SAMPLE_PRICES is not None and not force:
+        return _SHEET_SAMPLE_PRICES
+    prices: dict[str, int] = {}
+    try:
+        ws = gs_client().open_by_key(INVENTORY_SHEET_ID).worksheet(INVENTORY_STATUS_TAB)
+        for r in ws.get(INVENTORY_PRICE_RANGE, value_render_option="UNFORMATTED_VALUE"):
+            if not r:
+                continue
+            code = str(r[0]).strip()
+            if not re.match(r"^s\d+$", code):
+                continue
+            val = r[4] if len(r) > 4 else None
+            if isinstance(val, (int, float)) and val:
+                prices[code] = int(val)
+    except Exception as e:
+        print(f"[WARN] 재고현황 단가 로드 실패 ({e}) → SAMPLE_TABLE 하드코딩 단가 사용")
+    _SHEET_SAMPLE_PRICES = prices
+    return prices
+
+
 def lookup_sample(page_text: str) -> tuple[str, int, str | None] | None:
     """페이지에서 읽은 샘플명 → (정식이름, 단가, s코드) or None.
 
     가이드 룰: '최대한 텍스트가 일치하는 제품'을 찾는다.
     매칭 실패 == 신규 제품 (단가미정).
+    단가는 재고현황 시트(s코드) 우선, 없으면 SAMPLE_TABLE 폴백.
     """
     norm = _normalize(page_text)
     if not norm:
@@ -250,6 +281,9 @@ def lookup_sample(page_text: str) -> tuple[str, int, str | None] | None:
         # 가장 긴 매치 우선 (구체적인 게 정확)
         candidates.sort(reverse=True)
         _, name, price, code = candidates[0]
+        sheet_prices = sample_prices_from_sheet()
+        if code and code in sheet_prices:
+            price = sheet_prices[code]   # 시트 단가 우선
         return (name, price, code)
     return None
 

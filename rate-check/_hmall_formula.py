@@ -120,6 +120,27 @@ def main(argv=None):
         flag = "◆" if x["hiq"] else " "
         print(f"{i:>3} {x['sr']:>7.4f} {x['소']:>8,} {x['prev']:>8,} {x['buy']:>8,} {flag} {C.combo_label_ko(list(x['combo']))}")
 
+    # --pick "1,2,6,..." : 선택 순위의 조합을 COMBOS 형식으로 출력 (+ --add-single f5,h3).
+    if "--pick" in argv:
+        picks = [int(x) for x in argv[argv.index("--pick") + 1].split(",") if x.strip()]
+        add = argv[argv.index("--add-single") + 1].split(",") if "--add-single" in argv else []
+        single_map = {"f5": (("f", 5),), "h3": (("h", 3),)}
+        chosen = [cands[p - 1]["combo"] for p in picks if 1 <= p <= len(cands)]
+        for a in add:
+            sg = single_map.get(a.strip())
+            if sg and sg not in chosen:
+                chosen.append(sg)
+        print(f"\n=== 선택 조합 {len(chosen)}개 (순위 {picks} + 단일 {add}) ===")
+        for i, combo in enumerate(chosen, 1):
+            sr = next((c["sr"] for c in cands if c["combo"] == combo), None)
+            srs = f"{sr:.4f}" if sr is not None else "  -  "
+            print(f"  {i:>2} 공급률 {srs} 소비자 {consumer(combo):>8,}  {C.combo_label_ko(list(combo))}")
+        print("\nCOMBOS = [")
+        for combo in chosen:
+            print("    " + repr([list(t) for t in combo]) + ",")
+        print("]")
+        return 0
+
     # --write ROW : 시트에 랭킹 기록 (A{ROW}부터). 롯데 섹션(~107) 아래 108부터 권장.
     write_row = _argval(argv, "--write", 0)
     if write_row:
