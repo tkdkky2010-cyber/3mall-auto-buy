@@ -62,17 +62,20 @@ def _pick_cdp_backend(endpoint: str):
 
 IDS = json.load(open(ROOT / "hsmaster" / "config" / "sulwhasoo-ids.json"))["ids"]
 
-# 캐러셀 카드명 → 페이백계수
-CARD_NAME_TO_PAYBACK = {
-    "롯데카드": C.CARD_PAYBACK["롯데카드"],
-    "비씨카드": C.CARD_PAYBACK["비씨카드"],
-    "비씨카드(페이북)": C.CARD_PAYBACK["비씨카드"],
-    "삼성카드": C.CARD_PAYBACK["삼성카드"],
-    "하나카드": C.CARD_PAYBACK["하나카드"],
-    "농협카드": C.CARD_PAYBACK["농협카드"],
-    "NH농협카드": C.CARD_PAYBACK["농협카드"],
-    "KB국민카드": C.CARD_PAYBACK["KB국민카드"],
-    "국민카드": C.CARD_PAYBACK["KB국민카드"],
+# 캐러셀 카드 brand → 페이백계수.
+# brand 는 '롯데카드' 같은 단독형뿐 아니라 '카카오페이 롯데' / '토스페이 삼성' 처럼
+# 간편결제로 래핑된 형태로도 나옴. 간편결제(카카오/토스)도 실제 underlying 카드로 청구되므로
+# 일반 카드결제와 동일 페이백 적용 → underlying 카드 stem 으로 매칭 (사용자 6/2 지시).
+CARD_STEM_TO_PAYBACK = {
+    "롯데": C.CARD_PAYBACK["롯데카드"],
+    "비씨": C.CARD_PAYBACK["비씨카드"],
+    "BC":   C.CARD_PAYBACK["비씨카드"],
+    "삼성": C.CARD_PAYBACK["삼성카드"],
+    "하나": C.CARD_PAYBACK["하나카드"],
+    "농협": C.CARD_PAYBACK["농협카드"],
+    "NH":   C.CARD_PAYBACK["농협카드"],
+    "국민": C.CARD_PAYBACK["KB국민카드"],
+    "KB":   C.CARD_PAYBACK["KB국민카드"],
 }
 
 CHECKOUT_URL_FRAG = "/mo/oda/order"
@@ -111,9 +114,11 @@ def detect_card_offer(page) -> dict | None:
 
 
 def lookup_payback(brand: str) -> float:
-    """카드명 → 페이백계수 (없으면 0)."""
-    for key, pct in CARD_NAME_TO_PAYBACK.items():
-        if key in brand or brand in key:
+    """카드 brand → 페이백계수 (없으면 0).
+    brand 는 '롯데카드' 또는 간편결제 래핑형 '카카오페이 롯데'/'토스페이 삼성' 등.
+    underlying 카드 stem 으로 매칭 (간편결제도 실제 카드 청구 → 일반결제와 동일 페이백)."""
+    for stem, pct in CARD_STEM_TO_PAYBACK.items():
+        if stem in brand:
             return pct
     return 0.0
 
