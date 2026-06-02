@@ -261,6 +261,20 @@ def sample_prices_from_sheet(force: bool = False) -> dict[str, int]:
     return prices
 
 
+def check_sample_price_drift() -> list[tuple[str, str, int, int]]:
+    """하드코딩 SAMPLE_TABLE 단가 vs 재고현황 시트 단가 불일치 목록 (s코드 기준).
+    반환: [(s코드, 정식이름, 코드단가, 시트단가), ...]. Step 1 에서 drift 가시화용."""
+    sheet = sample_prices_from_sheet()
+    seen: set[str] = set()
+    out = []
+    for name, price, code in SAMPLE_TABLE:
+        if code and code in sheet and code not in seen:
+            seen.add(code)
+            if sheet[code] != price:
+                out.append((code, name, price, sheet[code]))
+    return out
+
+
 def lookup_sample(page_text: str) -> tuple[str, int, str | None] | None:
     """페이지에서 읽은 샘플명 → (정식이름, 단가, s코드) or None.
 

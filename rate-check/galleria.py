@@ -406,6 +406,18 @@ def main(argv=None):
     codes = [args.only] if args.only else C.PRODUCT_CODES
 
     print(f"▶ 갤러리아 공급률 분석 ({today}) — 탭 {tab!r}")
+
+    # 샘플 단가 체크 — 재고현황 시트(SoT)에서 동적 로드 + 하드코딩 SAMPLE_TABLE drift 가시화.
+    sheet_prices = C.sample_prices_from_sheet()
+    print(f"  [단가체크] 재고현황 시트에서 {len(sheet_prices)}건 로드 (시트 우선 적용)")
+    drift = C.check_sample_price_drift()
+    if drift:
+        print(f"  [단가체크] ⚠️ 하드코딩 SAMPLE_TABLE와 {len(drift)}건 불일치 → 시트값 사용:")
+        for code, name, old, new in drift:
+            print(f"            {code} {name}: 코드 {old:,} → 시트 {new:,}")
+    elif sheet_prices:
+        print("  [단가체크] ✓ 하드코딩과 일치 (drift 0)")
+
     print(f"  CDP {C.CDP_PORT} attach...")
     driver = attach_chrome()
 
