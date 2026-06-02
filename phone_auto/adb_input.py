@@ -76,6 +76,8 @@ class ADB:
 
     # --- input primitives ---
     def tap(self, x: int, y: int) -> None:
+        if os.environ.get("DEBUG_TAP"):
+            print(f"      [tap] ({x},{y})", flush=True)
         self._shell("input", "tap", str(x), str(y))
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int, duration_ms: int = 300) -> None:
