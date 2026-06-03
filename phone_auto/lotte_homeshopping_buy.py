@@ -6,11 +6,15 @@
 hmall pay_lotte 와 동일 → lotte_card.json flow_payment[14:22] 재사용.
 
 범위: **구매~주문완료(A~D) + 뷰티포인트(E) + 카드등록 dismiss(F) + 구매사은 적립금(G)**.
-  - D 카드: ★당일 할인카드 **자동감지**(청구할인 배너 최고% — 하드코딩 제거, 2026-06-02). 롯데=LOCA / 삼성=PAYCO+ARS.
-    삼성/PAYCO = 2026-06-02 #10 라이브 풀검증(주문 F71650). PAYCO PIN=payco_pin6 137601(hmall 재사용).
-    ARS 본인인증 = handle_ars_call 자동응답(받기→10s→키패드→'1' 반복). ⚠️통화화면 앵커 라이브검증 필요.
-  - E: nested-scroll 동의(_box_scroll + 동의함 fresh-OCR 탭) 해결. F: 삼성 경로엔 안 뜸 → 보통 no-op.
-  - G: ★상품번호(숫자) 검색으로 한글입력 한계 우회(#10 검증). goods_no 없으면 최근검색어 폴백.
+  - D 카드: ★당일 할인카드 **자동감지**(청구할인 배너 최고% — 하드코딩 제거). buy_one 분기:
+      **롯데=pay_loca(LOCA앱 137601) / 삼성=pay_lotte_samsung_general(카드번호 직접, PAYCO·ARS 회피, #12 G05038 검증)
+       / KB=pay_lotte_kb(KB Pay 간편번호 137601, #13 G70658 검증)**. 그 외 카드=UNVERIFIED_CARD(라이브 필요).
+      (구 PAYCO/ARS 경로 pay_lotte_payco·handle_ars_call 은 deprecated — 금액 크면 ARS 전화의존이라 무인불가.)
+  - E 뷰티포인트(★2026-06-03 #17 검증): **동의 먼저** — 적립신청 먼저 누르지 말고, 동의 박스를 박스 안 시작 800px swipe
+      (claim_beauty_point._box_fling)로 끝까지 → '동의함' 왼쪽 라디오(cx-86) 탭 + **픽셀 채움검증** → 그 다음 적립신청 → 완료 폴링.
+      ⚠️ 뷰티 멤버십 없는 계정(1~20 중 일부)은 정상 실패. F: 삼성/KB 경로엔 카드등록 안 뜸 → 보통 no-op.
+  - G 구매사은(★2026-06-03 검증): **검색 폐기** — 주문완료의 **구매상품을 직접 탭**(상품명='(공통)…세트', 설화수 접두 없음)
+      → 상품상세 → 구매사은 섹션 최대N%적립 → 광세일 게이트 → 혜택 신청하기. 랜덤 오claim 방지(못찾으면 SKIP).
 
 검증된 결제설정 순서 (★쿠폰이 적립금/L.POINT 리셋→포인트는 쿠폰 뒤 / ★카드가 현금영수증 리셋→cash 는 카드 뒤):
   주소 → 할인쿠폰(10%×n) → 플러스쿠폰(최고%, 비활성제외) → 적립금/L.POINT(전액) → 카드 → 현금영수증 → 동의 → 결제하기
@@ -104,16 +108,8 @@ def _tap_fresh(text: str, dx: int = 0, dy: int = 0, exact: bool = False,
     return False
 
 
-def _box_scroll(times: int = 1) -> None:
-    """내부 스크롤 div(뷰티포인트 동의 안내 박스 등)를 박스만 스크롤. 페이지 안 밀림.
-    contained swipe (540,1620→540,1500, 120px) — #4 'adb swipe가 페이지 스크롤' 난제 해법(6/1·#14 검증).
-    ★빠른 스크롤(사용자 6/3): **거리는 검증된 120px 그대로**(키우면 박스 대신 페이지 스크롤돼 깨짐 — #15 실패),
-    duration 600→300ms + sleep 1.0→0.5s 만 단축 = ~2배 빠름, 동작 불변."""
-    serial = hw._serial()
-    for _ in range(times):
-        subprocess.run([hw.ADB, "-s", serial, "shell", "input", "swipe",
-                        "540", "1620", "540", "1500", "300"])
-        time.sleep(0.5)
+# (구 `_box_scroll`(작은 contained swipe) 제거 — 뷰티포인트 동의 박스 스크롤은 claim_beauty_point 의 `_box_fling`
+#  (박스 안 시작 + 800px) 가 정본. 작은 거리는 느리고, 잘못 큰거리로 바꾸면 페이지스크롤로 깨짐(#15). 헷갈림 방지 위해 단일화.)
 
 
 # ──────────────────────────── A. 앱 초기화 + 로그인 ────────────────────────────
@@ -1001,9 +997,11 @@ def pay_lotte_kb() -> dict:
 # ──────────────────────────── E. 뷰티포인트 적립신청 (nested-scroll 동의) ────────────────────────────
 
 def claim_beauty_point() -> dict:
-    """주문완료 화면 '아모레퍼시픽 뷰티포인트 적립 신청' → 동의안내 박스(내부 스크롤 div) 끝까지 →
-    '동의함' 라디오 → '적립신청' → 완료. ★설화수(아모레퍼시픽)만, 본 주문완료 화면에서만(now-or-never).
-    6/1 #5 라이브 검증: contained _box_scroll + 동의함 fresh-OCR 탭(stale 1680 실패→정착 ~1587)."""
+    """주문완료 화면 뷰티포인트 적립신청. ★설화수(아모레퍼시픽)만, 본 주문완료 화면에서만(now-or-never).
+    ★★순서(2026-06-03 #17 검증, 사용자 4회 지적): **동의 안 한 채 적립신청 먼저 누르기 금지.**
+      ① 동의 박스를 **박스 안(540,1600) 잡고 800px swipe**(_box_fling)로 끝까지 → '동의함' 등장 (적립신청 누르지 않음).
+      ② '동의함' 왼쪽 라디오(OCR cx-86) 탭 + **픽셀 채움검증**(미선택~0 / 선택~319 dark). ③ 그 다음 '적립신청' → 완료 폴링.
+    ⚠️ 뷰티 멤버십 없는 계정은 완료문구 안 떠 정상 실패(1~20 중 일부). 박스가 안 보이면 적립신청 1회로 노출(폴백)."""
     out = {}
     if not (screen_has("뷰티포인트") or screen_has("적립신청")):
         out["skip"] = "뷰티포인트 적립 화면 아님(비설화수/미등장)"; out["ok"] = True; return out
@@ -1077,7 +1075,7 @@ def _ignore_keywords() -> list[str]:
         return ["페이백", "L.CLUB", "선물", "선물하기", "무료가입", "창립", "이리오십쇼", "가정의달", "게이트페이지"]
 
 
-def claim_lotte_reward(goods_no: str | None = None, search_term: str = "설화수") -> dict:
+def claim_lotte_reward(goods_no: str | None = None) -> dict:    # (search_term 제거 — 검색폐기로 미사용)
     """구매사은 적립금 신청 (G). ★**구매한 상품 상세로 직접 진입**(주문완료 화면의 구매상품 항목 탭)
     → '구매사은·혜택' 섹션의 '최대 N% 적립' (★ignore 제외) → '광세일' 행사페이지 → '혜택 신청하기'.
 
@@ -1184,7 +1182,7 @@ def dismiss_card_register() -> dict:
 
 def buy_one(idx: int, card: str | None = None, goods_no: str | None = None) -> dict:
     """idx 계정 롯데홈쇼핑 1건 구매. card=당일카드 override(미지정 시 청구할인 배너 자동감지).
-    goods_no=구매사은 적립 검색용 상품번호(미지정 시 최근검색어 '설화수' 폴백)."""
+    goods_no=구매사은 (옵션)상품번호 검색 override(미지정=기본: 주문완료의 구매상품 직접 탭)."""
     res = {"idx": idx, "status": None}
     print(f"\n{'='*54}\n[#{idx}] 롯데홈쇼핑 구매 시작", flush=True)
     reset_lotte_app()
