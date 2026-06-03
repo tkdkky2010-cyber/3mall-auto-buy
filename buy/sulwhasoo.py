@@ -101,34 +101,75 @@ def dismiss_popup(page: Page) -> None:
 # ───────────── 갤러리아 ─────────────
 
 
-def galleria_login(page: Page, account_id: str, account_pw: str) -> bool:
-    """갤러리아 로그인 (이미 로그인된 다른 계정이면 로그아웃 후 재로그인)."""
-    body = page.inner_text("body")
-    if "로그아웃" in body:
+def _galleria_hide_dim(page: Page) -> None:
+    """pw_noti(비밀번호 변경안내) + dim 오버레이 숨김 — 로그인 버튼 클릭 가림 방지(2026-06-03 UI)."""
+    try:
+        page.evaluate("""() => {
+            ['lyr_pw_noti','lyr_pw_noti_dim'].forEach(id => {
+                const e = document.querySelector('#' + id); if (e) e.style.display = 'none';
+            });
+        }""")
+    except Exception:
+        pass
+
+
+def _galleria_dismiss_popups(page: Page) -> None:
+    """포스트로그인 팝업 닫기: 쇼핑클래스 혜택안내(닫기/다시 보지 않기) / 비밀번호 변경안내(30일 후 변경)."""
+    for nm in ("닫기", "다시 보지 않기", "30일 후 변경"):
         try:
-            page.get_by_role("link", name="로그아웃").click()
-            page.wait_for_timeout(1500)
+            loc = page.get_by_role("button", name=nm)
+            if loc.count() and loc.first.is_visible():
+                loc.first.click(timeout=2000); page.wait_for_timeout(700)
         except Exception:
             pass
 
+
+def galleria_login(page: Page, account_id: str, account_pw: str) -> bool:
+    """갤러리아 로그인 — ★2026-06-03 UI개편 대응. **progressive 2단계**: 로그인레이어 → ID → '다음'(#next_btn_lyr)
+    → 비번칸(#pwd) 등장 → PW → '로그인'(#lyrLoginBtn) → 포스트로그인 팝업(쇼핑클래스 혜택안내/비번변경안내) 닫기.
+    캡차(#answer)는 실패 누적 시만 강제(평소 숨김) → 보이면 자동 불가로 중단."""
+    # 0) 다른 계정 로그인 상태면 로그아웃
+    if "로그아웃" in page.inner_text("body"):
+        try:
+            page.evaluate("overpass.link('LOGOUT',{})"); page.wait_for_timeout(2500)
+        except Exception:
+            pass
+        page.goto(GALLERIA_HOME, wait_until="domcontentloaded", timeout=15000); page.wait_for_timeout(2000)
+    # 1) 로그인 레이어 열기
     try:
-        page.get_by_role("link", name="로그인").click(timeout=5000)
+        page.evaluate("overpass.link('LOGIN',{galloc:'COMMON_00_GNB'})")
     except Exception:
-        # 이미 로그인 페이지일 수 있음
-        pass
-    page.wait_for_timeout(1500)
+        try:
+            page.get_by_role("link", name="로그인").first.click(timeout=4000)
+        except Exception:
+            pass
+    page.wait_for_timeout(1800)
+    _galleria_hide_dim(page)
     try:
-        page.get_by_role("textbox", name="아이디 또는 이메일").fill(account_id)
-        page.get_by_role("button", name="다음").click()
-        page.wait_for_timeout(1200)
-        page.get_by_role("textbox", name="비밀번호").fill(account_pw)
-        page.get_by_role("textbox", name="비밀번호").press("Enter")
-        page.wait_for_load_state("domcontentloaded", timeout=15000)
-        page.wait_for_timeout(2000)
-        return "로그아웃" in page.inner_text("body")
+        # 2) ID → '다음' (progressive — 비번칸은 ID 입력+다음 후 등장)
+        page.locator("#login_id").fill(account_id); page.wait_for_timeout(400)
+        try:
+            page.locator("#next_btn_lyr").click(timeout=3000)
+        except Exception:
+            page.locator("#login_id").press("Enter")
+        page.wait_for_timeout(1500); _galleria_hide_dim(page)
+        # 캡차 강제되면 중단 (자동 불가)
+        try:
+            if page.locator("#answer").is_visible():
+                print(f"  [LOGIN] {account_id}: ⚠️ 캡차(자동입력 방지 문자) 강제됨 — 자동 로그인 불가, 수동 필요")
+                return False
+        except Exception:
+            pass
+        # 3) PW → '로그인'
+        page.locator("#pwd").fill(account_pw); page.wait_for_timeout(400)
+        page.locator("#lyrLoginBtn").click(timeout=5000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000); page.wait_for_timeout(3000)
     except Exception as e:
         print(f"  [LOGIN ERR] {account_id}: {e}")
         return False
+    # 4) 포스트로그인 팝업 닫기 + 검증
+    _galleria_dismiss_popups(page); page.wait_for_timeout(1000)
+    return "로그아웃" in page.inner_text("body")
 
 
 def galleria_clear_cart(page: Page) -> None:
@@ -366,27 +407,47 @@ def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_
                 else:
                     print(f"    [INFO] Naver 로그인 skip (URL={pay_page.url[:60]})")
 
-                # 카드 선택 — "롯데 2224" 가 선택될 때까지 "다음 결제수단" 클릭
+                # ★카드 선택 — 롯데 2224 (Naver Pay 등록카드 메모 '갤러리아 이걸로 결제', 사용자 지정).
+                #   2026-06-03 UI: 카드 = swiper 캐러셀(1장씩). 활성카드=.swiper-slide-active 의 CardPlate_name.
+                #   화살표(이전/다음 결제수단)는 Playwright 클릭이 actionability로 막힘 → blind span 조상 button **JS 클릭**.
+                #   ⚠️ .first 읽기는 항상 DOM 첫카드(삼성)라 오인 — 반드시 active-slide 로 판정.
                 TARGET_CARD = "롯데 2224"
-                pay_page.wait_for_selector(".CardPlate_name__2ukEK", timeout=10000)
-                pay_page.wait_for_timeout(1500)
+
+                def _active_card():
+                    return pay_page.evaluate("""() => {
+                        const a = document.querySelector('.swiper-slide-active');
+                        if (!a) return '';
+                        const n = a.querySelector('[class*=CardPlate_name]');
+                        return n ? (n.innerText || '').trim() : '';
+                    }""")
+
+                def _nav_card(label):
+                    return pay_page.evaluate("""(lbl) => {
+                        const sp = [...document.querySelectorAll('span,em,i,button')].find(e => (e.innerText||'').trim()===lbl);
+                        let el = sp; while (el && el.tagName!=='BUTTON' && el.tagName!=='A') el = el.parentElement;
+                        if (el) { el.click(); return true; } return false;
+                    }""", label)
+
+                try:
+                    pay_page.wait_for_selector('.swiper-slide-active', timeout=10000)
+                except Exception:
+                    pass
+                pay_page.wait_for_timeout(1200)
                 matched = False
-                for i in range(15):
-                    try:
-                        cur = (pay_page.locator(".CardPlate_name__2ukEK").first.text_content() or "").strip()
-                    except Exception:
-                        cur = ""
-                    if TARGET_CARD in cur:
-                        matched = True
-                        print(f"    [OK] 카드 선택: {cur}")
+                for direction in ("다음 결제수단", "이전 결제수단"):   # next 우선(롯데2224가 보통 우측), 안 되면 prev
+                    for _ in range(24):
+                        if TARGET_CARD in _active_card():
+                            matched = True
+                            break
+                        if not _nav_card(direction):
+                            break
+                        pay_page.wait_for_timeout(450)
+                    if matched:
                         break
-                    try:
-                        pay_page.get_by_role("button", name="다음 결제수단").click(timeout=3000)
-                        pay_page.wait_for_timeout(600)
-                    except Exception:
-                        break
-                if not matched:
-                    print(f"    [WARN] 카드 '{TARGET_CARD}' 못 찾음 — 마지막 카드: {cur}")
+                if matched:
+                    print(f"    [OK] 카드 선택: {_active_card()}")
+                else:
+                    print(f"    [WARN] 카드 '{TARGET_CARD}' 못 찾음 — 현재 활성: {_active_card()}")
 
                 # 동의하고 결제하기
                 try:
