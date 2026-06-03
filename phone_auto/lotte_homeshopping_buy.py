@@ -39,6 +39,7 @@ from phone_auto import hmall_webview as hw
 from phone_auto.hmall_hyundai_buy import (
     cap, _adb, ocr_find, ocr_tap, wait_text, screen_has, _resolve_serial, _wait_app,
     CARD_ALIASES, CARD_GRID_NAME,
+    _card_secrets, _tap_shuffle,        # 삼성 일반결제 공용 헬퍼 (hmall=정본, 양 몰 공용)
 )
 from phone_auto.flow_runner import _ocr_texts, FlowRunner
 # PATH(bare adb)는 hmall_hyundai_buy import 시 이미 설정됨.
@@ -46,7 +47,6 @@ from phone_auto.flow_runner import _ocr_texts, FlowRunner
 PKG = "com.omnitel.android.lottewebview"
 LOTTE_CARD_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "lotte_card.json"
 ACCOUNTS_FILE = ROOT / "lotte.json"
-CARD_SECRETS_FILE = ROOT / "secrets" / "card_secrets.json"   # 삼성 일반결제 고정값 등. ⚠️gitignored(다른 컴퓨터 수동복사)
 
 # (참조) 로카페이 간편번호 = 137601 — 실입력은 lotte_card.json flow_payment[19] 의 dump 셔플로 처리.
 BIZ_NO = ("507", "18", "15504")       # 현금영수증 지출증빙 사업자번호 (3칸)
@@ -782,52 +782,13 @@ def pay_lotte_payco(card: str = "삼성") -> dict:
 
 # ──────── D'. 삼성 일반결제 (카드번호 직접 — PAYCO/ARS 완전 회피) ────────
 
-_CARD_SECRETS_CACHE: dict | None = None
-
-
-def _card_secrets() -> dict:
-    """secrets/card_secrets.json 로드(1회 캐시). 삼성 일반결제 고정값(card_no/cvc/pin6/cert_pw6) 등.
-    ⚠️ gitignored → 다른 컴퓨터엔 수동 복사 필요(WORKLOG 2026-06-02 저녁 인계주의). 김건엽 명의 1장 전계정 공용."""
-    global _CARD_SECRETS_CACHE
-    if _CARD_SECRETS_CACHE is None:
-        _CARD_SECRETS_CACHE = json.loads(CARD_SECRETS_FILE.read_text(encoding="utf-8"))
-    return _CARD_SECRETS_CACHE
-
-
-KEYPAD_ROI_Y = (0.45, 0.98)   # 셔플 키패드는 화면 하단 → 상단(상태바'100'/금액/카드마스킹/라벨) stray 배제용
-
-
-def _tap_shuffle(value: str, delay: float = 1.0, force_vote: bool = False) -> dict:
-    """셔플 숫자 키패드에 value(숫자 문자열)를 입력. 키패드는 **로드 시 1회만 셔플**(재배열 X) →
-    **1회 OCR 후 value 연속탭**(매 키 사이 delay: 카드/CVC=1.0 / 비번=0.7~0.8).
-    ★엔진 에스컬레이션(사용자 합의): **2엔진(vision+gcv) voting → 실패 시 4엔진**. voting 이라 단일엔진
-    오독(8↔0 등) 교차검증됨. 둘 다 **키패드 ROI(하단) 제한**으로 stray digit 배제 — 2026-06-02 #12/#13 실측:
-    roi 없으면 상태바'100'→0@(975,46)·라벨→8@(453)·카드마스킹 숫자가 오매핑돼 비번 틀림. roi 제한+partial 로 해결.
-    force_vote=True 면 2엔진 건너뛰고 4엔진부터. 반환 {ok, via, digits, err}."""
-    out: dict = {}
-    shot = cap("/tmp/_lt_kp.png")
-    from phone_auto.ocr_keypad import vote_digits
-    need = set(value)
-    passes = [(("easyocr", "tesseract", "vision", "gcv"), "4엔진")] if force_vote else \
-             [(("vision", "gcv"), "2엔진"), (("easyocr", "tesseract", "vision", "gcv"), "4엔진")]
-    dmap = None
-    for engines, label in passes:
-        vm = vote_digits(shot, flip_h=False, roi_y_frac=KEYPAD_ROI_Y,
-                         engines=engines, allow_partial=True) or {}
-        if need.issubset(vm):                        # value 의 숫자만 다 잡히면 충분
-            dmap = vm; out["via"] = label; break
-    if not dmap:
-        out["err"] = f"키패드 매핑 실패(2/4엔진 roi, 필요={sorted(need)})"; return out
-    for d in value:
-        x, y = dmap[d]; _adb().tap(x, y)
-        time.sleep(delay)
-    out["ok"] = True; out["digits"] = len(value)
-    return out
+# _card_secrets / _tap_shuffle / KEYPAD_ROI_Y = hmall_hyundai_buy 에서 import (정본=hmall, 양 몰 공용). 상단 import 참조.
+# (셔플키패드 2엔진→4엔진 roi 로직·card_secrets 로더는 hmall pay_samsung 과 공유 — 한 곳만 고치면 됨.)
 
 
 def pay_lotte_samsung_general() -> dict:
-    """삼성카드 **일반결제(카드번호 직접 입력)** — PAYCO/ARS 완전 회피. 2026-06-02 #11 수동 라이브 풀완주 → 코드화.
-    ⚠️⚠️ **작성 후 라이브 미검증** — 다음 삼성 구매 때 end-to-end 재검증 필수.
+    """삼성카드 **일반결제(카드번호 직접 입력)** — PAYCO/ARS 완전 회피.
+    ✅ 2026-06-02 #12 leenamsu0318 **라이브 풀완주 검증**(주문 2026-06-02-G05038, 뷰티+적립금까지). 1~8단계 전부 동작.
     고정값 = secrets/card_secrets.json['삼성'](card_no/cvc/pin6/cert_pw6, 김건엽 명의 1장 전계정 공용 — 하드코딩 금지).
     경로(WORKLOG 2026-06-02 저녁 발견3, 1~8): (원)결제하기 → 삼성 SDK모달 '다른결제'(❌간편결제=PAYCO)
       → '일반결제(카드번호)'(❌SMS) → 카드번호 15자리 + CVC 3자리 → 다음 → 일반결제 비밀번호(pin6) → 다음
