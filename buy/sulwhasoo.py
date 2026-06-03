@@ -567,7 +567,26 @@ def lotte_clear_cart(page: Page) -> bool:
         if remaining == 0:
             print("    [cart] 비우기 완료 (검증)")
             return True
-        print(f"    [cart] 비우기 후에도 {remaining}개 남음 → 실패")
+        # ★ 벌크 '선택삭제'가 안 먹히는 카트(일부 계정, 2026-06-03 #18/#19 실측: 다이얼로그는 뜨나 미삭제)
+        #   → 개별 '삭제' 링크를 1개씩 클릭 폴백. 각 삭제마다 native dialog accept.
+        print(f"    [cart] 벌크삭제 미동작({remaining}개 잔존) → 개별삭제 폴백")
+        page.on("dialog", lambda d: d.accept())
+        for _ in range(remaining + 5):
+            dels = page.get_by_role("link", name="삭제", exact=True)   # '선택삭제' 제외 (exact)
+            try:
+                if dels.count() == 0:
+                    break
+                dels.first.click(timeout=3000)
+            except Exception:
+                break
+            page.wait_for_timeout(1800)
+            if cart_item_count() == 0:
+                break
+        final = cart_item_count()
+        if final == 0:
+            print("    [cart] 개별삭제로 비우기 완료 (검증)")
+            return True
+        print(f"    [cart] 개별삭제 후에도 {final}개 남음 → 실패")
         return False
     except Exception as e:
         print(f"    [cart] 비우기 예외: {e}")
