@@ -200,6 +200,20 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
     }
 
 
+def ensure_logged_in(page) -> bool:
+    """myhome 로 로그인 상태 확인, 로그아웃이면 accounts[0] 으로 재로그인.
+    반환 True = 로그인됨(이미 또는 재로그인 성공) / False = 재로그인 실패.
+    세션은 측정 중 끊길 수 있어(구매하기→비회원폼/장바구니 바운스) 매 조합 실패 시 재호출한다."""
+    page.goto("https://www.hmall.com/mo/mma/myhome", wait_until="domcontentloaded")
+    page.wait_for_timeout(1200)
+    if "loginForm" not in page.url and "/login" not in page.url:
+        return True
+    cfg = json.load(open(ROOT / "hmall_config.json"))
+    acc = cfg["accounts"][0]
+    print(f"[INFO] 세션 로그아웃 감지 → 재로그인 {acc['id']}")
+    return login(page, acc["id"], acc["pw"])
+
+
 def write_sheet(results: list[dict], tab: str):
     """시트 "{M.DD}" 탭 Hmall 영역 입력 (RULES.md §13 layout)."""
     gc = C.gs_client()
@@ -277,21 +291,18 @@ def main(argv=None):
         page.set_default_timeout(25000)
 
         # 로그인 검증
-        page.goto("https://www.hmall.com/mo/mma/myhome", wait_until="domcontentloaded")
-        page.wait_for_timeout(1500)
-        if "loginForm" in page.url or "/login" in page.url:
-            print("[INFO] 로그인 필요")
-            cfg = json.load(open(ROOT / "hmall_config.json"))
-            acc = cfg["accounts"][0]
-            if not login(page, acc["id"], acc["pw"]):
-                sys.exit("❌ 로그인 실패")
-            page.wait_for_timeout(1500)
-        else:
-            print(f"[INFO] 이미 로그인 상태")
+        if not ensure_logged_in(page):
+            sys.exit("❌ 로그인 실패")
 
         for idx, combo in combos:
             try:
                 r = process_combo(page, idx, combo, add_gift_value, gwp_6set)
+                # 측정 중 세션이 끊기면 구매하기가 장바구니/비회원폼으로 바운스됨
+                # → 재로그인 후 그 조합만 1회 재시도 (이후 조합 줄줄이 실패 방지).
+                if str(r.get("error", "")).startswith("체크아웃 페이지 미도달"):
+                    if ensure_logged_in(page):
+                        print(f"  [RETRY] 조합 {idx} 재로그인 후 재시도")
+                        r = process_combo(page, idx, combo, add_gift_value, gwp_6set)
             except Exception as e:
                 r = {"idx": idx, "error": f"예외: {e}"}
             results.append(r)
