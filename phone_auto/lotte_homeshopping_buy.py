@@ -1047,11 +1047,14 @@ def claim_beauty_point() -> dict:
             ok = True; break
     if not ok:
         out["err"] = "동의함 라디오 선택 실패(픽셀 미채움)"; return out
-    # 4) 적립신청 → '완료되었습니다' 명시 확인 (느슨한 '완료' 매칭은 false ✓ 위험 → 완료문구 명시)
+    # 4) 적립신청 → '완료되었습니다' **폴링** 확인 (★완료팝업 지연렌더로 단발 체크가 false-negative[#19] → 최대 ~4s 폴링).
     if not _tap_fresh("적립신청", retries=3):
         out["err"] = "적립신청 버튼 미발견"; return out
-    time.sleep(2.0)
-    completed = screen_has("적립신청이 완료") or screen_has("완료되었습니다")
+    completed = False
+    for _ in range(6):
+        time.sleep(0.7)
+        if screen_has("적립신청이 완료") or screen_has("완료되었습니다"):
+            completed = True; break
     out["completed"] = completed
     ocr_tap("확인", retries=2); time.sleep(1.0)
     if not completed:
