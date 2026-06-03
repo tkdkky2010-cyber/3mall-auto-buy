@@ -106,12 +106,14 @@ def _tap_fresh(text: str, dx: int = 0, dy: int = 0, exact: bool = False,
 
 def _box_scroll(times: int = 1) -> None:
     """내부 스크롤 div(뷰티포인트 동의 안내 박스 등)를 박스만 스크롤. 페이지 안 밀림.
-    contained swipe (540,1620→540,1500, 600ms) — #4 'adb swipe가 페이지 스크롤' 난제 해법(6/1 검증)."""
+    contained swipe (540,1620→540,1500, 120px) — #4 'adb swipe가 페이지 스크롤' 난제 해법(6/1·#14 검증).
+    ★빠른 스크롤(사용자 6/3): **거리는 검증된 120px 그대로**(키우면 박스 대신 페이지 스크롤돼 깨짐 — #15 실패),
+    duration 600→300ms + sleep 1.0→0.5s 만 단축 = ~2배 빠름, 동작 불변."""
     serial = hw._serial()
     for _ in range(times):
         subprocess.run([hw.ADB, "-s", serial, "shell", "input", "swipe",
-                        "540", "1620", "540", "1500", "600"])
-        time.sleep(1.0)
+                        "540", "1620", "540", "1500", "300"])
+        time.sleep(0.5)
 
 
 # ──────────────────────────── A. 앱 초기화 + 로그인 ────────────────────────────
@@ -152,10 +154,25 @@ def dismiss_popups(max_iter: int = 5) -> int:
     return closed
 
 
+def dismiss_review_prompt(tries: int = 5) -> bool:
+    """리뷰작성 프롬프트('나중에 할게요') 닫기. ★마이 진입 시 / 로그인 직후 **지연 등장**(오랜만에 앱 켜고
+    그 사이 리뷰가능 상품이 생긴 경우) — dismiss_popups 는 첫 OCR 없으면 바로 break 라 놓침 → 지연 렌더 대비
+    tries회 재시도(2026-06-03 #13 사용자 확인). ⚠️'리뷰쓰기'(우측 액션) 아님 — '나중에 할게요'(좌)만 탭."""
+    for _ in range(tries):
+        it = next((x for x in _ocr_texts(cap()) if "나중에" in x["text"]), None)
+        if it:
+            _adb().tap(it["cx"], it["cy"]); time.sleep(1.0)
+            print("   [review] '나중에 할게요' 닫기", flush=True)
+            return True
+        time.sleep(0.8)
+    return False
+
+
 def logout() -> bool:
     """마이 → 설정(우상단 톱니) → 로그아웃. (계정 전환 전 필수.)"""
     _adb().tap(*NAV_MY); time.sleep(2.0)
     dismiss_popups(2)
+    dismiss_review_prompt()          # ★마이 진입 시 리뷰 프롬프트(지연 등장) 닫기 — 안 닫으면 톱니/로그아웃 막힘(#13)
     # ⚠️ 설정 톱니 = 헤더 아님! "고객님 반가워요!" 인사말 줄 우측(벨+톱니). (1010,150)은 장바구니라 누르면 안 됨.
     _adb().tap(1010, 336); time.sleep(1.5)   # 톱니 (6/1 실측)
     if not screen_has("로그아웃"):           # 설정화면 진입 검증
@@ -216,6 +233,7 @@ def login(idx: int) -> dict:
     bx, by = (btn["cx"], btn["cy"]) if btn else (540, 889)        # 6/1 #5 실측 폴백
     _adb().tap(bx, by); time.sleep(3.0)
     dismiss_popups()
+    dismiss_review_prompt()          # ★로그인 직후에도 리뷰 프롬프트 등장 가능(#13 사용자 확인)
     # 로그인 검증: 마이/홈 진입 (로그인 폼 사라짐)
     if screen_has("아이디") and screen_has("비밀번호"):
         out["err"] = "로그인 실패(폼 잔존 — 비번 오류 가능)"; return out
@@ -925,6 +943,61 @@ def pay_lotte_samsung_general() -> dict:
     return out
 
 
+# ──────── D''. KB국민카드 결제 (KB Pay 간편결제 — hmall pay_kb 흐름 재사용) ────────
+
+def pay_lotte_kb() -> dict:
+    """KB국민카드 = KB Pay 간편결제. hmall `pay_kb` 흐름 재사용(카드앱 구간 몰 무관).
+    ✅ 2026-06-03 #13 Lee0128 라이브 검증(주문 2026-06-03-G70658, KB 7%).
+    경로: (원)결제하기 → KB SDK모달 'KB Pay 결제' 박스 → KB앱(com.kbcard) 결제하기(dump)
+      → 간편번호6 137601(content-desc dump 자동제출; FLAG_SECURE라 screencap 검정이나 dump O)
+      → 롯데 복귀 주문완료. ⚠️실 결제."""
+    out = {"step": "order_sheet", "card": "KB"}
+    if screen_has("다음에도") or screen_has("사용할까요"):
+        ocr_tap("사용할게요", contains=True, retries=2)
+    # 1) (원)결제하기 — 하단 'NNN원 결제하기'
+    pay = next((it for it in _ocr_texts(cap()) if "결제하기" in it["text"] and it["cy"] > 2000), None)
+    if pay:
+        _adb().tap(pay["cx"], pay["cy"])
+    elif not ocr_tap("결제하기", contains=True):
+        out["err"] = "원결제하기 실패"; return out
+    time.sleep(3.0)
+    # 2) KB SDK 모달 → 'KB Pay 결제' 박스(노란 앱카드)
+    out["step"] = "kb_modal"
+    if not wait_text("KB Pay", timeout=12):
+        out["err"] = "KB 결제 모달 미도달"; return out
+    box = next((it for it in _ocr_texts(cap()) if it["text"].strip() == "KB Pay 결제"), None) or \
+          next((it for it in _ocr_texts(cap()) if "KB Pay" in it["text"] and "결제" in it["text"]), None)
+    if not box:
+        out["err"] = "'KB Pay 결제' 박스 미발견"; return out
+    _adb().tap(box["cx"], box["cy"]); time.sleep(1.0)
+    # 3) KB앱(com.kbcard) 진입 → 결제하기(dump) → 간편번호6 137601(dump 자동제출)
+    out["step"] = "kb_app"
+    if not _wait_app("com.kbcard", timeout=15):
+        out["err"] = "KB앱 미진입"; return out
+    fr = FlowRunner(use_camera=False)
+    try:
+        fr.run_action({"action": "tap_dump_text", "text": "결제하기"})
+        time.sleep(2.5)
+        fr.run_action({"action": "input_pin", "value": "137601", "source": "dump"})
+    except Exception as e:
+        out["err"] = f"KB앱 결제 실패: {e}"; return out
+    # 4) 롯데 복귀 + 주문완료 폴링
+    out["step"] = "order_complete"
+    if not _wait_app(PKG, timeout=20):
+        out["err"] = "롯데앱 복귀 실패(결제 미확정 가능)"; return out
+    time.sleep(3.0)
+    end = time.time() + 30
+    while time.time() < end:
+        t = _all_text()
+        if "주문번호" in t or ("주문" in t and "완료" in t):
+            mo = re.search(r"(\d{4}-\d{2}-\d{2}-[A-Z]\d+)", t)
+            out["order"] = mo.group(1) if mo else None
+            out["ok"] = True; return out
+        time.sleep(1.5)
+    out["err"] = "주문완료 미확인(timeout)"
+    return out
+
+
 # ──────────────────────────── E. 뷰티포인트 적립신청 (nested-scroll 동의) ────────────────────────────
 
 def claim_beauty_point() -> dict:
@@ -934,50 +1007,55 @@ def claim_beauty_point() -> dict:
     out = {}
     if not (screen_has("뷰티포인트") or screen_has("적립신청")):
         out["skip"] = "뷰티포인트 적립 화면 아님(비설화수/미등장)"; out["ok"] = True; return out
-    # 1) 적립신청 → '정보제공 동의를 하셔야' 팝업 → 확인 (동의 안내 박스 노출)
-    if not _tap_fresh("적립신청", retries=3):
-        out["err"] = "적립신청 버튼 미발견"; return out
-    time.sleep(1.5)
-    ocr_tap("확인", retries=2); time.sleep(1.5)
-    # 2) 동의 안내 박스(내부 스크롤) 끝까지 → '동의함' 라디오 등장 (페이지 아닌 박스만 스크롤).
-    #    ⚠️#6 실패: 1회차 박스스크롤 안 먹힐 때 있음 → 다회 + 안 보이면 적립신청 재탭으로 박스 재노출.
-    for attempt in range(2):
-        for _ in range(12):
-            if _find("동의함", exact=True):
-                break
-            _box_scroll(1)
-        if _find("동의함", exact=True):
+    # ★★ 순서 (사용자 6/3 강조, 4회 지적): **동의 안 한 채 적립신청 먼저 누르기 금지.**
+    #    스크롤 → '동의함' 체크 먼저 → 그 다음 적립신청. (적립신청 노출은 박스가 정말 없을 때만 폴백.)
+    serial = hw._serial()
+    def _agree_it():
+        return _find("동의함", exact=True)
+    def _box_fling():
+        # ★동의 박스 안(540,1600) 잡고 **800px 위로(1600→800)** → 시작점이 박스 안이면 끝점이 박스 밖이어도 박스가 그만큼 스크롤.
+        #   (작은 120px 여러번=느림 / 큰 swipe라도 시작점이 박스 밖이면 페이지스크롤로 깨짐[#15] → '시작점 박스 안+800px'이 핵심.)
+        subprocess.run([hw.ADB, "-s", serial, "shell", "input", "swipe", "540", "1600", "540", "800", "300"])
+        time.sleep(0.7)
+    # 1) ★동의 먼저: **적립신청 누르지 말고** 동의 안내 박스를 스크롤해 '동의함' 찾기 (박스는 주문완료 화면에 이미 있음).
+    for _ in range(6):
+        if _agree_it():
             break
-        # 박스 미노출 → 적립신청 재탭 + 확인 후 재시도
-        _tap_fresh("적립신청", retries=2); time.sleep(1.2)
+        _box_fling()
+    # 2) [폴백] 스크롤해도 동의함 없으면(박스 미노출) → 적립신청 1회로 동의안내 노출('하셔야' 팝업 확인) 후 재스크롤.
+    if not _agree_it():
+        _tap_fresh("적립신청", retries=3); time.sleep(1.5)
         ocr_tap("확인", retries=2); time.sleep(1.5)
-    if not _find("동의함", exact=True):
-        out["err"] = "동의함 라디오 미도달(박스 스크롤 실패)"; return out
-    # 3) ⚠️동의함 fresh-OCR 라디오 원(텍스트 cx-100) 탭 + 적립신청으로 선택검증. 미선택(팝업)이면 재정착 후 재시도.
+        for _ in range(6):
+            if _agree_it():
+                break
+            _box_fling()
+    if not _agree_it():
+        out["err"] = "동의함 미도달(박스 스크롤 실패)"; return out
+    # 3) ★'동의함' 왼쪽 라디오 원(동의함 cx-86) 탭 + **픽셀로 선택검증**(채워지면 dark↑, 실측 미선택~0 / 선택~319). 미선택이면 재시도.
     ok = False
     for _ in range(4):
-        time.sleep(1.0)
-        it = _find("동의함", exact=True)
+        it = _agree_it()
         if not it:
             break
-        _adb().tap(it["cx"] - 100, it["cy"]); time.sleep(1.2)     # 라디오 원 (stale 금지 → 매번 fresh)
-        if not _tap_fresh("적립신청", retries=2):
-            break
-        time.sleep(1.8)
-        if screen_has("하셔야"):              # '동의를 하셔야' 팝업 = 동의함 미선택
-            ocr_tap("확인", retries=2); time.sleep(1.0)
-            _box_scroll(1)                    # 라디오 재정착(탭 가능 위치로)
-            continue
-        ok = True; break
+        rx, ry = it["cx"] - 86, it["cy"]
+        _adb().tap(rx, ry); time.sleep(1.0)
+        im = Image.open(cap("/tmp/_lt_agree.png")).convert("L"); px = im.load(); W, H = im.size
+        dark = sum(1 for yy in range(max(0, ry - 16), min(H, ry + 16))
+                   for xx in range(max(0, rx - 18), min(W, rx + 18)) if px[xx, yy] < 120)
+        if dark >= 60:               # 라디오 채워짐 = 동의함 선택됨
+            ok = True; break
     if not ok:
-        out["err"] = "동의함 선택/적립신청 실패"; return out
-    # 4) '뷰티포인트 적립신청이 완료되었습니다' 명시 확인 (★느슨한 "완료" 매칭은 false ✓ 위험 → 완료문구 명시)
-    time.sleep(1.2)
+        out["err"] = "동의함 라디오 선택 실패(픽셀 미채움)"; return out
+    # 4) 적립신청 → '완료되었습니다' 명시 확인 (느슨한 '완료' 매칭은 false ✓ 위험 → 완료문구 명시)
+    if not _tap_fresh("적립신청", retries=3):
+        out["err"] = "적립신청 버튼 미발견"; return out
+    time.sleep(2.0)
     completed = screen_has("적립신청이 완료") or screen_has("완료되었습니다")
     out["completed"] = completed
     ocr_tap("확인", retries=2); time.sleep(1.0)
     if not completed:
-        out["err"] = "적립신청 완료문구 미확인(미적립 가능)"   # ok 안 세움 → 정직 실패
+        out["err"] = "적립신청 완료문구 미확인(미적립 가능)"
         return out
     out["ok"] = True
     return out
@@ -997,42 +1075,45 @@ def _ignore_keywords() -> list[str]:
 
 
 def claim_lotte_reward(goods_no: str | None = None, search_term: str = "설화수") -> dict:
-    """구매사은 적립금 신청 (G). 검색 → 구매상품 상세 → '구매사은' 섹션의 '최대 N% 적립' 이벤트
-    (★ignore 키워드 제외) → '광세일' 행사페이지 → '혜택 신청하기'. 6/1 #5 라이브 검증.
+    """구매사은 적립금 신청 (G). ★**구매한 상품 상세로 직접 진입**(주문완료 화면의 구매상품 항목 탭)
+    → '구매사은·혜택' 섹션의 '최대 N% 적립' (★ignore 제외) → '광세일' 행사페이지 → '혜택 신청하기'.
 
-    ★**상품번호(goods_no) 검색** = adb 한글입력 한계 우회 (2026-06-02 사용자 지정 + #10 라이브검증):
-       검색창에 상품번호(숫자) 입력 → 자동으로 해당 상품페이지 오픈 (한글 타이핑 불필요).
-       goods_no 없으면 최근검색어(search_term) 탭 폴백. 둘 다 안 되면 SKIP.
-    ⚠️ 본 행사 = 앱 직접 구매 건만, 신청기간 내. 이미 '혜택 신청완료'면 idempotent skip."""
+    ★검색 방식 폐기(2026-06-03 사용자 지적): 설화수 검색→랜덤상품 선택은 **구매 안 한 제품에 오claim** 위험
+    (#14 실측: 자음생크림리치 구매했는데 검색결과 '자음생2종'에 적립). → 주문완료의 **그 주문 상품**만 탭해 상세 진입.
+    상품 미발견/상세 미진입/광세일 게이트 실패 시 **SKIP**(오claim 방지 — 적립 못해도 잘못된 적립보다 나음).
+    goods_no 지정 시(호출자 override) 번호검색=정확. ⚠️앱 직접구매 건만, 신청기간 내. '혜택 신청완료'면 idempotent."""
     out = {}
     ignore = _ignore_keywords()
-    # 1) 검색 진입 (우상단 Q)
-    _adb().tap(*NAV_HOME); time.sleep(1.5)
-    dismiss_popups(2)
-    _adb().tap(888, 150); time.sleep(1.8)
     if goods_no:
-        # 2a) ★상품번호 입력(숫자=adb 가능) → ENTER → 상품페이지 자동 오픈 (한글 우회)
+        # (옵션) 상품번호(숫자) 검색 = 정확. 호출자가 명시할 때만.
+        _adb().tap(*NAV_HOME); time.sleep(1.5); dismiss_popups(2); _adb().tap(888, 150); time.sleep(1.8)
         inp = next((it for it in _ocr_texts(cap()) if "검색어를 입력" in it["text"]), None)
         if inp:
             _adb().tap(inp["cx"], inp["cy"]); time.sleep(1.0)
         _input_text(str(goods_no))
-        subprocess.run([hw.ADB, "-s", hw._serial(), "shell", "input", "keyevent", "66"])
-        time.sleep(3.0)
+        subprocess.run([hw.ADB, "-s", hw._serial(), "shell", "input", "keyevent", "66"]); time.sleep(3.0)
         out["search"] = f"번호 {goods_no}"
     else:
-        # 2b) 폴백: 최근검색어 중 search_term 포함 항목 탭 (한글입력 불가 우회)
-        rec = next((it for it in _ocr_texts(cap())
-                    if search_term in it["text"] and it["cy"] < 800), None)
-        if not rec:
-            out["skip"] = f"상품번호 미지정 + 최근검색어 '{search_term}' 없음 — 검색 SKIP"
-            out["ok"] = True; return out
-        _adb().tap(rec["cx"] - 40, rec["cy"]); time.sleep(2.5)   # 'X'(삭제) 왼쪽 본문 탭
-        # 3) 검색결과 → ★'공통' 상품 선호(광세일 행사상품=적립배너 有). '기획' 단품엔 적립카드 없음.
-        prods = [it for it in _ocr_texts(cap()) if "설화수" in it["text"] and it["cy"] > 600]
-        prod = next((p for p in prods if "공통" in p["text"]), None) or (prods[0] if prods else None)
+        # ★구매한 상품 항목을 주문완료 화면에서 직접 탭 → 상품 상세(GoodDetail). 검색/한글입력 불필요(2026-06-03 라이브검증).
+        #   ⚠️ 상품명은 '(공통)…세트' / '(롯데I 단독)…' / '…ml 기획세트' — **'설화수' 접두 없음**(#15 skip 원인: 옛필터가 '설화수' 찾음).
+        #   '세트'+(공통/단독/ml/기획/설화수) 매칭. 콤보면 첫 구매상품. 뷰티/적립/도착예정 텍스트 제외.
+        prod = None
+        for _ in range(5):
+            prod = next((it for it in _ocr_texts(cap())
+                         if "세트" in it["text"]
+                         and any(k in it["text"] for k in ("공통", "단독", "ml", "기획", "설화수"))
+                         and not any(k in it["text"] for k in ("적립", "포인트", "뷰티", "도착", "주문"))
+                         and it["cy"] > 1000), None)
+            if prod:
+                break
+            _adb().swipe(540, 1000, 540, 1500, 400); time.sleep(0.8)    # 주문완료 아래로(상품 노출)
         if not prod:
-            out["err"] = "검색결과 상품 미발견"; return out
-        _adb().tap(prod["cx"], prod["cy"]); time.sleep(2.5)
+            out["skip"] = "주문완료서 구매상품 항목 미발견 — reward SKIP(오claim 방지)"; out["ok"] = True; return out
+        out["product"] = prod["text"]
+        _adb().tap(prod["cx"], prod["cy"]); time.sleep(3.5)
+        # 게이트: 상품 상세(GoodDetail) 진입 검증 — 주문완료에 머물렀으면(상품 미진입) SKIP.
+        if screen_has("주문이 완료") or screen_has("주문완료"):
+            out["skip"] = "구매상품 탭 후 상품상세 미진입(주문완료 잔류) — reward SKIP"; out["ok"] = True; return out
     # 4) ★'구매사은 · 혜택' 섹션까지 스크롤 → 그 섹션 안의 '최대 N% 적립' 카드 탐색 (6/2 #9 라이브 확정).
     #    상품상세엔 "최대 N% 적립"이 3종 존재:
     #      ① 상단 프로모 배너 "'광세일' 구매시 최대 N% 적립금" (섹션 밖, 탭하면 향수 등 엉뚱한 페이지)
@@ -1141,7 +1222,9 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None) -> d
     if use_card == "롯데":
         pay = pay_loca()
     elif use_card == "삼성":
-        pay = pay_lotte_samsung_general()       # ⚠️작성 후 라이브 미검증 — 첫 삼성 구매 때 end-to-end 재검증
+        pay = pay_lotte_samsung_general()       # ✅ #12 G05038 라이브검증
+    elif use_card == "KB":
+        pay = pay_lotte_kb()                    # ✅ #13 G70658 라이브검증 (KB Pay 간편결제)
     else:
         res["status"] = f"UNVERIFIED_CARD:{use_card}(롯데 결제경로 미검증 — 라이브 필요)"; return res
     res["pay"] = pay
