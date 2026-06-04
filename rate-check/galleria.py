@@ -305,6 +305,9 @@ def emit_gwp_pending(date: str, image_path: Path) -> int:
     print(f'         {{"text": "여윤팩 35ml", "qty": 2}}')
     print(f'       ]')
     print(f"     }}")
+    print(f"   ⚠️ 합본 SKU(s코드 1개)는 반드시 한 줄로. 이미지에 따로 적혀 있어도 합쳐라:")
+    print(f'        예) 자정수 25ml + 자정유액 25ml → {{"text": "자정수25ml자정유액25ml", "qty": 1}}')
+    print(f"        쪼개면 둘 다 같은 합본 단가에 매칭돼 이중계상됨 (2026-06-04 사고).")
     print(f"   그 다음 이 명령 재실행.")
     print("=" * 60)
     return PENDING_EXIT
