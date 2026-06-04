@@ -42,7 +42,8 @@ GALLERIA_URL = "https://www.galleria.co.kr/goods/initDetailGoods.action?goods_no
 def attach_chrome() -> webdriver.Chrome:
     opts = Options()
     opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{C.CDP_PORT}")
-    return webdriver.Chrome(options=opts)
+    svc = C.matched_chromedriver_service(C.CDP_PORT)  # 버전 mismatch 회피 (_common 참조)
+    return webdriver.Chrome(options=opts, service=svc) if svc else webdriver.Chrome(options=opts)
 
 
 # ============================================================

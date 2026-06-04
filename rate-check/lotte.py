@@ -20,13 +20,15 @@ from _common import (
     combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID,
     today_tab_name, gs_client, COMBOS, CARD_PAYBACK,
     LOTTE_HEADER_ROW, LOTTE_COMBO_END_ROW, CHART_RANGE,
+    matched_chromedriver_service,
 )
 
 import os as _os
 _LOTTE_PORT = _os.environ.get("RATE_CHECK_CDP_PORT", "9222")
 opts = Options()
 opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{_LOTTE_PORT}")
-driver = webdriver.Chrome(options=opts)
+_svc = matched_chromedriver_service(_LOTTE_PORT)  # 버전 mismatch 회피
+driver = webdriver.Chrome(options=opts, service=_svc) if _svc else webdriver.Chrome(options=opts)
 print(f"CDP attach: 127.0.0.1:{_LOTTE_PORT}")
 
 IDS = json.load(open('/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/hsmaster/config/sulwhasoo-ids.json'))['ids']

@@ -491,6 +491,42 @@ def load_galleria_gwp_from_sheet(ws) -> list[dict]:
     return set_items
 
 
+def matched_chromedriver_service(port):
+    """CDP(debuggerAddress) attach 시 드라이버 버전 mismatch 회피.
+
+    문제: attach 모드에선 Selenium Manager 가 실행 중 Chrome 의 버전을 못 읽어
+    최신 stable 드라이버를 고른다. CFT 가 한 단계 낮은 major 면 chromedriver 가
+    "only supports Chrome version N" 으로 연결 거부 → 매 실행 첫 attach 실패.
+
+    해결: 실행 중 Chrome 의 major 버전을 CDP `/json/version` 으로 읽고,
+    selenium 캐시에서 같은 major 의 chromedriver 로 Service 를 만들어 고정한다.
+    (chromedriver 는 major 만 맞으면 동작.) 일치 캐시 없으면 None →
+    Selenium Manager 기본동작에 위임 (한 번 받아두면 다음부턴 캐시 매칭됨).
+    """
+    import glob
+    import json
+    import platform
+    import re
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=3) as r:
+            browser = json.load(r).get("Browser", "")
+    except Exception:
+        return None
+    m = re.search(r"/(\d+)\.", browser)  # "Chrome/148.0.7778.97" → 148
+    if not m:
+        return None
+    major = m.group(1)
+    arch = "mac-arm64" if platform.machine() == "arm64" else "mac-x64"
+    base = Path.home() / ".cache" / "selenium" / "chromedriver" / arch
+    cands = sorted(glob.glob(str(base / f"{major}.*" / "chromedriver")))
+    if not cands:
+        return None
+    from selenium.webdriver.chrome.service import Service
+    return Service(executable_path=cands[-1])  # 같은 major 중 최신 패치
+
+
 def gs_client() -> gspread.Client:
     return gspread.service_account(filename=str(SERVICE_ACCOUNT))
 
