@@ -60,8 +60,10 @@ out.coupon_text = null;
 const couponBtns = document.querySelectorAll('button.down em, button[onclick*="couponListLayer"] em');
 for (const em of couponBtns) {
     const t = (em.textContent || '').trim();
-    if (t.includes('쿠폰') && /\d+\s*%/.test(t)) {
-        out.coupon_text = t;  // "[카테고리] 쿠폰명 N%" 형태
+    // ★ button.down em 은 쿠폰 버튼 자체(신뢰 element, RULES §6-1) — % 만 있으면 채택.
+    //   '쿠폰' 글자 강제 금지: "설화수 더블 20%" 처럼 쿠폰명에 '쿠폰' 없는 경우 누락됨(2026-06-04 버그).
+    if (/\d+\s*%/.test(t)) {
+        out.coupon_text = t;  // "[카테고리] 쿠폰명 N%" 형태 (첫 항목 = 최고 할인율)
         break;
     }
 }
@@ -313,53 +315,52 @@ def emit_gwp_pending(date: str, image_path: Path) -> int:
 def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
                            combos: list[dict], tab: str) -> str:
     # ★ galleria 영역 = 행 1~C.GALLERIA_DATA_END_ROW.
-    # C.HMALL_HEADER_ROW~ Hmall, C.LOTTE_HEADER_ROW~ 롯데 침범 금지 (RULES §13).
-    rows: list[list] = [[""] for _ in range(C.GALLERIA_DATA_END_ROW)]
+    # GWP 샘플 / 상품별 추가증정은 품목 수가 매일 가변(5·6·7·10…) → **고정 행 인덱스 금지**.
+    # 위→아래 flow 로 쌓는다. 하위 reader(_common.load_galleria_*)는 전부 라벨 검색이라
+    # 위치 가변에 안전 (RULES §1-4). 침범 방지는 끝에서 길이 검증.
+    rows: list[list] = []
 
-    def setrow(idx, *vals):
-        rows[idx] = list(vals)
+    def emit(*vals):
+        rows.append(list(vals) if vals else [""])
 
-    setrow(0, f"{tab} 공급률 분석 리포트 (갤러리아몰)")
+    emit(f"{tab} 공급률 분석 리포트 (갤러리아몰)")
+    emit()
     coupon_summary = ", ".join(f"{c}={products[c].coupon_pct:.0f}%" for c in C.PRODUCT_CODES)
-    setrow(2, f"할인정보: 기본할인 + 쿠폰 ({coupon_summary}) + 네이버구매할인 ×{C.GALLERIA_NAVER_MULT}")
-    setrow(3, "카드페이백: 없음 (갤러리아몰 카드할인 미운영)")
+    emit(f"할인정보: 기본할인 + 쿠폰 ({coupon_summary}) + 네이버구매할인 ×{C.GALLERIA_NAVER_MULT}")
+    emit("카드페이백: 없음 (갤러리아몰 카드할인 미운영)")
+    emit()
 
-    setrow(5, f"[40/70만원 구매혜택 구성] {gwp.period}")
-    for i, s in enumerate(gwp.set_items):
-        setrow(6 + i, s.name, f"x{s.qty}", f"{s.price:,}원" if s.price else "단가미정")
-    setrow(11, "1세트 합계", "", f"{gwp.set_value:,}원")
-    setrow(12, "6세트 합계 (70만+)", "", f"{gwp.set_value * 6:,}원")
+    # GWP 1세트 구성 — 품목 수 무관
+    emit(f"[40/70만원 구매혜택 구성] {gwp.period}")
+    for s in gwp.set_items:
+        emit(s.name, f"x{s.qty}", f"{s.price:,}원" if s.price else "단가미정")
+    emit("1세트 합계", "", f"{gwp.set_value:,}원")
+    emit("6세트 합계 (70만+)", "", f"{gwp.set_value * 6:,}원")
+    emit()
 
-    # 상품별 추가증정 (행 15~)
-    setrow(14, "[상품별 추가증정 구성]")
-    header = ["", *[f"{c} {C.PRODUCTS[c]['name']}" for c in C.PRODUCT_CODES]]
-    setrow(15, *header)
-    max_samples = max(len(products[c].add_gifts) for c in C.PRODUCT_CODES) if products else 0
+    # 상품별 추가증정 구성 — 샘플 수 무관
+    emit("[상품별 추가증정 구성]")
+    emit("", *[f"{c} {C.PRODUCTS[c]['name']}" for c in C.PRODUCT_CODES])
+    max_samples = max((len(products[c].add_gifts) for c in C.PRODUCT_CODES), default=0)
     for i in range(max_samples):
         row = [f"샘플{i + 1}"]
         for c in C.PRODUCT_CODES:
             items = products[c].add_gifts
-            if i < len(items):
-                s = items[i]
-                row.append(f"{s.name} x{s.qty} ({s.price:,}원)")
-            else:
-                row.append("")
-        setrow(16 + i, *row)
-    setrow(16 + max_samples, "추가증정가치", *[f"{products[c].add_gift_value:,}원" for c in C.PRODUCT_CODES])
-    # 신규 품목 알림
-    new_alerts = []
-    for c in C.PRODUCT_CODES:
-        if products[c].new_items:
-            new_alerts.append(f"{c}: {', '.join(products[c].new_items)}")
+            row.append(f"{items[i].name} x{items[i].qty} ({items[i].price:,}원)"
+                       if i < len(items) else "")
+        emit(*row)
+    emit("추가증정가치", *[f"{products[c].add_gift_value:,}원" for c in C.PRODUCT_CODES])
+    new_alerts = [f"{c}: {', '.join(products[c].new_items)}"
+                  for c in C.PRODUCT_CODES if products[c].new_items]
     if new_alerts:
-        setrow(17 + max_samples, "⚠️ 신규품목 (단가미정)", *new_alerts)
+        emit("⚠️ 신규품목 (단가미정)", *new_alerts)
+    emit()
 
-    # 20개 조합 공급률 요약 (타이틀 28→행29, 헤더 29→행30, 데이터 30~49→행31~50)
-    # A~G열: 조합 요약 / I~K열: 상품별 쿠폰율 (b~h, 첫 7행)
-    setrow(28, f"[{len(C.COMBOS)}개 조합 공급률 요약 - 갤러리아몰]", "", "", "", "", "", "",
-           "", "[상품별 쿠폰율]")
-    setrow(29, "조합번호", "조합", "소비자가", "총샘플가치", "네이버최종구매가", "순구매가", "공급률",
-           "", "상품", "기본할인%", "쿠폰%")
+    # 20개 조합 공급률 요약 — A~G열 요약 / I~K열 상품별 쿠폰율 (b~h, 첫 7행)
+    emit(f"[{len(C.COMBOS)}개 조합 공급률 요약 - 갤러리아몰]", "", "", "", "", "", "",
+         "", "[상품별 쿠폰율]")
+    emit("조합번호", "조합", "소비자가", "총샘플가치", "네이버최종구매가", "순구매가", "공급률",
+         "", "상품", "기본할인%", "쿠폰%")
     for i, r in enumerate(combos):
         row_data = [r["idx"], r["name"], r["소비자가"], r["총샘플"],
                     r["최종구매가"], r["순구매가"], round(r["공급률"], 4)]
@@ -370,7 +371,17 @@ def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
                          f"{code} {C.PRODUCTS[code]['name']}",
                          f"{p.basic_discount_pct:.0f}%",
                          f"{p.coupon_pct:.0f}%"]
-        setrow(30 + i, *row_data)
+        emit(*row_data)
+
+    # 갤러리아 영역 초과 = Hmall(C.HMALL_HEADER_ROW~)/롯데 침범 → 조용히 덮어쓰지 말고 명시적 실패.
+    if len(rows) > C.GALLERIA_DATA_END_ROW:
+        raise ValueError(
+            f"갤러리아 섹션이 {len(rows)}행 (> 예약 {C.GALLERIA_DATA_END_ROW}행) — "
+            f"GWP/샘플 품목 과다. GALLERIA_DATA_END_ROW 상향 + Hmall/롯데 행 재조정 필요 (RULES §13)."
+        )
+    # batch_clear(A1:I{END}) 영역을 전부 덮어쓰도록 빈 행 패딩.
+    while len(rows) < C.GALLERIA_DATA_END_ROW:
+        rows.append([""])
 
     rng = C.write_grid(ws, 1, rows)
 

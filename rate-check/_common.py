@@ -399,8 +399,8 @@ def load_galleria_composition_from_sheet(ws) -> dict:
     Returns: {"add_gift_value": {b: int, ...}, "gwp_1set": int, "gwp_6set": int}
     galleria가 미실행이면 ValueError.
     """
-    # 1) 추가증정가치 행 — "추가증정가치" 라벨 검색 (row 17~30 안에 있음, max_samples에 따라 가변)
-    block = ws.get("A15:H30")
+    # 1) 추가증정가치 행 — "추가증정가치" 라벨 검색 (갤러리아 섹션 전체, 위치 가변 안전)
+    block = ws.get("A6:H50")
     add_gift_value = {}
     for row in block:
         if row and row[0].strip().startswith("추가증정가치"):
@@ -411,8 +411,8 @@ def load_galleria_composition_from_sheet(ws) -> dict:
     if not add_gift_value or len(add_gift_value) < 7:
         raise ValueError("'추가증정가치' 행 sheet에서 못찾음 — galleria 먼저 실행 필요")
 
-    # 2) GWP 1세트/6세트 — "1세트 합계" / "6세트 합계" 라벨 검색 (row 6~15)
-    gwp_block = ws.get("A6:C15")
+    # 2) GWP 1세트/6세트 — "1세트 합계" / "6세트 합계" 라벨 검색 (품목 수 무관, 위치 가변 안전)
+    gwp_block = ws.get("A6:C50")
     gwp_1set = gwp_6set = 0
     for row in gwp_block:
         if not row:
@@ -434,9 +434,9 @@ def load_galleria_samples_from_sheet(ws) -> dict:
 
     각 cell 텍스트 형식: '{name} x{qty} ({price}원)'. s코드는 SAMPLE_TABLE lookup.
     Returns: {code: [{name, qty, price, code}, ...]}
-    캐시 X — sheet가 SoT.
+    캐시 X — sheet가 SoT. "샘플" 행만 수집, "추가증정가치"에서 종료 → 위치 가변 안전.
     """
-    block = ws.get("A15:H30")
+    block = ws.get("A6:H50")
     products = {c: [] for c in "bcdefgh"}
     for row in block[1:]:  # row 0 = 헤더
         if not row:
@@ -466,10 +466,10 @@ def load_galleria_samples_from_sheet(ws) -> dict:
 def load_galleria_gwp_from_sheet(ws) -> list[dict]:
     """galleria sheet의 GWP 1세트 샘플 리스트 파싱 (inventory.py 용).
 
-    Sheet row 7~11 (변동 가능): col A=name, col B='x{qty}', col C='{price}원'
+    col A=name, col B='x{qty}', col C='{price}원'. "1세트 합계" 라벨에서 종료 (품목 수 무관).
     Returns: [{name, qty, price, code}, ...]
     """
-    block = ws.get("A7:C13")
+    block = ws.get("A7:C50")
     set_items = []
     for row in block:
         if not row or not row[0].strip():

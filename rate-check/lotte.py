@@ -18,7 +18,7 @@ import gspread
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import (
     combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID,
-    today_tab_name, gs_client, COMBOS,
+    today_tab_name, gs_client, COMBOS, CARD_PAYBACK,
     LOTTE_HEADER_ROW, LOTTE_COMBO_END_ROW, CHART_RANGE,
 )
 
@@ -128,20 +128,13 @@ for code in 'bcdefgh':
     # 첫 상품(b)에서만 카드 청구할인 확인
     if code == 'b' and card_info is None:
         js_card = """
-        // detail_list / benefit 영역에서 "청구할인" 텍스트 + N% 추출
+        // "청구할인" 라인 + N% 추출. brand 는 % 가 잡힌 그 라인을 Python 이 stem 매칭.
         const body = document.body.innerText;
         const lines = body.split('\\n').filter(l => /청구할인/.test(l));
         const out = {lines: lines.slice(0,10)};
         for (const l of lines) {
           const m = l.match(/(\\d+)\\s*%\\s*청구할인/);
-          if (m) { out.pct = parseInt(m[1]); break; }
-        }
-        // 카드 이름 추출 (롯데/비씨/삼성/하나/농협)
-        for (const c of ['롯데카드', '비씨카드', '삼성카드', '하나카드', '농협카드']) {
-          if (body.includes(c)) {
-            if (!out.cards) out.cards = [];
-            out.cards.push(c);
-          }
+          if (m) { out.pct = parseInt(m[1]); out.cardline = l.trim(); break; }
         }
         return out;
         """
@@ -197,13 +190,27 @@ try:
 except Exception as e:
     print(f"⚠️ 적립금 subprocess 실패 ({e}) — tiers 빈 dict")
 
-# 카드 결정 (단일 카드 가정)
-CARD_NAME = (card_info.get('cards') or ['미확인'])[0] if card_info else '미확인'
-CARD_PCT = card_info.get('pct') or 0 if card_info else 0
-PAYBACK = {
-    '롯데카드': 0.02, '비씨카드': 0.015, '삼성카드': 0.01,
-    '하나카드': 0.01, '농협카드': 0.01,
-}.get(CARD_NAME, 0)
+# 카드 결정 (단일 카드 가정). brand = "청구할인" 라인에서 stem 매칭.
+# 롯데홈쇼핑 결제수단 카드: 현대 / 하나 / NHPay / KBPay / 롯데 / 삼성 / BC(ISP·페이북) (사용자 6/4).
+# 페이백은 카탈로그 CARD_PAYBACK 단일소스 (없는 brand=0). 5%할인 등 pct 는 라인에서 추출.
+LOTTE_CARD_STEMS = [
+    ("현대카드", ("현대",)),
+    ("하나카드", ("하나",)),
+    ("농협카드", ("NH", "농협")),       # NHPay
+    ("KB국민카드", ("KB", "국민")),     # KBPay
+    ("롯데카드", ("롯데",)),
+    ("삼성카드", ("삼성",)),
+    ("비씨카드", ("BC", "비씨", "ISP", "페이북")),
+]
+_cardline = ((card_info or {}).get('cardline')
+             or " ".join((card_info or {}).get('lines', []) or []))
+CARD_NAME = '미확인'
+for _name, _stems in LOTTE_CARD_STEMS:
+    if any(s in _cardline for s in _stems):
+        CARD_NAME = _name
+        break
+CARD_PCT = (card_info.get('pct') or 0) if card_info else 0
+PAYBACK = CARD_PAYBACK.get(CARD_NAME, 0)
 
 print(f"\n적용 카드: {CARD_NAME} {CARD_PCT}% (페이백 {PAYBACK*100:.1f}%)")
 
