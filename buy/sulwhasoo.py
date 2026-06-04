@@ -214,7 +214,9 @@ def galleria_add_product_by_url(page: Page, goods_no: str, qty: int) -> bool:
 
         # 쿠폰 영역 펼치기 + 모든 쿠폰 다운로드
         try:
-            coupon_btn = page.get_by_role("button").filter(has_text=re.compile(r"\[화장\].*설화수.*\d+%")).first
+            # [화장] 쿠폰 버튼이면 채택 — '설화수' 글자 강제 금지 ("[화장] 더블쿠폰 14%"(b/f/h)는
+            # '설화수'가 없어 누락됐었음, 2026-06-04). %만 있으면 펼친다 (rate-check 쿠폰 룰과 동일).
+            coupon_btn = page.get_by_role("button").filter(has_text=re.compile(r"\[화장\].*\d+\s*%")).first
             coupon_btn.click(timeout=3000)
             page.wait_for_timeout(800)
             page.get_by_role("button", name="모든 쿠폰 다운로드").click(timeout=3000)
