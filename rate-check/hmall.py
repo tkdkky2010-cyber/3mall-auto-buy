@@ -1,4 +1,4 @@
-"""Hmall 공급률 분석 — 20조합 실제 체크아웃 페이지 가격 기반 (active).
+"""Hmall 공급률 분석 — 전 조합(len(COMBOS)) 실제 체크아웃 페이지 가격 기반 (active).
 
 Step 1 substep #4 의 active script. buy/run.py 의 로그인 + cart 자동 fill 사용 →
 사용자 수동 cart 세팅 불필요. 완전 자동.

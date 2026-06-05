@@ -257,26 +257,27 @@ evaluator 발견 시 사용자 confirm 받고 fix. 자동 fix 금지 (root cause
 
 ---
 
-## §13. 시트 "{M.DD}" 탭 layout 구조 — 20조합 (2026-05-17 갱신, 5/18~ 적용)
+## §13. 시트 "{M.DD}" 탭 layout 구조 — N조합 (행번호 len(COMBOS) 파생, 2026-06-05~)
 
 **구조만 기술 — 셀 값(공급률, 가격 등)은 매일 다르므로 박지 않는다.**  
-**행 번호는 `_common.py` 상수로 단일소스 (DRY) — 하드코드 금지.**
+**행 번호는 `_common.py` 상수로 단일소스 (DRY) — `len(COMBOS)` 기반 파생, 하드코드 금지.**
+**조합 개수 N은 가변 — Hmall/Lotte 행·차트 범위가 N 따라 자동 정렬. (N=20: Hmall 53~78 / Lotte 81~107 / J1:M21. 현재 N=23: Hmall 53~81 / Lotte 84~113 / J1:M24.)**
 
-### 13-1. 행 영역 (vertical layout)
-- **행 1~50** (`GALLERIA_DATA_END_ROW`): 갤러리아 섹션 (제목 / 할인정보 / GWP / 추증가치 / 20조합 요약)
-- **행 51~52**: 빈 (간격)
-- **행 53~78** (`HMALL_HEADER_ROW`~`HMALL_COMBO_END_ROW`): 현대Hmall 섹션 (헤더 6행 + 20조합 = 26행)
-- **행 79~80**: 빈
-- **행 81~107** (`LOTTE_HEADER_ROW`~`LOTTE_COMBO_END_ROW`): 롯데 섹션 (헤더 7행 + 20조합 + 우측 쿠폰 블록 = 27행)
+### 13-1. 행 영역 (vertical layout) — N = len(COMBOS)
+- **행 1~50** (`GALLERIA_DATA_END_ROW`): 갤러리아 섹션 (제목 / 할인정보 / GWP / 추증가치 / N조합 요약, 동적 flow). 초과 시 명시적 에러(가드).
+- **gap 3행** (51~52 빈): 간격
+- **`HMALL_HEADER_ROW`(=GALLERIA_END+3) ~ `HMALL_COMBO_END_ROW`**: 현대Hmall (헤더 6행 + N조합)
+- **gap 3행**: 빈
+- **`LOTTE_HEADER_ROW`(=HMALL_END+3) ~ `LOTTE_COMBO_END_ROW`**: 롯데 (헤더 7행 + N조합 + 우측 쿠폰 블록)
 - **행 1~N+3, O~R열**: 카트플랜 출력 (cart_plan.py — galleria K~M 비교차트와 분리, J까지만 사용)
 
-→ 각 mall 스크립트의 `START` 변수 (모두 `_common.py` 상수 참조):
+→ 각 mall 스크립트의 `START` 변수 (모두 `_common.py` 파생 상수 참조):
 - galleria.py: row 1부터 (`batch_clear A1:I{GALLERIA_DATA_END_ROW}`)
-- hmall.py: `C.HMALL_HEADER_ROW` (=53)
-- lotte.py: `C.LOTTE_HEADER_ROW` (=81)
+- hmall.py: `C.HMALL_HEADER_ROW`
+- lotte.py: `C.LOTTE_HEADER_ROW`
 
-### 13-2. 3사 공급률 비교 차트 — `CHART_RANGE` = "J1:M21"
-오른쪽 상단에 배치 (행 1~21, 갤러리아 데이터 안 닿는 J~M열).
+### 13-2. 3사 공급률 비교 차트 — `CHART_RANGE` = f"J1:M{1+N}"
+오른쪽 상단에 배치 (행 1~(1+N), 갤러리아 데이터 안 닿는 J~M열).
 
 | 열 | 행 1 (header) | 행 2~21 (조합 1~20) |
 |---|---|---|

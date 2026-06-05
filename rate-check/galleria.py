@@ -490,7 +490,7 @@ def main(argv=None):
 
     # --only 디버그 모드면 20조합 계산 스킵
     if args.only:
-        print(f"\n  --only {args.only} → 20조합 계산/시트 입력 생략")
+        print(f"\n  --only {args.only} → 전체 조합 계산/시트 입력 생략")
         return 0
 
     # 20개 조합 계산 (조합번호 1~20 순)

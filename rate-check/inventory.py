@@ -63,7 +63,7 @@ def composition_to_combo_codes(comp: dict, gwp_sets_per_combo: int = 6) -> dict[
     같은 코드끼리 합산.
 
     gwp_sets_per_combo: 가이드는 조합별 본품가>700K → 6세트, 400K~700K → 3세트.
-    실제로 20조합 모두 700K+ 가정 (Layer 1 TOP 20 정의 기준) — 디폴트 6.
+    실제로 전 조합 700K+ 가정 (Layer 1 조합 정의 기준) — 디폴트 6.
     """
     products = comp["products"]
     gwp_set = comp["gwp"]["set"]
