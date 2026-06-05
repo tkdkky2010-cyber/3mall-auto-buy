@@ -268,24 +268,39 @@ def _cart_count(its: list) -> tuple:
     return gb, (re.search(r"\((\d+)\s*/\s*(\d+)\)", near["text"]) if near else None)
 
 
-def cdp_select_all(timeout: float = 8) -> tuple[bool, str]:
-    """전체선택 → (ok, '(n/n)'). **native '일반상품' 헤더 체크박스 직접 탭**.
-    ⚠️ CDP basktList는 분절(stale/1개짜리 WebView 동시 visible)이라 신뢰 X(#4 실측). 검증도
-    화면 첫 (n/m)이 추천 캐러셀일 수 있어 '일반상품' 행의 (n/m)로만 판정(#4: 카트1개인데 캐러셀'(1/7)' 오탐)."""
+def _checkbox_selected(png: str, cx: int, cy: int) -> bool:
+    """'일반상품' 헤더 체크박스 픽셀색 판정 — 선택=빨강(실측 249,132,117), 미선택=회색(235,235,235).
+    중심 ±14px 평균 R-G > 60 이면 선택. OCR (n/m) 숫자 판정 대체(2026-06-05 오독 사고)."""
+    from PIL import Image
+    im = Image.open(png).convert("RGB")
+    px = [im.getpixel((x, y)) for x in range(max(0, cx - 14), cx + 15)
+          for y in range(max(0, cy - 14), cy + 15)]
+    r = sum(p[0] for p in px) / len(px)
+    g = sum(p[1] for p in px) / len(px)
+    return (r - g) > 60
+
+
+def cdp_select_all(timeout: float = 25) -> tuple[bool, str]:
+    """전체선택 → (ok, '(n/m)'). '일반상품' 헤더 좌측 체크박스 탭 + **픽셀색 검증**.
+    ⚠️ CDP basktList는 분절(stale/1개짜리 WebView 동시 visible)이라 신뢰 X(#4 실측).
+    ⚠️ (n/m) 숫자 OCR 판정 금지 — 실측 사고 2건(2026-06-05 #2/#3/#17/#18):
+      ① '(1/1)' 회색 두번째 1을 7로 오독 → (1/7) → 멀쩡한 선택을 토글로 해제
+      ② 렌더 직후 첫 탭 불발(핸들러 미부착) 후 즉시 False 리턴
+    → 판정은 체크박스 빨강(_checkbox_selected)으로만, 숫자는 리포팅용. timeout까지 탭 재시도."""
     end = time.time() + timeout
+    last = "no-cart(일반상품 헤더 미발견)"
     while time.time() < end:
-        gb, mm = _cart_count(_ocr_texts(cap()))
+        png = cap()
+        gb, mm = _cart_count(_ocr_texts(png))
         if gb is None:
             time.sleep(0.5); continue
-        if mm and mm.group(1) == mm.group(2) and int(mm.group(2)) > 0:
-            return True, mm.group(0)                              # 이미 전체선택
-        # 일반상품 헤더 왼쪽 체크박스 탭 (전체선택 토글) — 좌표: 헤더 좌측끝 ~50px 왼쪽
-        _adb().tap(max(45, gb["cx"] - gb["w"] // 2 - 50), gb["cy"]); time.sleep(1.3)
-        gb2, mm2 = _cart_count(_ocr_texts(cap()))
-        if mm2 and mm2.group(1) == mm2.group(2):
-            return True, mm2.group(0)
-        return (False, mm2.group(0) if mm2 else "no-count")
-    return False, "no-cart(일반상품 헤더 미발견)"
+        # 체크박스 중심 = 헤더 좌측끝 ~50px 왼쪽 (실측 (60,422), 계산 (65,425))
+        bx, by = max(45, gb["cx"] - gb["w"] // 2 - 50), gb["cy"]
+        last = mm.group(0) if mm else "no-count"
+        if _checkbox_selected(png, bx, by):
+            return True, last                                     # 선택 확인(픽셀)
+        _adb().tap(bx, by); time.sleep(1.3)
+    return False, last
 
 
 def beauty_reauth(profile: dict, timeout: float = 12) -> dict:
@@ -475,32 +490,87 @@ def enter_card_password() -> dict:
 
 # ──────────────────────────── 결제 시퀀스 ────────────────────────────
 
+def _fuzzy_has(text: str, name: str) -> bool:
+    """OCR 1글자 오독 허용 카드명 매칭 — text(공백제거) 안에 name과 hamming<=1 윈도우 존재.
+    실측: '현대카드'를 '혀대카드'로 오독(#17 2026-06-05) → 정확매칭/startswith 실패."""
+    t = text.replace(" ", "")
+    n = len(name)
+    if name in t:
+        return True
+    for i in range(len(t) - n + 1):
+        if sum(a != b for a, b in zip(t[i:i + n], name)) <= 1:
+            return True
+    return False
+
+
+def _verify_pay_method(grid_name: str, timeout: float = 14) -> bool:
+    """주문서 '결제수단' 행 **아래**에 목표 카드명 표기 **양성 검증** (fuzzy, 스크롤 포함).
+    select_card 성공 판정은 이걸로만 — '신용카드 선택 placeholder 부재' 같은 부재 검증 금지(#17 오진).
+    · 밴드 = 결제수단 행 아래 전체 (위쪽 'Ed2 현대카드 청구할인' 이벤트 행 오매칭 방지)
+    · '적용되었어요' 토스트가 카드명 행을 덮을 수 있음 → 토스트 보이면 대기 후 재확인
+    · 탭형 UI(카드/페이/무통장/휴대폰)는 카드명 행이 화면 하단에 잘림(#17 실측) → 소폭 스크롤 2회 탐색
+      (300px — '카드할인' 헤더가 화면에 남아 호출측 재탐색 안 깨짐)"""
+    end = time.time() + timeout
+    swiped_big = 0
+    swiped_small = 0
+    while time.time() < end:
+        its = _ocr_texts(cap())
+        txt = " ".join(it["text"] for it in its)
+        pm = next((it for it in its if "결제수단" in it["text"]), None)
+        if pm:
+            band = [it for it in its if it["cy"] > pm["cy"] - 10]
+            if any(_fuzzy_has(it["text"], grid_name) for it in band):
+                return True
+            if "적용되" in txt:                    # 토스트가 카드명 행을 덮는 중 → 사라질 때까지 재시도
+                time.sleep(1.2); continue
+            if swiped_small < 2:                    # 카드명 행이 탭 아래 잘림 → 소폭 스크롤
+                _adb().swipe(540, 1750, 540, 1450, 400); swiped_small += 1
+                time.sleep(0.7); continue
+            return False                            # 결제수단 아래 어디에도 카드명 없음 = 미설정
+        if swiped_big < 4:                          # '결제수단' 자체가 화면 밖 → 스크롤 다운
+            _adb().swipe(540, 1700, 540, 900, 400); swiped_big += 1
+        time.sleep(0.7)
+    return False
+
+
 def _pick_card_from_grid(grid_name: str = "현대카드") -> bool:
-    """결제수단변경/신용카드 선택 → '카드 선택' 그리드 → grid_name 탭 (등록 없이 카드+할인 설정).
-    실측: opener = 등록계정 '결제수단변경' / 미등록 '신용카드 선택'. 그리드 한 단계 더(신용카드 선택)일 수 있음.
+    """결제수단변경/신용카드 선택 → '카드 선택' 그리드 → grid_name 탭.
+    ⚠️ '미등록' 개념 없음 — 모든 카드사가 모든 계정에서 그리드로 항상 선택 가능(2026-06-06 사용자 확인).
+    opener 표기는 계정/UI 상태별: '결제수단변경' / '신용카드 선택' placeholder / 탭형(페이→카드).
     (#7·#8 현대카드, #4 롯데카드 2026-05-31 검증.)"""
-    # 결제수단 섹션(결제수단변경/신용카드 선택)이 화면 아래일 수 있음 → 스크롤하며 opener 탐색
-    op = None
+    # 결제수단 섹션 opener 3단계 (화면 아래일 수 있음 → 스크롤하며 탐색):
+    #   ① '결제수단변경' → ② '신용카드 선택' placeholder
+    #   → ③ 탭형 UI(둘 다 없음): '페이/Pay' 탭 → 다시 '카드' 탭 = '카드 선택' 전체 그리드 등장
+    #     (사용자 실측 2026-06-06 #17: 탭형 주문서에서 전 카드 목록 뜨는 유일 경로)
+    opened = False
     for _ in range(5):
         its = _ocr_texts(cap())
         op = next((it for it in its if "결제수단변경" in it["text"]), None) or \
              next((it for it in its if "신용카드 선택" in it["text"]), None)
         if op:
+            _adb().tap(op["cx"], op["cy"]); time.sleep(1.8)
+            opened = True
+            break
+        pay_tab = next((it for it in its if "페이" in it["text"] and "Pay" in it["text"]), None)
+        card_tab = next((it for it in its if it["text"].strip() == "카드"), None)
+        if pay_tab and card_tab:
+            _adb().tap(pay_tab["cx"], pay_tab["cy"]); time.sleep(1.5)
+            _adb().tap(card_tab["cx"], card_tab["cy"]); time.sleep(1.5)
+            opened = True
             break
         _adb().swipe(540, 1700, 540, 900, 400); time.sleep(0.8)   # 결제수단 보이게 스크롤 다운
-    if not op:
+    if not opened:
         return False
-    _adb().tap(op["cx"], op["cy"]); time.sleep(1.8)
     its2 = _ocr_texts(cap())
-    if not any(it["text"].strip().startswith(grid_name) for it in its2):   # 신용카드 선택 드롭다운 한 단계 더
+    if not any(_fuzzy_has(it["text"].strip(), grid_name) for it in its2):  # 신용카드 선택 드롭다운 한 단계 더
         sc = next((it for it in its2 if "신용카드 선택" in it["text"]), None)
         if sc:
             _adb().tap(sc["cx"], sc["cy"]); time.sleep(1.5)
     # '카드 선택' 그리드는 카드 많아 길 수 있음 → grid_name 안 보이면 그리드 영역 스크롤하며 탐색
+    # _fuzzy_has: '비씨카드(페이북)' 접미사(startswith 상위집합) + '혀대카드' 류 OCR 오독 대응(#17).
     hd = None
     for _ in range(5):
-        # startswith: 'BC'→'비씨카드'가 그리드엔 '비씨카드(페이북)'로 뜸(접미사) 대응. 정확매칭의 상위집합.
-        hd = next((it for it in _ocr_texts(cap()) if it["text"].strip().startswith(grid_name)), None)
+        hd = next((it for it in _ocr_texts(cap()) if _fuzzy_has(it["text"].strip(), grid_name)), None)
         if hd:
             break
         _adb().swipe(540, 1750, 540, 1050, 400); time.sleep(0.8)   # 그리드 스크롤 다운
@@ -515,13 +585,18 @@ def _pick_hyundai_from_grid() -> bool:
 
 
 def select_card_discount(grid_name: str = "현대카드") -> dict:
-    """주문서 '카드할인'에서 당일 할인카드(오른쪽에 금액 적힌 행) 선택 → '결제수단' 자동변경.
-    grid_name = 미등록 계정 그리드 fallback 카드명(당일 카드, 기본 현대카드).
+    """⚠️ LEGACY (2026-06-06부터 미사용) — 당일카드 선택 정본은 flow_runner
+    `hmall_select_card_discount`(700px + 캐러셀금액==결제버튼금액 판정). 이 OCR 버전은 카드명
+    검증이라 할인적용 미보장 → 새 코드에서 호출 금지. 참고용으로만 보존.
+
+    주문서 '카드할인'에서 당일 할인카드(오른쪽에 금액 적힌 행) 선택 → '결제수단' 자동변경.
+    grid_name = 그리드 fallback 카드명(당일 카드, 기본 현대카드).
     실측(#6 2026-05-31): 카드할인 행 탭 → 결제수단이 카카오페이→'현대카드'로 자동 변경 + 즉시할인 적용.
     ⚠️ 금액(원) 적힌 행만 선택. '현대카드 Ed2 7% 청구할인'처럼 '>'만 있고 금액 없는 건 이벤트 안내 → 탭 금지.
        금액 카드 2개면 위(첫번째)=당일 할인카드."""
     out = {"ok": False}
-    for _ in range(6):
+    taps = 0
+    for _ in range(8):
         its = _ocr_texts(cap())
         hdr = next((it for it in its if it["text"].strip() == "카드할인"), None)
         if hdr:
@@ -534,19 +609,40 @@ def select_card_discount(grid_name: str = "현대카드") -> dict:
                     and y_lo < it["cy"] < y_hi and "결제하기" not in it["text"]]
             rows.sort(key=lambda it: it["cy"])          # 위(첫번째)=당일 할인카드
             if rows:
+                # ⚠️ 카드할인 행 = **토글**. 이미 목표카드 설정 상태에서 또 탭하면 해제됨
+                # (#17 2026-06-05: 적용된 상태 재탭 → off → 결제수단 미설정 → '미등록' 오진).
+                # → 탭 전에 결제수단 양성 검증 먼저. 성공 판정도 이걸로만(부재 검증 금지).
+                if _verify_pay_method(grid_name, timeout=4):
+                    out["ok"] = True
+                    out["pre_applied"] = (taps == 0)
+                    return out
+                if taps >= 2:
+                    out["err"] = f"결제수단 '{grid_name}' 설정 검증 실패(탭 {taps}회)"
+                    return out
                 _adb().tap(350, rows[0]["cy"]); time.sleep(1.8)   # 카드 행 좌측 탭 (즉시할인 적용)
+                taps += 1
                 out["amt"] = rows[0]["text"]
-                t2 = " ".join(x["text"] for x in _ocr_texts(cap()))
-                # 카드 미등록 계정(#7): 결제수단 '신용카드 선택' → 카드선택 그리드에서 그 카드 선택.
-                # (등록 계정은 카드할인 탭만으로 결제수단 자동 → 그리드 불필요)
+                its2 = _ocr_texts(cap())
+                t2 = " ".join(x["text"] for x in its2)
+                # '~% 즉시할인이 적용되었어요' 토스트의 카드 토큰이 목표와 다르면 = 다른 카드 행을 탭함
+                # (detect 오감지 등) → 즉시 실패.
+                toast = next((x["text"] for x in its2 if "적용되" in x["text"]), "")
+                if toast:
+                    out["toast"] = toast
+                    tk = next((k for a, k in CARD_ALIASES.items() if a in toast), None)
+                    expect = next((k for k, v in CARD_GRID_NAME.items() if v == grid_name), grid_name[:2])
+                    if tk and tk != expect:
+                        out["err"] = f"카드할인 적용 카드 불일치: 토스트='{toast}' (목표 {grid_name})"
+                        return out
+                # 결제수단 placeholder '신용카드 선택'이 뜨면 그리드에서 그 카드 선택
+                # ('미등록' 개념 없음 — 그리드는 항상 사용 가능한 경로. 평소엔 행 탭만으로 자동설정)
                 if "신용카드 선택" in t2:
                     out["grid"] = _pick_card_from_grid(grid_name)
-                    t2 = " ".join(x["text"] for x in _ocr_texts(cap()))
                 out["applied"] = "적용" in t2                      # '적용되었어요' 토스트
-                out["ok"] = "신용카드 선택" not in t2              # placeholder 사라짐 = 현대카드 설정됨
-                return out
-        _adb().swipe(540, 1700, 540, 800, 400); time.sleep(0.8)   # 스크롤 다운
-    out["err"] = "카드할인 섹션 못 찾음"
+                continue                                           # 검증은 루프 상단 pre-check 에서
+        else:
+            _adb().swipe(540, 1700, 540, 800, 400); time.sleep(0.8)   # 스크롤 다운
+    out.setdefault("err", "카드할인 섹션 못 찾음/설정 실패")
     return out
 
 
@@ -948,7 +1044,15 @@ def detect_card() -> str | None:
                 return None
             # ⚠️ OCR이 '현대 5% 즉시할인'과 '255,968원'을 별도 item으로 쪼갤 수 있음 → 영역 전체에서
             #    카드사 토큰 검색(위=첫번째 당일카드). 금액 item엔 카드명 없음(#4 실측).
+            # ⚠️ 단, 금액 없는 행은 제외 — '현대홈쇼핑 현대카드 Ed2 7% 청구할인 >' 이벤트 안내 행에서
+            #    '현대' 오감지 → 당일카드가 롯데인데 현대로 진행하는 사고(#17 2026-06-05 오진 원인 후보).
+            amt_rows = [it for it in region
+                        if re.search(r"[\d,]{4,}\s*원", it["text"]) and "결제하기" not in it["text"]]
             for it in sorted(region, key=lambda x: x["cy"]):
+                same_row_amt = re.search(r"[\d,]{4,}\s*원", it["text"]) or \
+                    any(abs(a["cy"] - it["cy"]) < 40 for a in amt_rows)
+                if not same_row_amt:
+                    continue
                 for alias, key in CARD_ALIASES.items():   # 별칭 매핑(현대 외 변형표기 대비, 현대 오폴백 방지)
                     if alias in it["text"]:
                         return key
@@ -964,9 +1068,18 @@ def select_card(card: str, day: str | None = None) -> dict:
         day = detect_card()
     grid_name = CARD_GRID_NAME.get(card, card + "카드")
     if day == card:
-        return select_card_discount(grid_name)                 # 캐러셀 (당일 할인)
+        # ★당일카드 = 700px 정본(flow_runner hmall_select_card_discount, 식품 flow와 동일):
+        #   맨위→700px→캐러셀 '즉시할인' 행 금액 == 하단 결제버튼 금액 판정(2026-06-06 사용자 지정).
+        #   동일=선택됨(탭 X, 토글 보호) / 다름=탭→재확인 / 불일치 지속=raise(결제 차단).
+        #   ⚠️ fallback 금지 — 정본이 차단한 결제를 다른 검증으로 통과시키면 가드 무력화.
+        try:
+            FlowRunner(use_camera=False).run_action({"action": "hmall_select_card_discount"})
+            return {"ok": True, "via": "700px"}
+        except Exception as e:
+            return {"ok": False, "via": "700px", "err": f"카드할인 적용 확인 실패(결제 차단): {e}"}
     ok = _pick_card_from_grid(grid_name)                        # 그리드 (오늘 할인 아님 — 강제선택)
-    return {"ok": ok, "via": "grid", "err": None if ok else f"{card} 그리드 선택 실패"}
+    ok = ok and _verify_pay_method(grid_name)                   # 양성 검증 (그리드 탭≠설정 보장, #17 교훈)
+    return {"ok": ok, "via": "grid", "err": None if ok else f"{card} 그리드 선택/검증 실패"}
 
 
 def pay_hyundai(pin: str = CARD_PIN) -> dict:
@@ -976,12 +1089,14 @@ def pay_hyundai(pin: str = CARD_PIN) -> dict:
     # 6) 결제하기(금액) → 현대 결제방식 (SDK 로딩)
     if not ocr_tap("결제하기", contains=True):
         out["err"] = "결제하기(금액) 실패"; return out
-    # 카드 미등록 계정: '카드종류를 선택해주세요' 팝업(결제수단=신용카드 선택) vs 'PIN번호 결제'(현대) 판정
+    # 결제수단 미설정: '카드종류를 선택해주세요' 팝업 vs 'PIN번호 결제'(현대) 판정
     end = time.time() + 15
     while time.time() < end:
         t = " ".join(x["text"] for x in _ocr_texts(cap()))
         if "카드종류" in t or "신용카드 선택" in t:
-            out["err"] = "현대카드 미등록 — 결제수단에 등록된 카드 없음(계정에 현대카드 등록 필요)"; return out
+            # ⚠️ '미등록이라 등록 필요' 아님 — select_card 검증을 통과 못 한 채 결제 진입한 것.
+            # 미등록 계정도 그리드 탭으로 등록 없이 결제 가능. (#17 2026-06-05 오진 메시지 수정)
+            out["err"] = "결제수단 미설정(카드종류 선택 팝업) — select_card 단계 카드선택 실패"; return out
         if "PIN번호 결제" in t:
             break
         time.sleep(0.3)
@@ -1109,9 +1224,20 @@ def buy_one(idx: int, card: str | None = None) -> dict:
         res["status"] = "BUY_FAIL(구매하기)"; return res
     if not wait_text("결제하기", timeout=15):
         res["status"] = "ORDER_PAGE_FAIL(주문서 미도달)"; return res
+    # ★H.Point 전액사용 (700px 방식, <100p skip — flow_runner 정본 재사용, 식품 flow step5와 동일.
+    #   카드선택보다 먼저. 2026-06-05 결정사항인데 설화수 경로에 누락돼 있던 것 2026-06-06 연결)
+    try:
+        FlowRunner(use_camera=False).run_action({"action": "hmall_use_all_points"})
+    except Exception as e:
+        print(f"[#{idx}] ⚠️ 포인트 전액사용 실패(계속 진행): {e}", flush=True)
+    lap("H.Point 전액사용 (700px)")
     # 카드 결정 + 선택 (공통) — card 미지정 시 카드할인 캐러셀 당일카드 자동감지(스크롤 포함)
     day_card = detect_card()
-    use_card = card or day_card or "현대"
+    use_card = card or day_card
+    if not use_card:
+        # ⚠️ '현대' 기본 폴백 제거(2026-06-06): 감지 실패에 카드 추측 = 오결제/오SDK 위험.
+        #   감지 실패는 정지가 정답 (감지=SDK 디스패치 결정이라 틀리면 카드앱 흐름 전체가 어긋남).
+        res["status"] = "DETECT_CARD_FAIL(당일카드 미감지 — 추측 진행 금지)"; return res
     res["card"] = use_card
     print(f"[#{idx}] 당일카드 감지={day_card}, 사용={use_card}", flush=True)
     if use_card not in CARDS_SUPPORTED:
@@ -1263,6 +1389,13 @@ def resume(idx=None, max_steps: int = 50) -> dict:
         elif s == "PAY_METHOD":
             ocr_tap("PIN번호 결제", contains=True); wait_text("PIN번호를 입력", timeout=15)
         elif s == "ORDER_SHEET":
+            # ★주문서 재개도 정본 가드 통과 후 결제 (포인트→카드 금액일치, 2026-06-06).
+            #   둘 다 멱등: 포인트 이미 사용/없음=skip, 카드 금액일치=skip — 재개 시 이중적용 없음.
+            try:
+                FlowRunner(use_camera=False).run_action({"action": "hmall_use_all_points"})
+                FlowRunner(use_camera=False).run_action({"action": "hmall_select_card_discount"})
+            except Exception as e:
+                res["status"] = f"SELECT_CARD_FAIL(resume):{e}"; return res
             ocr_tap("결제하기", contains=True); wait_text("PIN번호 결제", timeout=15)
         elif s == "CART":
             cdp_select_all()

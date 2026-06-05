@@ -538,35 +538,45 @@ class FlowRunner:
             # '즉시할인' 텍스트를 dump로 찾아 그 실위치 탭(좌표 하드코딩 X). 포인트 유무·할인줄 수로
             # 캐러셀이 위아래로 움직임(계정2=1727 / 계정3=1987). 안전위치(y≤1900) 아니면(=결제버튼 근처/미발견)
             # 더 스크롤해 캐러셀을 위로 끌어올린 뒤 탭. dump 렌더 지연도 같은 루프로 흡수.
-            ij = None; nodes = []
-            for _ in range(7):
+            #
+            # ★판정(2026-06-06 사용자 지정): 캐러셀 '즉시할인' 행 오른쪽 '~~~원' == 하단 '~~~원 결제하기'
+            #   동일 → 카드 선택됨(탭 불필요/완료). 다름 → 미선택 → '즉시할인' 탭 → 재확인(동일해야 함).
+            #   (캐러셀 행 = 토글이라 무조건 탭 금지 — 적용 상태서 탭하면 해제. 금액 일치가 유일 신뢰 신호)
+            def _row_amt(nodes, iy):
+                # 즉시할인 행과 같은 줄(±60px)의 '~~~원' (결제하기 버튼 제외).
+                # ⚠️ dump가 '574,522' / '원' 을 별도 노드로 쪼갬(#17 실측) → 숫자-only 노드도 매칭.
+                for t, x1, y1, x2, y2 in nodes:
+                    if "결제하기" in t:
+                        continue
+                    tt = t.strip()
+                    m = _re.search(r"([\d,]{4,})\s*원", tt) or _re.fullmatch(r"([\d,]{4,})", tt)
+                    if m and abs((y1 + y2) // 2 - iy) < 60:
+                        return int(m.group(1).replace(",", ""))
+                return None
+
+            taps = 0
+            for _ in range(9):
                 nodes = _nodes()
-                if any("즉시할인이 적용" in t for t, *_ in nodes):
-                    self._log("  ✓ 즉시할인 이미 적용됨 — skip"); return
                 cand = next(((x1, y1, x2, y2) for t, x1, y1, x2, y2 in nodes if t.strip() == "즉시할인"), None)
-                if cand and (cand[1] + cand[3]) // 2 <= 1900:     # 안전 위치 확보 → 확정
-                    ij = cand; break
-                cy = (cand[1] + cand[3]) // 2 if cand else None
-                self._log(f"  즉시할인 위치 {cy} 미확보(결제버튼 근처/미발견) → 더 스크롤(위로 끌어올림)")
-                self.adb.swipe(540, 1500, 540, 1150, 300); time.sleep(1.0)   # 콘텐츠 위로 = 캐러셀 위로
-            if ij is None:
-                raise FlowError("hmall_select_card_discount: 즉시할인 카드 안전위치 확보 실패")
-            ix1, iy1, ix2, iy2 = ij
-            iy = (iy1 + iy2) // 2
-            before = _pay(nodes)
-            self.adb.tap((ix1 + ix2) // 2, iy)
-            self._log(f"  ✓ 즉시할인 카드 탭 @ ({(ix1+ix2)//2},{iy}) before={before}")
-            time.sleep(2.2)
-            # ★결제 가드: 적용(금액 감소/적용문구) 확인 — 안 되면 raise(결제 차단)
-            for _ in range(6):
-                nodes = _nodes()
-                after = _pay(nodes)
-                if any("즉시할인이 적용" in t for t, *_ in nodes) \
-                        or (after is not None and before is not None and after < before):
-                    self._log(f"  ✓ 즉시할인 적용 ({before}→{after})")
+                if not cand or (cand[1] + cand[3]) // 2 > 1900:   # 안전위치 미확보 → 캐러셀 위로 끌어올림
+                    cy = (cand[1] + cand[3]) // 2 if cand else None
+                    self._log(f"  즉시할인 위치 {cy} 미확보(결제버튼 근처/미발견) → 더 스크롤(위로 끌어올림)")
+                    self.adb.swipe(540, 1500, 540, 1150, 300); time.sleep(1.0)
+                    continue
+                ix1, iy1, ix2, iy2 = cand
+                iy = (iy1 + iy2) // 2
+                row, pay = _row_amt(nodes, iy), _pay(nodes)
+                if row is not None and pay is not None and row == pay:
+                    self._log(f"  ✓ 캐러셀 금액 == 결제버튼 금액 ({row:,}원) — 카드 선택됨")
                     return
-                time.sleep(0.8)
-            raise FlowError(f"hmall_select_card_discount: 즉시할인 적용 미확인 ({before}→{after}) — 결제 중단")
+                if taps >= 2:
+                    raise FlowError(
+                        f"hmall_select_card_discount: 탭 {taps}회에도 금액 불일치 (캐러셀 {row} vs 결제 {pay}) — 결제 중단")
+                self.adb.tap((ix1 + ix2) // 2, iy)
+                taps += 1
+                self._log(f"  즉시할인 탭 #{taps} @ ({(ix1+ix2)//2},{iy}) (캐러셀 {row} vs 결제 {pay} 불일치)")
+                time.sleep(2.2)
+            raise FlowError("hmall_select_card_discount: 즉시할인 카드 안전위치/금액일치 확보 실패 — 결제 중단")
 
         elif kind == "hmall_use_all_points":
             # 주문페이지 맨 위로 → 700px 1회 고정 스크롤 → '전액사용'(텍스트) 탭. H.Point <100p 면 skip.
