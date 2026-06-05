@@ -103,7 +103,6 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 
 | # | 제품명 | URL |
 |---|--------|-----|
-| 1 | 이너플로라 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2154750833 |
 | 2 | 하루견과 초록색 100봉 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2151046312&sectId=3059445 |
 | 3 | 하루견과 갈색 100봉 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2225431602&sectId=3059445 |
 | 6 | 레놉티 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244138695&sectId=3059445 |
@@ -130,8 +129,6 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 | 26 | 오라틱스 구강유산균 10박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244032427&sectId=3059445 |
 | 28 | 스키니랩 시서스 다이어트 11박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2202464603&sectId=3059445 |
 | 29 | 아이클타임 키성장 에프지오 6박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2237140367 |
-| 30 | 올바른 파로 효소 골드 30포 10박스 (총 300포) | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244523957 |
-| 31 | 닥터린 알파CD 원데이 핏 6박스 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2245068818 |
 | 32 | 셀게이트 엑스트라버진 올리브오일 그리스 30포 6박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244447362 |
 
 ---
@@ -297,7 +294,6 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 
 | # | 제품명 | 10% 적립 | 적립 문구 | 구분 | 쿠폰 적용가 |
 |---|--------|----------|----------|------|------------|
-| 1 | 이너플로라 | ✅ | 매일 10% 적립 | ✅ 단순10% | — |
 | 2 | ... | ... | ... | ... | ... |
 
 ### 범례

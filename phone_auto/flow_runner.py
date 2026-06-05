@@ -497,6 +497,143 @@ class FlowRunner:
                 raise FlowError(f"verify_selected: '{want_text}' selected=true 아님")
             self._log(f"verify_selected ✓ '{want_text}'=selected, '{forbid}' not selected")
 
+        elif kind == "hmall_select_card_discount":
+            # 주문페이지 맨 위로 → 700px 1회 고정 스크롤 → 카드할인 캐러셀 '즉시할인' 카드 탭.
+            # 캐러셀은 할인율 높은 카드가 맨 위 → 700px 고정이면 1장/2장 상관없이 그 카드 위치 일정(y~1727).
+            # 탭하면 현대카드 자동설정 + N% 즉시할인 적용 (계정1 라이브검증).
+            # ⚠️ 'N% 청구할인'(월 한도)은 캐러셀 아래(y~1900)라 자연히 제외. y>1950(결제버튼 근처)면 안전중단.
+            # ★결제 가드: 즉시할인 적용(금액 감소/적용문구) 확인 안 되면 raise → 결제 못 감. (2026-06-05)
+            import re as _re, xml.etree.ElementTree as ET
+            _BND = _re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
+            _AMT = _re.compile(r"([\d,]+)\s*원\s*결제하기")
+            tmp = "/tmp/_cs.xml"
+            self._log("hmall_select_card_discount: 맨위→700px→즉시할인 카드 탭")
+
+            def _nodes():
+                self.adb.dump_ui(tmp)
+                try:
+                    root = ET.parse(tmp).getroot()
+                except Exception:
+                    return []
+                out = []
+                for n in root.iter():
+                    m = _BND.match(n.attrib.get("bounds", ""))
+                    if m:
+                        x1, y1, x2, y2 = map(int, m.groups())
+                        out.append((n.attrib.get("text", "") or "", x1, y1, x2, y2))
+                return out
+
+            def _pay(nodes):
+                for t, *_ in nodes:
+                    mm = _AMT.search(t)
+                    if mm:
+                        return int(mm.group(1).replace(",", ""))
+                return None
+
+            # 맨 위로 → 700px 1회 고정 스크롤
+            for _ in range(4):
+                self.adb.swipe(540, 700, 540, 1900, 300); time.sleep(0.7)
+            self.adb.swipe(540, 1700, 540, 1000, 500); time.sleep(1.5)
+
+            # '즉시할인' 텍스트를 dump로 찾아 그 실위치 탭(좌표 하드코딩 X). 포인트 유무·할인줄 수로
+            # 캐러셀이 위아래로 움직임(계정2=1727 / 계정3=1987). 안전위치(y≤1900) 아니면(=결제버튼 근처/미발견)
+            # 더 스크롤해 캐러셀을 위로 끌어올린 뒤 탭. dump 렌더 지연도 같은 루프로 흡수.
+            ij = None; nodes = []
+            for _ in range(7):
+                nodes = _nodes()
+                if any("즉시할인이 적용" in t for t, *_ in nodes):
+                    self._log("  ✓ 즉시할인 이미 적용됨 — skip"); return
+                cand = next(((x1, y1, x2, y2) for t, x1, y1, x2, y2 in nodes if t.strip() == "즉시할인"), None)
+                if cand and (cand[1] + cand[3]) // 2 <= 1900:     # 안전 위치 확보 → 확정
+                    ij = cand; break
+                cy = (cand[1] + cand[3]) // 2 if cand else None
+                self._log(f"  즉시할인 위치 {cy} 미확보(결제버튼 근처/미발견) → 더 스크롤(위로 끌어올림)")
+                self.adb.swipe(540, 1500, 540, 1150, 300); time.sleep(1.0)   # 콘텐츠 위로 = 캐러셀 위로
+            if ij is None:
+                raise FlowError("hmall_select_card_discount: 즉시할인 카드 안전위치 확보 실패")
+            ix1, iy1, ix2, iy2 = ij
+            iy = (iy1 + iy2) // 2
+            before = _pay(nodes)
+            self.adb.tap((ix1 + ix2) // 2, iy)
+            self._log(f"  ✓ 즉시할인 카드 탭 @ ({(ix1+ix2)//2},{iy}) before={before}")
+            time.sleep(2.2)
+            # ★결제 가드: 적용(금액 감소/적용문구) 확인 — 안 되면 raise(결제 차단)
+            for _ in range(6):
+                nodes = _nodes()
+                after = _pay(nodes)
+                if any("즉시할인이 적용" in t for t, *_ in nodes) \
+                        or (after is not None and before is not None and after < before):
+                    self._log(f"  ✓ 즉시할인 적용 ({before}→{after})")
+                    return
+                time.sleep(0.8)
+            raise FlowError(f"hmall_select_card_discount: 즉시할인 적용 미확인 ({before}→{after}) — 결제 중단")
+
+        elif kind == "hmall_use_all_points":
+            # 주문페이지 맨 위로 → 700px 1회 고정 스크롤 → '전액사용'(텍스트) 탭. H.Point <100p 면 skip.
+            # 700px 지점이면 전액사용 y~1237(안전 중앙). 적용=결제금액 감소로 검증.
+            import re as _re, xml.etree.ElementTree as ET
+            _BND = _re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
+            _AMT = _re.compile(r"([\d,]+)\s*원\s*결제하기")
+            tmp = "/tmp/_pt.xml"
+            self._log("hmall_use_all_points: 맨위→700px→전액사용 (H.Point ≥100p)")
+
+            def _nodes():
+                self.adb.dump_ui(tmp)
+                try:
+                    root = ET.parse(tmp).getroot()
+                except Exception:
+                    return []
+                out = []
+                for n in root.iter():
+                    m = _BND.match(n.attrib.get("bounds", ""))
+                    if m:
+                        x1, y1, x2, y2 = map(int, m.groups())
+                        out.append((n.attrib.get("text", "") or "", x1, y1, x2, y2))
+                return out
+
+            def _pay(nodes):
+                for t, *_ in nodes:
+                    m = _AMT.search(t)
+                    if m:
+                        return int(m.group(1).replace(",", ""))
+                return None
+
+            # 맨 위로 → 700px 1회 고정 스크롤
+            for _ in range(4):
+                self.adb.swipe(540, 700, 540, 1900, 300); time.sleep(0.7)
+            self.adb.swipe(540, 1700, 540, 1000, 500); time.sleep(1.5)
+
+            nodes = _nodes()
+            # H.Point 잔액 <100p 면 사용불가 → skip (H.Point 행 숫자 최댓값)
+            hp = next(((x1, y1, x2, y2) for t, x1, y1, x2, y2 in nodes if t.strip().startswith("H.Point")), None)
+            if hp:
+                hy = (hp[1] + hp[3]) // 2
+                nums = [int(t.replace(",", "")) for t, x1, y1, x2, y2 in nodes
+                        if abs((y1 + y2) // 2 - hy) < 80 and _re.fullmatch(r"[\d,]+", t.strip())]
+                if nums and max(nums) < 100:
+                    self._log(f"  H.Point {max(nums)}p < 100p — 사용불가, skip"); return
+            # '전액사용' 텍스트 (700px 지점, 결제버튼 위 = y<1900). 렌더 지연 대비 재dump.
+            btn = None
+            for _ in range(3):
+                btn = next(((x1, y1, x2, y2) for t, x1, y1, x2, y2 in nodes
+                            if "전액사용" in t and (y1 + y2) // 2 < 1900), None)
+                if btn:
+                    break
+                time.sleep(0.7); nodes = _nodes()
+            if not btn:
+                self._log("  '전액사용' 미발견 — skip (포인트 없음/잔액부족 가능)"); return
+            bx1, by1, bx2, by2 = btn
+            before = _pay(nodes)
+            self.adb.tap((bx1 + bx2) // 2, (by1 + by2) // 2)
+            self._log(f"  ✓ 전액사용 탭 @ ({(bx1+bx2)//2},{(by1+by2)//2}) before={before}")
+            time.sleep(2.0)
+            after = _pay(_nodes())
+            if before is not None and after is not None and after < before:
+                self._log(f"  ✓ 포인트 적용 ({before}→{after})")
+            else:
+                self._log(f"  ⚠️ 결제금액 변화 미확인 ({before}→{after})")
+            return
+
         elif kind == "lotte_change_address":
             target_keyword = action.get("address_keyword", "화곡동 890")
             self._log(f"lotte_change_address target='{target_keyword}'")

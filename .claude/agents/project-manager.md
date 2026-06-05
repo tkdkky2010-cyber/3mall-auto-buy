@@ -184,29 +184,31 @@ bash step2.sh   # Chrome launch (idempotent) + check10.py + inspect 한 번에
 - "수정" / "다시" → 자연어 plan 다시 입력 받기 (이 step 반복)
 - "abort" / "취소" → 종료
 
-### Step 4 — Cart 담기 (결제 X)
+### Step 4 — Cart 담기 (장바구니만, 결제 X)
 ```bash
-python3 buy/run.py 2>&1 | tee logs/YYYY-MM-DD.log
+CART_ONLY=true python3 buy/run.py 2>&1 | tee logs/YYYY-MM-DD.log
 ```
-- 19계정 sequential cart fill **만** (default 모드)
-- `buy/run.py`는 `--checkout` 플래그가 없으면 cart까지만 진행하고 정지
+- 19계정 sequential **장바구니 담기만**. ★ **`CART_ONLY=true` 필수.**
+- ⚠️ **`CART_ONLY` 없이 그냥 `python3 buy/run.py` 절대 금지** — 기본값 `CART_ONLY=false`라
+  `process_account`가 `do_checkout`(cart→구매하기→카드선택→**결제하기 클릭**→옛 7자리 추출)까지 진행함.
+  (`--checkout` 같은 플래그는 **없음**. 실제 게이트는 `CART_ONLY` 환경변수.) — 폰 결제와 충돌 방지 위해 담기만.
 - 표준출력 + stderr 모두 `logs/YYYY-MM-DD.log` 저장
-- 시간 ~5-10분 소요 (Bash timeout — `timeout: 1200000` ms)
-- stdout 끝의 SUMMARY 섹션 캡처 — 각 계정 cart 담기 성공/실패 보고
+- INACTIVE 계정(`INACTIVE_ACCOUNTS=[6]`)은 자동 스킵 — ★**현대몰(run.py) 전용**. 갤러리아/롯데(`sulwhasoo.py`)는 계정 6 정상 사용(스킵 X)
+- 시간 소요 (계정당 ~1분, `CART_ONLY_DELAY_SEC` 20s)
+- stdout 끝의 SUMMARY 섹션 캡처 — 각 계정 담기 성공/실패 보고
 - **Step 4 끝나면 정지**. Step 5로 자동 진행 금지 (리셀러 탐지 회피 시간차 필요)
 
-### Step 5 — 결제 (사용자 명시 호출만)
-```bash
-python3 buy/run.py --checkout 2>&1 | tee -a logs/YYYY-MM-DD.log
-```
-- 사용자가 "Step 5 진행" / "결제 진행" 명시 호출했을 때만 실행
-- 19계정 sequential checkout — 7자리 코드 추출까지 (Phase 3-A)
-- Phase 3-B (폰 자동화) 미구현 — 7자리 코드 추출 후 사용자가 폰에서 수동 결제
-- log는 append 모드 (`tee -a`)
-- 시간 ~5-10분 소요
+### Step 5 — 결제 (★폰 ADB, 사용자 명시 호출만)
+- 결제는 **브라우저가 아니라 폰(ADB)에서** 함. 카트는 Step 4에서 PC로 채워둠.
+- **설화수 콤보 / 현대몰 우수스토어 식품 모두 동일 방식**: 폰 hmall 앱 → 구매하기 → 결제하기 →
+  **카드앱 PIN(137601)**. `phone_auto/flow_runner.py … flow_payment`.
+  예) 설화수: `python3 -m phone_auto.hmall_combo_checkout` (계정 로그인→cart 확인→`flow_payment` 결제).
+- ⚠️ run.py의 `do_checkout`/`trigger_phone_payment`(브라우저 7자리 monimo 코드 추출 → 폰 입력)는
+  **옛 Phase 3-A 경로**. 현재 표준 결제는 위 폰 `flow_payment`(7자리 **안** 씀, 카드앱 PIN).
+- 사용자가 "결제 진행" 명시 호출 시에만.
 
 **3몰 적용 범위 (모두 몰 홈 직접 진입, 우회 진입 X)**:
-- ✅ **현대Hmall** — `buy/run.py` 직접 hmall.com 진입 (Step 4 cart ✓, Step 5 checkout Phase 3-A 7자리 추출 ✓). Phase 3-B 폰 자동화 대기.
+- ✅ **현대Hmall** — Step 4: `CART_ONLY=true buy/run.py` 로 hmall.com 카트담기만 ✓ / Step 5: 폰 ADB `flow_payment` 결제(카드앱 PIN). 브라우저 7자리 경로 아님.
 - ⚠️ **갤러리아** — `buy/sulwhasoo.py:galleria_*` 코드 있음 (login + cart + checkout + 네이버페이). 갤러리아 홈 직접 진입. PM 통합 X, 작동 검증 X.
 - ⚠️ **롯데홈쇼핑** — `buy/sulwhasoo.py:lotte_*` 코드 있음 (login + cart + checkout + L포인트). 롯데 홈 직접 진입. PM 통합 X, 작동 검증 X.
 

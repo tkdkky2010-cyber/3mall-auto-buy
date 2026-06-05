@@ -54,7 +54,7 @@ CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
 DRY_PAYMENT = os.environ.get("DRY_PAYMENT", "true").lower() == "true"
 
 # CART_ONLY: 계정별로 plan 의 모든 상품을 장바구니에 누적 담기만 하고 checkout/결제는 안 함.
-# (쿠폰 받기는 add_to_cart 안에서 auto_coupon 시 그대로 수행) — 카카오페이 등 사용자 수동 결제일 때.
+# (쿠폰 받기는 add_to_cart 안에서 '있으면 무조건' 수행 — 우수식품 규칙, auto_coupon 게이팅 제거됨)
 # 계정당 clear_cart 1회 후 전 상품 add → 재시도 시에도 중복 없이 plan 그대로 재구성.
 CART_ONLY = os.environ.get("CART_ONLY", "false").lower() == "true"
 CART_ONLY_DELAY_SEC = int(os.environ.get("CART_ONLY_DELAY_SEC", "20"))  # cart-only 계정 간 대기(결제 없어 추적위험 낮음)
@@ -316,8 +316,9 @@ def add_to_cart(page: Page, product_id: str, info: dict, qty: int) -> bool:
         print(f"    [SKIP] #{product_id} {info['name']} — 판매중단")
         return False
 
-    if info.get("auto_coupon", False):
-        click_coupon_receive(page)
+    # 우수식품 규칙: 쿠폰 있으면 무조건 받는다 (사용자 지시). auto_coupon 플래그로 게이팅하지 않음 —
+    # click_coupon_receive 는 '쿠폰 받기' 버튼이 없으면 내부에서 no-op 이므로 항상 호출해도 안전.
+    click_coupon_receive(page)
 
     try:
         purchase = page.locator("button.btn-purchase").first

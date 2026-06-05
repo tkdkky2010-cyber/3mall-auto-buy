@@ -5,7 +5,7 @@
     "slitmCd": "Hmall 상품 코드",
     "url_extra": "URL 뒤에 붙는 추가 쿼리 (sectId 등)",
     "option_index": "옵션 팝업에서 클릭할 [선택 N] 번호 (단일옵션도 1)",
-    "auto_coupon": "쿠폰받기 버튼이 있으면 자동 클릭할지. 하루견과는 사용자가 직접 받으므로 false (가이드 부록 §4)"
+    "auto_coupon": "[DEPRECATED/미사용] 쿠폰은 우수식품 규칙상 '있으면 무조건 받기' 라 run.py add_to_cart 가 플래그 무관하게 항상 click_coupon_receive 호출. (이전 주석 '하루견과 직접 받으므로 false' = 오류, 사용자는 수동으로 안 받음)"
   },
   "1": {
     "name": "이너플로라 (유한건강생활 3박스)",

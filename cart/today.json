@@ -1,5 +1,5 @@
 {
-  "date": "2026-05-29",
+  "date": "2026-06-05",
   "account_used": "tkdkky2002",
   "products": [
     {
@@ -10,9 +10,9 @@
       "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605280070",
+          "prmo": "P202606041301",
           "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 30000,
@@ -23,7 +23,7 @@
       ],
       "tiers": [],
       "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "event_end": "6.05 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -141,9 +141,9 @@
       "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605280070",
+          "prmo": "P202606041301",
           "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 30000,
@@ -154,7 +154,7 @@
       ],
       "tiers": [],
       "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "event_end": "6.05 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -188,9 +188,9 @@
       "phrase": "매일 10%적립",
       "events": [
         {
-          "prmo": "P202605197962",
+          "prmo": "P202605197973",
           "name": "매일 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 1,
@@ -201,7 +201,7 @@
       ],
       "tiers": [],
       "max_reward": "10,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "event_end": "6.05 23:59",
       "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
@@ -235,9 +235,9 @@
       "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605280070",
+          "prmo": "P202606041301",
           "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 30000,
@@ -248,7 +248,7 @@
       ],
       "tiers": [],
       "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "event_end": "6.05 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -282,9 +282,9 @@
       "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605280070",
+          "prmo": "P202606041301",
           "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 30000,
@@ -295,7 +295,7 @@
       ],
       "tiers": [],
       "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "event_end": "6.05 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -330,9 +330,9 @@
       "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605280070",
+          "prmo": "P202606041301",
           "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 30000,
@@ -343,7 +343,7 @@
       ],
       "tiers": [],
       "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "event_end": "6.05 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -387,168 +387,16 @@
       "id": 16,
       "name": "루솔",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2225275921",
-      "ten_percent": true,
-      "phrase": "베이비&키즈페어 10%적립",
-      "events": [
-        {
-          "prmo": "P202605228756",
-          "name": "베이비&키즈페어 10%적립",
-          "event_end": "5.31 23:59",
-          "tiers": [
-            {
-              "min_won": 30000,
-              "min_unit": "원",
-              "reward_pt": 3000
-            },
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 150000,
-              "min_unit": "원",
-              "reward_pt": 15000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            },
-            {
-              "min_won": 1000000,
-              "min_unit": "원",
-              "reward_pt": 100000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 30000,
-          "min_unit": "원",
-          "reward_pt": 3000
-        },
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 150000,
-          "min_unit": "원",
-          "reward_pt": 15000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        },
-        {
-          "min_won": 1000000,
-          "min_unit": "원",
-          "reward_pt": 100000
-        }
-      ],
-      "max_reward": "100,000P",
-      "event_end": "5.31 23:59",
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 1,
-        "list_price": 51500,
-        "member_price": 46350,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 46350,
-        "kakao_reward_pt": 3000,
-        "kakao_final_cost": 40106,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 30000,
-          "tier_reward": 3000,
-          "nominal_pct": 10.0,
-          "actual_total": 46350,
-          "actual_reward": 3000,
-          "effective_pct": 6.472491909385113
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 46350,
-        "options": [
-          {
-            "idx": 1,
-            "name": "[우수고객샵] [루솔] 진한 배도라지즙 선물박스(60포) 배즙",
-            "list_price": 51500
-          },
-          {
-            "idx": 2,
-            "name": "[우수고객샵] [루솔] 진한 배도라지즙 선물박스(80포) 배즙",
-            "list_price": 71000
-          },
-          {
-            "idx": 3,
-            "name": "[우수고객샵] [루솔] 진한 배도라지즙 선물박스(100포) 배즙",
-            "list_price": 87000
-          },
-          {
-            "idx": 4,
-            "name": "[우수고객샵] [루솔] 진한 배도라지즙 선물박스(120포) 배즙",
-            "list_price": 103000
-          }
-        ]
-      }
+      "simple_ranges": []
     },
     {
       "id": 17,
@@ -558,9 +406,9 @@
       "phrase": "매일 10%적립",
       "events": [
         {
-          "prmo": "P202605197962",
+          "prmo": "P202605197973",
           "name": "매일 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 1,
@@ -571,7 +419,7 @@
       ],
       "tiers": [],
       "max_reward": "10,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "event_end": "6.05 23:59",
       "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
@@ -601,95 +449,29 @@
       "id": 20,
       "name": "바디랩 유기농 레몬즙 1박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244671296&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강은 金이다 최대 10%적립",
-      "events": [
-        {
-          "prmo": "P202605280070",
-          "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 30000,
-            "max_won": 2000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": null,
+      "events": [],
       "tiers": [],
-      "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 30000,
-          "max_won": 2000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": null,
-        "member_price": null,
-        "card_slides": [],
-        "kakao_price": null,
-        "kakao_reward_pt": 0,
-        "kakao_final_cost": null,
-        "paybacks": {},
-        "optimal_tier": null,
-        "effective_ten_percent": false,
-        "error": "≥10% tier unreachable (cap 500K)",
-        "benefit_unit_price": 20800
-      }
+      "coupon_claimed": false
     },
     {
       "id": 22,
       "name": "올바른건강식품 와이 9박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244934734&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강은 金이다 최대 10%적립",
-      "events": [
-        {
-          "prmo": "P202605280070",
-          "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 30000,
-            "max_won": 2000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": null,
+      "events": [],
       "tiers": [],
-      "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 30000,
-          "max_won": 2000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": null,
-        "member_price": null,
-        "card_slides": [],
-        "kakao_price": null,
-        "kakao_reward_pt": 0,
-        "kakao_final_cost": null,
-        "paybacks": {},
-        "optimal_tier": null,
-        "effective_ten_percent": false,
-        "error": "≥10% tier unreachable (cap 500K)",
-        "benefit_unit_price": 66340
-      }
+      "coupon_claimed": false
     },
     {
       "id": 23,
@@ -702,164 +484,50 @@
       "max_reward": null,
       "event_end": null,
       "has_coupon": false,
-      "error": "판매중단"
+      "error": null,
+      "coupon_claimed": false
     },
     {
       "id": 25,
       "name": "유기농 석류젤리 9박(90개)",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강은 金이다 최대 10%적립 / 매일 10%적립",
-      "events": [
-        {
-          "prmo": "P202605280070",
-          "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 30000,
-            "max_won": 2000000,
-            "pct": 10
-          }
-        },
-        {
-          "prmo": "P202605197962",
-          "name": "매일 10%적립",
-          "event_end": "5.29 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 1,
-            "max_won": 100000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": null,
+      "events": [],
       "tiers": [],
-      "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59 / 5.29 23:59",
-      "has_coupon": true,
+      "max_reward": null,
+      "event_end": null,
+      "has_coupon": false,
       "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 30000,
-          "max_won": 2000000,
-          "pct": 10
-        },
-        {
-          "min_won": 1,
-          "max_won": 100000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": null,
-        "member_price": null,
-        "card_slides": [],
-        "kakao_price": null,
-        "kakao_reward_pt": 0,
-        "kakao_final_cost": null,
-        "paybacks": {},
-        "optimal_tier": null,
-        "effective_ten_percent": false,
-        "error": "≥10% tier unreachable (cap 500K)",
-        "benefit_unit_price": 55120
-      }
+      "coupon_claimed": false
     },
     {
       "id": 26,
       "name": "오라틱스 구강유산균 10박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244032427&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "매일 10%적립",
-      "events": [
-        {
-          "prmo": "P202605197962",
-          "name": "매일 10%적립",
-          "event_end": "5.29 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 1,
-            "max_won": 100000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": null,
+      "events": [],
       "tiers": [],
-      "max_reward": "10,000P (단순 10%)",
-      "event_end": "5.29 23:59",
-      "has_coupon": true,
+      "max_reward": null,
+      "event_end": null,
+      "has_coupon": false,
       "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 1,
-          "max_won": 100000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": null,
-        "member_price": null,
-        "card_slides": [],
-        "kakao_price": null,
-        "kakao_reward_pt": 0,
-        "kakao_final_cost": null,
-        "paybacks": {},
-        "optimal_tier": null,
-        "effective_ten_percent": false,
-        "error": "≥10% tier unreachable (cap 500K)",
-        "benefit_unit_price": 206310
-      }
+      "coupon_claimed": false
     },
     {
       "id": 28,
       "name": "스키니랩 시서스 다이어트 11박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202464603&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강은 金이다 최대 10%적립",
-      "events": [
-        {
-          "prmo": "P202605280070",
-          "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 30000,
-            "max_won": 2000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": null,
+      "events": [],
       "tiers": [],
-      "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 30000,
-          "max_won": 2000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": null,
-        "member_price": null,
-        "card_slides": [],
-        "kakao_price": null,
-        "kakao_reward_pt": 0,
-        "kakao_final_cost": null,
-        "paybacks": {},
-        "optimal_tier": null,
-        "effective_ten_percent": false,
-        "error": "≥10% tier unreachable (cap 500K)",
-        "benefit_unit_price": 143650
-      }
+      "coupon_claimed": false
     },
     {
       "id": 29,
@@ -869,9 +537,9 @@
       "phrase": "건강은 金이다 최대 10%적립 / 매일 10%적립",
       "events": [
         {
-          "prmo": "P202605280070",
+          "prmo": "P202606041301",
           "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 30000,
@@ -880,9 +548,9 @@
           }
         },
         {
-          "prmo": "P202605197962",
+          "prmo": "P202605197973",
           "name": "매일 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 1,
@@ -893,7 +561,7 @@
       ],
       "tiers": [],
       "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59 / 5.29 23:59",
+      "event_end": "6.05 23:59 / 6.05 23:59",
       "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
@@ -932,9 +600,9 @@
       "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605280070",
+          "prmo": "P202606041301",
           "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 30000,
@@ -945,7 +613,7 @@
       ],
       "tiers": [],
       "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "event_end": "6.05 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -979,9 +647,9 @@
       "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605280070",
+          "prmo": "P202606041301",
           "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 30000,
@@ -992,7 +660,7 @@
       ],
       "tiers": [],
       "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "event_end": "6.05 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -1026,9 +694,9 @@
       "phrase": "건강은 金이다 최대 10%적립",
       "events": [
         {
-          "prmo": "P202605280070",
+          "prmo": "P202606041301",
           "name": "건강은 金이다 최대 10%적립",
-          "event_end": "5.29 23:59",
+          "event_end": "6.05 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 30000,
@@ -1039,7 +707,7 @@
       ],
       "tiers": [],
       "max_reward": "200,000P (단순 10%)",
-      "event_end": "5.29 23:59",
+      "event_end": "6.05 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -1073,13 +741,7 @@
     12,
     13,
     14,
-    16,
     17,
-    20,
-    22,
-    25,
-    26,
-    28,
     29,
     30,
     31,

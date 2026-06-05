@@ -214,11 +214,36 @@ def ensure_logged_in(page) -> bool:
     return login(page, acc["id"], acc["pw"])
 
 
-def write_sheet(results: list[dict], tab: str):
-    """시트 "{M.DD}" 탭 Hmall 영역 입력 (RULES.md §13 layout)."""
+def _result_row(r: dict) -> list:
+    """results dict → 시트 한 행(13컬럼). error면 idx+에러만."""
+    if r.get("error"):
+        return [r["idx"], r["error"], "", "", "", "", "", "", "", "", "", "", ""]
+    cn = C.combo_label_ko(r["combo"])
+    return [r["idx"], cn, r["소비자가"], r["추증"], r["GWP"], r["총샘플"],
+            r["card_brand"], f"{r['card_pct']}%", f"{r['payback_pct']*100:.1f}%",
+            r["preview_price"], r["구매가격"], r["순구매가"], r["공급률"]]
+
+
+def write_sheet(results: list[dict], tab: str, only_idx: int | None = None):
+    """시트 "{M.DD}" 탭 Hmall 영역 입력 (RULES.md §13 layout).
+    only_idx 면 그 조합 행만 targeted 갱신 — 전체 batch_clear/재작성 안 함 → 나머지 22행 보존."""
     gc = C.gs_client()
     sh = gc.open_by_key(C.RATE_SHEET_ID)
     ws = C.get_or_create_tab(sh, tab, leftmost=True)
+
+    if only_idx is not None:
+        r = next((x for x in results if x["idx"] == only_idx), None)
+        if not r:
+            print(f"  ⚠️ 조합{only_idx} 결과 없음 — 시트 미갱신"); return
+        target_row = C.HMALL_HEADER_ROW + 6 + (only_idx - 1)   # 헤더/안내 6행 아래, idx 순 데이터
+        ws.update(values=[_result_row(r)], range_name=f"A{target_row}:M{target_row}",
+                  value_input_option="USER_ENTERED")
+        lcell = 1 + only_idx                                    # L1=헤더 'Hmall', L(1+idx)=조합idx
+        lval = "" if r.get("error") else round(r["공급률"], 4)
+        ws.update(values=[[lval]], range_name=f"L{lcell}:L{lcell}", value_input_option="USER_ENTERED")
+        print(f"  → 조합{only_idx} 단일행만 갱신: A{target_row}:M{target_row} + L{lcell} (나머지 행 보존)")
+        return
+
     ws.batch_clear([f"A{C.HMALL_HEADER_ROW}:M{C.HMALL_COMBO_END_ROW}"])
 
     rows = [
@@ -231,15 +256,7 @@ def write_sheet(results: list[dict], tab: str):
          "선택카드", "카드%", "페이백%", "미리보기가", "구매가격", "순구매가", "공급률"],
     ]
     for r in sorted(results, key=lambda x: x["idx"]):
-        if r.get("error"):
-            rows.append([r["idx"], r["error"], "", "", "", "", "", "", "", "", "", "", ""])
-            continue
-        cn = C.combo_label_ko(r["combo"])
-        rows.append([
-            r["idx"], cn, r["소비자가"], r["추증"], r["GWP"], r["총샘플"],
-            r["card_brand"], f"{r['card_pct']}%", f"{r['payback_pct']*100:.1f}%",
-            r["preview_price"], r["구매가격"], r["순구매가"], r["공급률"],
-        ])
+        rows.append(_result_row(r))
     C.write_grid(ws, C.HMALL_HEADER_ROW, rows)
     print(f"  → 시트 입력: A{C.HMALL_HEADER_ROW}:M{C.HMALL_HEADER_ROW + len(rows) - 1}")
 
@@ -320,8 +337,9 @@ def main(argv=None):
 
     if valid and not dry_sheet:
         tab = C.today_tab_name()
-        print(f"\n[INFO] 시트 입력 → 탭 {tab!r} (--dry-sheet 로 skip 가능)")
-        write_sheet(results, tab)
+        scope = f"조합{only_idx} 단일" if only_idx else "전체"
+        print(f"\n[INFO] 시트 입력({scope}) → 탭 {tab!r} (--dry-sheet 로 skip 가능)")
+        write_sheet(results, tab, only_idx)
     elif dry_sheet:
         print("\n[INFO] --dry-sheet — 시트 입력 생략")
 
