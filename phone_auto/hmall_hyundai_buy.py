@@ -64,6 +64,21 @@ CART_ICON = (1012, 151)      # hmall 메인 우측상단 장바구니 아이콘 
 HOME_NAV = (106, 2218)       # 하단 네비 '홈' (앱이 마이페이지로 복원돼도 홈 강제용)
 PIN_DOT = (540, 660)         # PIN 동그라미 영역 — 탭하면 고정 키패드 호출
 BP_PATH = ROOT / "secrets" / "beauty_point.json"
+BP_LEDGER = ROOT / "secrets" / "beauty_point_ledger.json"   # 뷰티포인트 누적 추적 (세션 릴레이, 목표 180,000P)
+
+
+def _ledger_append(idx: int, acct_id: str | None, profile_key: str | None) -> None:
+    """뷰티 재인증 성공 1건 기록 — 다음 세션이 누적치를 이어받는 SoT.
+    amount/points는 실측 어려워 건수 기반(요약 시 조합가로 보강). 실패해도 결제엔 영향 없음."""
+    try:
+        led = json.loads(BP_LEDGER.read_text(encoding="utf-8"))
+        led.setdefault("entries", []).append({
+            "date": time.strftime("%Y-%m-%d %H:%M"),
+            "idx": idx, "id": acct_id, "profile": profile_key,
+        })
+        BP_LEDGER.write_text(json.dumps(led, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"   [ledger] 기록 실패(무시): {e}", flush=True)
 LOTTE_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "lotte_card.json"   # 검증된 롯데 결제흐름(5/29)
 KB_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "kb_kbpay.json"        # KB 결제흐름(DRAFT, 라이브검증중)
 HANA_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "hana_card.json"     # 하나 결제흐름(5/29 nFilter검증, flow[16:]=하나앱)
@@ -1305,6 +1320,7 @@ def buy_one(idx: int, card: str | None = None) -> dict:
         time.sleep(1.0)
         if screen_has("완료"):
             ocr_tap("확인", post=2.0, retries=2)
+        _ledger_append(idx, res.get("id"), active)   # 누적 추적 (세션 릴레이)
     lap(f"뷰티포인트 재인증 → ★계정 #{idx} 총소요")
     res["status"] = "DONE" + ("" if bp.get("ok") else f"(beauty_fail:{bp.get('err')})")
     return res
@@ -1313,13 +1329,15 @@ def buy_one(idx: int, card: str | None = None) -> dict:
 def _do_beauty(res: dict) -> None:
     close_home_popup()   # 주문완료 화면 광고 팝업이 재인증 버튼 가림 → 닫기
     prof_cfg = json.loads(BP_PATH.read_text(encoding="utf-8"))
-    profile = prof_cfg.get("profiles", {}).get(prof_cfg.get("active_profile"), {})
+    active = prof_cfg.get("active_profile")
+    profile = prof_cfg.get("profiles", {}).get(active, {})
     bp = beauty_reauth(profile)
     res["beauty"] = bp
     if bp.get("ok"):
         time.sleep(1.0)
         if screen_has("완료"):
             ocr_tap("확인", post=2.0, retries=2)
+        _ledger_append(res.get("idx"), res.get("id"), active)   # 누적 추적 (세션 릴레이)
     res["status"] = "DONE" + ("" if bp.get("ok") else f"(beauty_fail:{bp.get('err')})")
 
 
