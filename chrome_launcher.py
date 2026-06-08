@@ -17,11 +17,26 @@ LAUNCHERS = {
 }
 
 
+def _ensure_tab(endpoint: str) -> None:
+    """탭 0개면 빈 탭 1개 생성. (탭 0개 Chrome 은 connect_over_cdp 가
+    'Browser context management is not supported' 로 실패 — 2026-06-08.)"""
+    try:
+        with urllib.request.urlopen(f"{endpoint}/json/list", timeout=2) as r:
+            import json as _json
+            if _json.load(r):
+                return
+        urllib.request.urlopen(urllib.request.Request(
+            f"{endpoint}/json/new?about:blank", method="PUT"), timeout=3)
+    except (urllib.error.URLError, OSError, ValueError):
+        pass
+
+
 def ensure_chrome(port: int = 9222, timeout: int = 15) -> None:
-    """CDP {port} 안 떠있으면 launch 스크립트 자동 호출."""
+    """CDP {port} 안 떠있으면 launch 스크립트 자동 호출. 떠있으면 탭 ≥1 보장."""
     endpoint = f"http://127.0.0.1:{port}"
     try:
         urllib.request.urlopen(f"{endpoint}/json/version", timeout=1.5)
+        _ensure_tab(endpoint)
         return
     except (urllib.error.URLError, OSError):
         pass

@@ -43,6 +43,7 @@ LOTTE_CART_ONLY = os.environ.get("LOTTE_CART_ONLY", "true").lower() == "true"
 
 GALLERIA_HOME = "https://www.galleria.co.kr/main/initMain.action"
 LOTTE_HOME = "https://www.lotteimall.com/"
+LOTTE_LOGIN_URL = "https://www.lotteimall.com/member/login/forward.LCLoginMem_pop.lotte"
 
 # 갤러리아 상품 정보 (hsmaster/config/sulwhasoo-ids.json 기준)
 GALLERIA_PRODUCTS = {
@@ -483,87 +484,123 @@ def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_
 # ───────────── 롯데 (skeleton — 시연 정보 기반, smoke test 후 보강) ─────────────
 
 
-def lotte_login(page: Page, account_id: str, account_pw: str) -> bool:
-    """롯데 로그인. codegen 흐름 그대로:
-    page1(mall popup) → 로그인 클릭 → page2(login popup) → fill → Enter →
-    page3(guide popup) → page2.close() → page3 처리 후 close.
-    page1(mall popup)은 절대 close 안 함.
-    멀티계정 시나리오: 이미 다른 계정 로그인 상태면 logout 후 fresh login.
-    """
-    context = page.context
+def _captcha_str(res) -> str:
+    """단일 엔진 OCR 결과 → 숫자 문자열(읽기순서). GCV 는 전체를 한 토큰(동일 x)으로 주므로
+    x 가 모두 같으면 리스트 순서(=읽기순서) 유지, 아니면 x 오름차순 정렬."""
+    items = [(ch, x) for ch, x, *_ in res if ch.strip().isdigit()]
+    if not items:
+        return ""
+    if len({x for _, x in items}) == 1:
+        return "".join(ch for ch, _ in items)
+    return "".join(ch for ch, _ in sorted(items, key=lambda t: t[1]))
+
+
+def _refresh_lotte_captcha(login_page: Page) -> None:
+    """'새로고침' 으로 새 캡차 요청(제출 아님 → 시도횟수/anti-bot 무관)."""
     try:
-        # 클릭 전 page focus (anti-bot detection 우회 도움)
+        login_page.get_by_role("button", name="새로고침").click(timeout=2000)
+    except Exception:
         try:
-            page.bring_to_front()
+            login_page.locator('img[alt="보안문자"]').click()
         except Exception:
             pass
+    login_page.wait_for_timeout(700)
 
-        # 0) 기존 로그인 상태 확인 — 있으면 logout 후 fresh login (계정 확인 까다로워서 무조건 logout)
+
+def _solve_lotte_captcha(login_page: Page, max_refresh: int = 3) -> str:
+    """롯데 보안문자(캡차) 견고 판독 — ★다중 엔진 투표(GCV + macOS Vision + Tesseract).
+    취소선 때문에 단일 엔진이 가끔 자리수 누락/오판 → ≥2 엔진이 같은 6자리에 합의할 때만 채택.
+    불합의면 '새로고침' 으로 더 쉬운 캡차로 교체 후 재시도(제출 낭비=anti-bot 자극 방지).
+    합의 못 얻으면 GCV 6자리 폴백(단일 엔진만 살아있는 환경 대비). easyocr/torch 는 lazy."""
+    from collections import Counter
+    sys.path.insert(0, str(PROJECT_ROOT / "phone_auto"))
+    import ocr_keypad as _K  # noqa: E402
+    engines = [_K._ocr_gcv, _K._ocr_macos_vision, _K._ocr_tesseract]
+    cap = str(ROOT / "_tmp_lotte_captcha.png")
+    fallback = ""
+    for _ in range(max_refresh + 1):
+        login_page.locator('img[alt="보안문자"]').screenshot(path=cap)
+        votes = Counter()
+        gcv6 = ""
+        for i, fn in enumerate(engines):
+            try:
+                s = _captcha_str(fn(cap))
+            except Exception:
+                s = ""
+            if len(s) == 6:
+                votes[s] += 1
+                if i == 0:
+                    gcv6 = s
+        if gcv6:
+            fallback = gcv6
+        if votes:
+            top, n = votes.most_common(1)[0]
+            if n >= 2:           # ≥2 엔진 합의 = 고신뢰 → 즉시 채택
+                return top
+        _refresh_lotte_captcha(login_page)
+    return fallback  # 합의 실패 시 GCV 최선값(이후 로그인 실패하면 재시도 루프가 처리)
+
+
+def lotte_login(page: Page, account_id: str, account_pw: str) -> bool:
+    """롯데 로그인 — ★팝업/새창 없이 기존 탭을 로그인 URL 로 직접 이동(2026-06-08).
+    popup 이 macOS 창 focus 강탈 주범 → 직접 nav 로 Chrome 백그라운드 유지(focus 안 뺏음).
+    보안문자(캡차)는 GCV 자동해결(_solve_lotte_captcha), 틀리면 새로고침 후 최대 3회.
+    멀티계정: 기존 로그인 상태면 logout 후 fresh login.
+    """
+    pw_name = "비밀번호(영문+숫자+특수 8~15자)"
+    try:
+        # 0) 기존 로그인 상태면 logout (같은 탭, 홈에서)
         try:
+            page.goto(LOTTE_HOME, wait_until="domcontentloaded", timeout=20000)
+            page.wait_for_timeout(1500)
             body = page.inner_text("body")
             if "로그아웃" in body and "로그인" not in body.split("로그아웃")[0][-20:]:
-                # 로그아웃 텍스트 존재 = 이미 로그인 상태
                 try:
                     page.get_by_role("link", name="로그아웃").first.click(timeout=3000)
                     page.wait_for_timeout(2500)
-                    print(f"  [INFO] 기존 로그인 해제 → {account_id} fresh login 진행")
+                    print(f"  [INFO] 기존 로그인 해제 → {account_id} fresh login")
                 except Exception as e:
                     print(f"  [WARN] logout click 실패: {e} — 그대로 login 시도")
         except Exception:
             pass
 
-        # context.expect_page (more stable than page.expect_popup)
-        with context.expect_page() as new_page_info:
-            page.get_by_role("link", name="로그인 로그인").click()
-        login_page = new_page_info.value
-
-        login_page.wait_for_load_state("domcontentloaded", timeout=15000)
-        login_page.wait_for_timeout(1000)  # popup 안정화 (anti-bot 자동입력 감지 회피, Hmall login E.1 패턴)
-        login_page.get_by_role("textbox", name="아이디 또는 이메일").click()
-        login_page.get_by_role("textbox", name="아이디 또는 이메일").fill(account_id)
-        login_page.wait_for_timeout(1000)  # id fill 후 1s
-        login_page.get_by_role("textbox", name="아이디 또는 이메일").press("Tab")
-        login_page.get_by_role("textbox", name="비밀번호(영문+숫자+특수 8~15자)").fill(account_pw)
-        login_page.wait_for_timeout(600)  # pw fill 후 Enter 전 0.6s
-
-        # Enter → guide popup (없으면 timeout)
-        guide_page = None
-        try:
-            with context.expect_page(timeout=8000) as guide_info:
-                login_page.get_by_role("textbox", name="비밀번호(영문+숫자+특수 8~15자)").press("Enter")
-            guide_page = guide_info.value
-        except PlaywrightTimeoutError:
-            pass
-
-        # login popup close
-        try:
-            login_page.close()
-        except Exception:
-            pass
-
-        # guide popup 처리 + close
-        if guide_page is not None:
+        # 1) 로그인 페이지 직접 진입 + 제출 (캡차 강제 시 GCV 자동, 최대 3회)
+        for attempt in range(3):
+            page.goto(LOTTE_LOGIN_URL, wait_until="domcontentloaded", timeout=20000)
+            page.wait_for_timeout(1500)
+            page.get_by_role("textbox", name="아이디 또는 이메일").fill(account_id)
+            page.wait_for_timeout(800)
+            page.get_by_role("textbox", name=pw_name).fill(account_pw)
+            page.wait_for_timeout(500)
+            answer = page.locator("#answer")
+            has_captcha = answer.count() > 0 and answer.is_visible()
+            if has_captcha:
+                code = _solve_lotte_captcha(page)
+                answer.fill(code); page.wait_for_timeout(300)
+                print(f"  [CAPTCHA] OCR={code} (시도 {attempt + 1})")
+                target = answer
+            else:
+                target = page.get_by_role("textbox", name=pw_name)
             try:
-                guide_page.get_by_role("link", name="일간 보이지 않기").click(timeout=3000)
-            except Exception:
+                target.press("Enter")
+                page.wait_for_load_state("domcontentloaded", timeout=12000)
+            except PlaywrightTimeoutError:
                 pass
-            try:
-                guide_page.close()
-            except Exception:
-                pass
-
-        # mall popup이 살아있으면 거기서 로그아웃 텍스트 검증, 아니면 fresh page 찾기
-        try:
-            if page.is_closed():
-                lps = [p for p in context.pages if 'lotteimall' in p.url and not p.is_closed()]
-                if not lps:
-                    return False
-                page = lps[-1]
             page.wait_for_timeout(2500)
-            body = page.inner_text("body")
-            return "로그아웃" in body
-        except Exception:
-            return False
+            # ★실패판정 = URL(pop_loginfailure) 기준. (실패 페이지에도 '로그아웃' 텍스트가 있어
+            #   body '로그아웃' 매칭은 오탐 → URL 로 판정.) 메시지는 캡차/비번 구분 없이 동일.
+            if "loginfailure" in page.url:
+                if not has_captcha:
+                    print("  [LOGIN] 자격증명 거부 — 중단")
+                    return False
+                print(f"  [LOGIN] 실패(캡차오판 또는 비번오류) — 재시도 ({attempt + 1}/3)")
+                continue
+            # 성공 추정 → ★홈으로 이동(이후 clear_cart/add_combo 가 홈 기준) + 최종 검증
+            page.goto(LOTTE_HOME, wait_until="domcontentloaded", timeout=20000)
+            page.wait_for_timeout(2000)
+            if "로그아웃" in page.inner_text("body") and "loginfailure" not in page.url:
+                return True
+        return False
     except Exception as e:
         print(f"  [LOGIN ERR] {account_id}: {e}")
         return False
@@ -975,7 +1012,11 @@ def main() -> int:
             print(f"[FATAL] CDP 연결 실패: {e}")
             return 1
         context = browser.contexts[0] if browser.contexts else browser.new_context()
-        mall_page = context.new_page()
+        # 롯데는 기존 탭 재사용(새 탭/팝업이 창 focus 강탈 → 직접 nav 만으로 진행). 갤러리아는 기존 흐름 유지.
+        if mall == "lotte":
+            mall_page = context.pages[-1] if context.pages else context.new_page()
+        else:
+            mall_page = context.new_page()
 
         home = LOTTE_HOME if mall == "lotte" else GALLERIA_HOME
         try:
