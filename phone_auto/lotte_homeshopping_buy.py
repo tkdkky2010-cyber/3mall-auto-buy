@@ -108,6 +108,40 @@ def _tap_fresh(text: str, dx: int = 0, dy: int = 0, exact: bool = False,
     return False
 
 
+def _dump_nodes() -> list[dict]:
+    """uiautomator dump → 노드 [{text,desc,cls,cx,cy,x1,y1,x2,y2}]. ★롯데 WebView 는 inner 요소를
+    content-desc/text+bounds 로 노출 → 자동 리플로우(좌표 위아래 밀림) 무관한 '현재 절대좌표' 확보.
+    (단발 dump — 'flow 중 동시 dump 금지'(137 SIGKILL)는 별도 모니터링 동시실행 얘기로 여기 무관.)"""
+    import re as _re, xml.etree.ElementTree as _ET
+    serial = hw._serial()
+    subprocess.run([hw.ADB, "-s", serial, "shell", "uiautomator", "dump", "/sdcard/_lg.xml"],
+                   capture_output=True)
+    raw = subprocess.run([hw.ADB, "-s", serial, "exec-out", "cat", "/sdcard/_lg.xml"],
+                         capture_output=True).stdout
+    nodes: list[dict] = []
+    try:
+        root = _ET.fromstring(raw)
+    except Exception:
+        return nodes
+    for el in root.iter("node"):
+        m = _re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", el.get("bounds", ""))
+        if not m:
+            continue
+        x1, y1, x2, y2 = map(int, m.groups())
+        nodes.append({"text": el.get("text", ""), "desc": el.get("content-desc", ""),
+                      "cls": el.get("class", ""), "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2,
+                      "x1": x1, "y1": y1, "x2": x2, "y2": y2})
+    return nodes
+
+
+def _dump_find(nodes: list[dict], key: str, cls: str = "") -> dict | None:
+    """nodes 에서 text/desc 에 key 포함(+선택 class 필터) 첫 노드."""
+    for n in nodes:
+        if key in (n["text"] + " " + n["desc"]) and (not cls or cls in n["cls"]):
+            return n
+    return None
+
+
 # (구 `_box_scroll`(작은 contained swipe) 제거 — 뷰티포인트 동의 박스 스크롤은 claim_beauty_point 의 `_box_fling`
 #  (박스 안 시작 + 800px) 가 정본. 작은 거리는 느리고, 잘못 큰거리로 바꾸면 페이지스크롤로 깨짐(#15). 헷갈림 방지 위해 단일화.)
 
@@ -185,52 +219,53 @@ def logout() -> bool:
 
 
 def login(idx: int) -> dict:
-    """마이 → '아이디/비밀번호로 계속하기' → ID/PW 입력 → 로그인. idx=1-based."""
+    """마이 → '아이디/비밀번호로 계속하기' → ID/PW 입력 → 로그인. idx=1-based.
+    ★2026-06-08: 앱이 자동으로 화면을 리플로우(좌표 전체 위아래로 밀림)해 OCR 탭이 어긋나
+    로그인 실패(폼 잔존)했음(예: '계속하기' OCR cy748 vs 실제 dump cy897 = 150px 밀림). →
+    **마이 후 + 폼 등장 후 uiautomator dump 로 절대좌표 확정**해 탭(리플로우 무관). OCR 폴백 유지.
+    dump 앵커: '로그인' Button / '비밀번호 표기' 토글(PW칸 우측). ID칸=PW칸 위 한 칸(빈 input 은
+    dump 에 안 잡혀 토글 앵커로 derive)."""
     acc = _accounts()[idx - 1]
     out = {"idx": idx, "id": acc["id"]}
     _adb().tap(*NAV_MY); time.sleep(1.5)
     dismiss_popups(2)
-    # ★마이 탭 후 로그인옵션이 스르륵 슬라이드(6/2 사용자 지적) → 1초 정착 후 fresh OCR 탭 (슬라이드 중 오탭 방지).
-    time.sleep(1.0)
-    if not ocr_tap("아이디/비밀번호로 계속하기", contains=True, retries=4):
-        if not ocr_tap("계속하기", contains=True, retries=2):
-            out["err"] = "로그인 진입 버튼 미발견"; return out
+    time.sleep(1.0)   # ★마이 후 리플로우 정착 (6/2 지적)
+    # ① 로그인옵션 화면 — dump 로 '아이디/비밀번호로 계속하기' 절대좌표
+    cont = _dump_find(_dump_nodes(), "아이디/비밀번호로 계속하기")
+    if cont:
+        _adb().tap(cont["cx"], cont["cy"]); time.sleep(1.5)
+    elif not (ocr_tap("아이디/비밀번호로 계속하기", contains=True, retries=4)
+              or ocr_tap("계속하기", contains=True, retries=2)):
+        out["err"] = "로그인 진입 버튼 미발견"; return out
     if not wait_text("아이디", timeout=10):
         out["err"] = "로그인 폼 미도달"; return out
-    # ★레이아웃 정착 대기 (6/2 사용자 지적 버그): 폼 등장 후 화면이 스르륵 이동 → 정착 전 탭하면
-    #   ID칸 좌표가 PW칸으로 밀려 ID가 PW칸에 입력(diinamic 사례). **1초 정착 + 매 시도 fresh OCR + 클리어 가드**로 해소.
-    time.sleep(1.0)
-    # ID 칸 = placeholder "L.POINT 통합회원 아이디 또는 이메일". 헤더/찾기 제외 + 400<cy<700.
-    # ★매 시도 fresh OCR + 클리어(혹시 잘못 들어간 값 제거) → 입력. 검증 = placeholder('통합회원') 사라짐.
+    time.sleep(1.2)   # ★폼 리플로우 정착
+    # ② 폼 — dump 앵커(로그인 Button + '비밀번호 표기' 토글)로 ID/PW/버튼 좌표 확정
+    nd = _dump_nodes()
+    btn = _dump_find(nd, "로그인", cls="Button")
+    tog = _dump_find(nd, "비밀번호 표기")
+    if btn and tog:
+        gap = (tog["y2"] - tog["y1"]) + 12          # PW행 높이+여백
+        id_xy = (300, tog["cy"] - gap)              # ID칸 = PW칸 위 한 칸
+        pw_xy = (300, tog["cy"])                    # PW칸 (토글 왼쪽 입력영역)
+        login_xy = (btn["cx"], btn["cy"])
+    else:                                            # OCR 폴백 (dump 실패 시)
+        id_xy, pw_xy, login_xy = (540, 585), (348, 720), (540, 889)
+    # ID 입력 (검증: placeholder '통합회원' 사라짐, 안 사라지면 재시도)
     for _ in range(3):
-        id_it = next((it for it in _ocr_texts(cap())
-                      if ("아이디" in it["text"] or "이메일" in it["text"])
-                      and not any(x in it["text"] for x in ("찾기", "회원가입", "로그인"))
-                      and 400 < it["cy"] < 700), None)
-        if not id_it:                     # placeholder 사라짐 = 이미 입력됨
-            break
-        _adb().tap(id_it["cx"], id_it["cy"]); time.sleep(0.8)
+        _adb().tap(*id_xy); time.sleep(0.8)
         _clear_field(); time.sleep(0.3)
         _input_text(acc["id"]); time.sleep(0.6)
-        if not screen_has("통합회원"):     # ID 칸 placeholder 사라짐 = 입력됨
+        if not screen_has("통합회원"):
             break
-    # PW 칸. 헤더/표기/찾기 제외 + 400<cy<850. ★클리어 가드: 혹시 ID가 PW칸에 잘못 들어가 있어도 제거 후 비번 입력.
-    pws = [it for it in _ocr_texts(cap()) if "비밀번호" in it["text"]
-           and not any(x in it["text"] for x in ("표기", "찾기", "로그인"))
-           and 400 < it["cy"] < 850]
-    pws.sort(key=lambda it: it["cx"])
-    px, py = (pws[0]["cx"], pws[0]["cy"]) if pws else (348, 720)
-    _adb().tap(px, py); time.sleep(0.8)
+    # PW 입력
+    _adb().tap(*pw_xy); time.sleep(0.8)
     _clear_field(); time.sleep(0.3)        # ★오염 가드 (PW칸에 ID 잘못 들어가 있어도 제거)
     _input_text(acc["pw"]); time.sleep(0.5)
-    # 로그인 버튼 (~540,889) = 키보드 위. ⚠️정확히 '로그인'만(간편/자동/안되시나요/찾기 제외) + 키보드 위(cy<1100).
-    btn = next((it for it in _ocr_texts(cap())
-                if it["text"].strip() == "로그인" and it["cy"] < 1100), None)
-    bx, by = (btn["cx"], btn["cy"]) if btn else (540, 889)        # 6/1 #5 실측 폴백
-    _adb().tap(bx, by); time.sleep(3.0)
+    # 로그인
+    _adb().tap(*login_xy); time.sleep(3.0)
     dismiss_popups()
-    dismiss_review_prompt()          # ★로그인 직후에도 리뷰 프롬프트 등장 가능(#13 사용자 확인)
-    # 로그인 검증: 마이/홈 진입 (로그인 폼 사라짐)
+    dismiss_review_prompt()          # ★로그인 직후에도 리뷰 프롬프트 등장 가능(#13)
     if screen_has("아이디") and screen_has("비밀번호"):
         out["err"] = "로그인 실패(폼 잔존 — 비번 오류 가능)"; return out
     out["ok"] = True
@@ -242,10 +277,12 @@ def login(idx: int) -> dict:
 def goto_cart_select_all() -> dict:
     """우상단 장바구니 → 전체선택 체크박스 → 주문하기. 주문서('결제하기' 등장) 도달까지."""
     out = {}
-    # 홈으로 이동 후 우상단 장바구니 아이콘 (홈에선 OCR 미검출 → 실측 좌표)
-    _adb().tap(*NAV_HOME); time.sleep(2.0)
+    # ★마이 경유 → 우상단 장바구니 아이콘 (2026-06-08 변경).
+    #   홈은 데일리 프로모 takeover(예: 스와로브스키 기획전)로 진입 불안정 → '마이'는 상단바 안정.
+    #   장바구니 아이콘은 마이/홈/기획전 모두 동일 (1002,148) (dump 실측). 옛 (960,150) 은 stale → 빗나감(CART_FAIL).
+    _adb().tap(*NAV_MY); time.sleep(2.0)
     dismiss_popups(2)
-    _adb().tap(960, 150); time.sleep(2.5)    # 카트 아이콘 (6/1 실측)
+    _adb().tap(1002, 148); time.sleep(2.5)   # 카트 아이콘 (마이 상단바, 2026-06-08 dump 실측)
     if not (wait_text("주문하기", timeout=8) or screen_has("장바구니")):
         out["err"] = "장바구니 미도달"; return out
     # 전체선택: 헤더 "일반 (a/b)" 좌측 체크박스 (~70,cy). ⚠️체크박스는 토글 → 이미 전체선택(a==b>0)이면
@@ -651,15 +688,26 @@ def pay_loca() -> dict:
     if not _wait_app(PKG, timeout=20):
         out["err"] = "롯데앱 복귀 실패(결제 미확정 가능)"; return out
     time.sleep(3.0)
-    end = time.time() + 20
+    # ★주문완료 화면 감지 후에도 주문번호가 아직 그 프레임에 안 떴을 수 있음(헤더 먼저 / 번호 지연 렌더)
+    #   → confirmed 후 번호 잡힐 때까지 계속 폴링(매 0.8s 재OCR). 못 잡으면 ok=True/order=None.
+    #   (2026-06-08 #3·4·5·7 번호 None 사고 수정 — 옛 코드는 첫 주문완료 프레임에서 즉시 return 해 번호 놓침.)
+    end = time.time() + 25
+    confirmed = False
+    order = None
     while time.time() < end:
         t = _all_text()
-        if ("주문" in t and "완료" in t) or "주문번호" in t:
-            out["ok"] = True
+        if not confirmed and (("주문" in t and "완료" in t) or "주문번호" in t):
+            confirmed = True
+        if confirmed:
             mo = re.search(r"(\d{4}-\d{2}-\d{2}-[A-Z]\d+)", t) or re.search(r"(20\d{12,})", t)
-            out["order"] = mo.group(1) if mo else None
-            return out
+            if mo:
+                order = mo.group(1)
+                break
         time.sleep(0.8)
+    if confirmed:
+        out["ok"] = True
+        out["order"] = order
+        return out
     out["err"] = "주문완료 미확인(timeout)"
     return out
 
