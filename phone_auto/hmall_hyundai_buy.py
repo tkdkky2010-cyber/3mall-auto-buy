@@ -815,6 +815,11 @@ def _card_secrets() -> dict:
 
 
 KEYPAD_ROI_Y = (0.45, 0.98)   # 셔플 키패드는 화면 하단 → 상단(상태바'100'/금액/카드마스킹/라벨) stray 배제용
+KEYPAD_ROI_MID = (0.38, 0.52)  # 2026-06-10 lotte 앱업뎃 reflow: 키패드가 화면 중앙으로 올라옴(윗줄 y~1035) → 하단 ROI가 윗줄 잘라먹음.
+                               #   하단(하단키패드=hmall/구lotte) → 중앙(신 lotte) 순차 에스컬레이션 (양쪽 안전). 입력완료(y~1260) 배제됨.
+KEYPAD_ROI_TOP = (0.20, 0.42)  # 2026-06-11 lotte '일반 결제' 모달 셔플키패드(화면 상단). 모달 높이 따라 위치 가변:
+                               #   CVC 키패드 윗줄 y~816=0.34/아랫줄 0.39 / pin6(숫자6자리) 키패드 더 위 윗줄 0.267/아랫줄 0.315.
+                               #   (0.20,0.42)=두 화면 모두 10/10 실측(/tmp/_cvc_now.png,_pin6_now.png). 하단 edge 0.42=placeholder stray('숫자6자리'의 6@0.43, CVC '•••'@0.50) 배제.
 
 
 def _tap_shuffle(value: str, delay: float = 1.0, force_vote: bool = False) -> dict:
@@ -829,14 +834,19 @@ def _tap_shuffle(value: str, delay: float = 1.0, force_vote: bool = False) -> di
     need = set(value)
     passes = [(("easyocr", "tesseract", "vision", "gcv"), "4엔진")] if force_vote else \
              [(("vision", "gcv"), "2엔진"), (("easyocr", "tesseract", "vision", "gcv"), "4엔진")]
+    # ROI 에스컬레이션: 하단(hmall/구lotte) → 중앙(신 lotte 카드번호) → 상단(lotte CVC 모달). 하단 우선이라 기존 동작 무회귀.
+    rois = [("하단", KEYPAD_ROI_Y), ("중앙", KEYPAD_ROI_MID), ("상단", KEYPAD_ROI_TOP)]
     dmap = None
-    for engines, label in passes:
-        vm = vote_digits(shot, flip_h=False, roi_y_frac=KEYPAD_ROI_Y,
-                         engines=engines, allow_partial=True) or {}
-        if need.issubset(vm):
-            dmap = vm; out["via"] = label; break
+    for roi_name, roi in rois:
+        for engines, label in passes:
+            vm = vote_digits(shot, flip_h=False, roi_y_frac=roi,
+                             engines=engines, allow_partial=True) or {}
+            if need.issubset(vm):
+                dmap = vm; out["via"] = f"{label}/{roi_name}"; break
+        if dmap:
+            break
     if not dmap:
-        out["err"] = f"키패드 매핑 실패(2/4엔진 roi, 필요={sorted(need)})"; return out
+        out["err"] = f"키패드 매핑 실패(2/4엔진 × 3ROI, 필요={sorted(need)})"; return out
     for d in value:
         x, y = dmap[d]; _adb().tap(x, y)
         time.sleep(delay)
