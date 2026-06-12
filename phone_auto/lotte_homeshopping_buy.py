@@ -8,7 +8,9 @@ hmall pay_lotte 와 동일 → lotte_card.json flow_payment[14:22] 재사용.
 범위: **구매~주문완료(A~D) + 뷰티포인트(E) + 카드등록 dismiss(F) + 구매사은 적립금(G)**.
   - D 카드: ★당일 할인카드 **자동감지**(청구할인 배너 최고% — 하드코딩 제거). buy_one 분기:
       **롯데=pay_loca(LOCA앱 137601) / 삼성=pay_lotte_samsung_general(카드번호 직접, PAYCO·ARS 회피, #12 G05038 검증)
-       / KB=pay_lotte_kb(KB Pay 간편번호 137601, #13 G70658 검증)**. 그 외 카드=UNVERIFIED_CARD(라이브 필요).
+       / KB=pay_lotte_kb(KB Pay 간편번호 137601, #13 G70658 검증)
+       / 현대=pay_lotte_hyundai(앱카드→현대카드 앱 dump 셔플 pin6, 2026-06-12 #1 B87302 검증)**.
+      그 외 카드=UNVERIFIED_CARD(라이브 필요). ⚠️현대 'PIN번호 결제'는 몰 첫결제 본인인증(SMS) 온보딩 요구 → 앱카드 경로 사용.
       (구 PAYCO/ARS 경로 pay_lotte_payco·handle_ars_call 은 deprecated — 금액 크면 ARS 전화의존이라 무인불가.)
   - E 뷰티포인트(★2026-06-03 #17 검증): **동의 먼저** — 적립신청 먼저 누르지 말고, 동의 박스를 박스 안 시작 800px swipe
       (claim_beauty_point._box_fling)로 끝까지 → '동의함' 왼쪽 라디오(cx-86) 탭 + **픽셀 채움검증** → 그 다음 적립신청 → 완료 폴링.
@@ -1042,6 +1044,66 @@ def pay_lotte_kb() -> dict:
     return out
 
 
+# ──────── D'''. 현대카드 결제 (앱카드 — 현대카드 앱 dump 셔플키패드) ────────
+
+def pay_lotte_hyundai() -> dict:
+    """현대카드 = **앱카드 결제** (현대카드 앱 com.hyundaicard.appcard).
+    ✅ 2026-06-12 #1 tkdkky2002 라이브 검증(주문 2026-06-12-B87302, 현대 7%, 603,686원).
+    ⚠️ 'PIN번호 결제' 금지 — 롯데 첫결제는 몰 단위 본인인증 온보딩(휴대폰SMS 등) 요구(#1 관찰).
+       앱카드는 온보딩 불필요 + 카드앱 구간 몰 무관 재사용.
+    경로: (원)결제하기 → XMPI 카드사 연결 → 현대 SDK 화면('앱카드 결제'/'PIN번호 결제'/무기명)
+      → 앱카드 결제 → 현대카드 앱 OnlinePaymentActivity('롯데홈쇼핑에서 N원을 결제합니다',
+      FLAG_SECURE=screencap 검정·dump O) → '결제 비밀번호 인증'(dump text) → 셔플키패드
+      (desc='N 버튼', dump 1회 매핑) pin6 → 자동제출 → 롯데 복귀 주문완료 폴링. ⚠️실 결제."""
+    pin6 = _card_secrets().get("현대", {}).get("pin6")
+    if not pin6:
+        return {"err": "card_secrets['현대'].pin6 없음"}
+    out = {"step": "order_sheet", "card": "현대"}
+    if screen_has("다음에도") or screen_has("사용할까요"):
+        ocr_tap("사용할게요", contains=True, retries=2)
+    # 1) (원)결제하기 — 하단 'NNN원 결제하기'
+    pay = next((it for it in _ocr_texts(cap()) if "결제하기" in it["text"] and it["cy"] > 2000), None)
+    if pay:
+        _adb().tap(pay["cx"], pay["cy"])
+    elif not ocr_tap("결제하기", contains=True):
+        out["err"] = "원결제하기 실패"; return out
+    time.sleep(3.0)
+    # 2) 현대 SDK 화면 → '앱카드 결제' (XMPI 연결 로딩 포함 폴링)
+    out["step"] = "hyundai_sdk"
+    if not wait_text("앱카드", timeout=20):
+        out["err"] = "현대 SDK 화면 미도달"; return out
+    if not ocr_tap("앱카드", contains=True, retries=3):
+        out["err"] = "'앱카드 결제' 선택 실패"; return out
+    # 3) 현대카드 앱 진입 → '결제 비밀번호 인증' (FLAG_SECURE → dump 전용)
+    out["step"] = "hyundai_app"
+    if not _wait_app("com.hyundaicard.appcard", timeout=15):
+        out["err"] = "현대카드 앱 미진입"; return out
+    time.sleep(2.0)
+    fr = FlowRunner(use_camera=False)
+    try:
+        fr.run_action({"action": "tap_dump_text", "text": "결제 비밀번호 인증", "timeout_sec": 12})
+        time.sleep(2.5)
+        # 4) 셔플키패드(desc='N 버튼') — dump 1회 매핑 후 연속탭, 6자리 자동제출
+        fr.run_action({"action": "input_pin", "value": pin6, "source": "dump", "tap_delay_sec": 0.5})
+    except Exception as e:
+        out["err"] = f"현대카드 앱 결제 실패: {e}"; return out
+    # 5) 롯데 복귀 + 주문완료 폴링
+    out["step"] = "order_complete"
+    if not _wait_app(PKG, timeout=20):
+        out["err"] = "롯데앱 복귀 실패(결제 미확정 가능)"; return out
+    time.sleep(3.0)
+    end = time.time() + 75
+    while time.time() < end:
+        t = _all_text()
+        if "주문번호" in t or ("주문" in t and "완료" in t):
+            mo = re.search(r"(\d{4}-\d{2}-\d{2}-[A-Z]\d+)", t)
+            out["order"] = mo.group(1) if mo else None
+            out["ok"] = True; return out
+        time.sleep(1.5)
+    out["err"] = "주문완료 미확인(timeout)"
+    return out
+
+
 # ──────────────────────────── E. 뷰티포인트 적립신청 (nested-scroll 동의) ────────────────────────────
 
 def claim_beauty_point() -> dict:
@@ -1274,6 +1336,8 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None) -> d
         pay = pay_lotte_samsung_general()       # ✅ #12 G05038 라이브검증
     elif use_card == "KB":
         pay = pay_lotte_kb()                    # ✅ #13 G70658 라이브검증 (KB Pay 간편결제)
+    elif use_card == "현대":
+        pay = pay_lotte_hyundai()               # ✅ 2026-06-12 #1 B87302 라이브검증 (앱카드)
     else:
         res["status"] = f"UNVERIFIED_CARD:{use_card}(롯데 결제경로 미검증 — 라이브 필요)"; return res
     res["pay"] = pay

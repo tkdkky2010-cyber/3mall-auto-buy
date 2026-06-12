@@ -947,6 +947,7 @@ class FlowRunner:
                 ks = {}
                 for n in _ET.parse("/tmp/_kp.xml").getroot().iter():
                     dd = (n.attrib.get("content-desc","") or "")
+                    dd = dd.replace(" 버튼", "")   # 현대카드 앱 desc="N 버튼" (순수숫자 desc 키패드 무영향)
                     if dd.isdigit() and len(dd) == 1:
                         mm = _BD.match(n.attrib.get("bounds",""))
                         if mm:
