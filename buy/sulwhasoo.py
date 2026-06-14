@@ -740,6 +740,14 @@ def lotte_add_product_by_url(page: Page, goods_no: str, qty: int) -> bool:
             except Exception:
                 break
 
+        # 쿠폰 레이어(#layer_down_coupon)가 안 닫히면(이미 다운로드 등) 장바구니 클릭을 가로챔 → 강제 숨김
+        try:
+            page.evaluate(
+                "() => { const l = document.querySelector('#layer_down_coupon');"
+                " if (l) l.style.display = 'none'; }")
+        except Exception:
+            pass
+
         # 장바구니 담기
         page.locator("#saveCart-btn").click(timeout=5000)
         page.wait_for_timeout(1500)

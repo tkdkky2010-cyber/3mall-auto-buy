@@ -136,7 +136,7 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
    - 1~3단계 완료 후 자동 실행. K2:M21 (3사 × 20조합 공급률) sheet fresh 읽기
    - 자동 채널 선택: 조합별 최저 공급률 몰 win count → 가장 많이 이긴 채널 (동률 시 평균 최저)
    - 채널별 디폴트 N: galleria=36, hmall=36, lotte=7 (`--n` override)
-   - 재고: INVENTORY 시트 '재고현황' D6:D12 fresh 읽기 (>50 코드 포함 조합 스킵, 한 칸 밀림)
+   - 재고: INVENTORY 시트 '재고현황' D6:D12 fresh 읽기 (참고 출력 전용 — 분배 결정엔 미사용. 재고>50 스킵 룰은 2026-06-14 제거)
    - 분배: sort (공급률 오름차순) + round-robin N개
    - 출력: stdout `=== CART_PLAN_BEGIN === {JSON} === CART_PLAN_END ===` 마커 + 오늘 탭 O1:R{N+3} 카트 플랜 영역
 

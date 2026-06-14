@@ -1,11 +1,10 @@
 """rate-check/cart_plan.py — Step 1 (3사 공급률 분석) 완료 후 자동 실행.
 
-자동 채널 선택 + N개 단순 분배 (sort + round-robin + 재고 50 스킵) + 시트 입력.
+자동 채널 선택 + N개 단순 분배 (sort + round-robin) + 시트 입력.
 LP 미사용 (scipy 의존 X). 표준 라이브러리만.
 
 분배 로직 (make_cart_plan):
 - 가중 수익 점수 (Σ PRODUCT_PROFIT × PRODUCT_VELOCITY × qty) 내림차순 정렬
-- 재고 OVERSTOCK (>50) 코드 포함 조합 스킵
 - N개 슬롯을 available 조합에 round-robin (slot % len(available))
 - **available < N 이면 같은 조합 2~3개씩 자동 누적** (N=14/36 친구 카드 케이스 핵심).
   예: available=7, N=14 → 각 조합 2개씩 / available=10, N=36 → 평균 3.6개씩.
@@ -19,7 +18,7 @@ LP 미사용 (scipy 의존 X). 표준 라이브러리만.
 
 데이터 소스 (캐시 X, sheet가 SoT, RULES §1-3):
 - 공급률: rate 시트 오늘 탭 K2:M{1+N} (galleria/hmall/lotte × N조합, N=len(COMBOS))
-- 재고:   INVENTORY 시트 '재고현황' 탭 D6:D12 (b~h)
+- 재고:   INVENTORY 시트 '재고현황' 탭 D6:D12 (b~h) — 참고 출력 전용 (분배 결정엔 미사용)
 
 출력:
 - stdout: '=== CART_PLAN_BEGIN === {JSON} === CART_PLAN_END ===' 마커 + product_totals
@@ -36,7 +35,6 @@ import _common as C
 
 
 CHANNEL_DEFAULT_N = {"galleria": 36, "hmall": 36, "lotte": 7}
-OVERSTOCK_THRESHOLD = 50
 
 
 def read_supply_rates(ws) -> list[list[float | None]]:
@@ -99,10 +97,6 @@ def read_stocks(gc) -> dict[str, int]:
     return stocks
 
 
-def is_overstocked(combo: list[tuple[str, int]], stocks: dict[str, int]) -> bool:
-    return any(stocks.get(code, 0) > OVERSTOCK_THRESHOLD for code, _ in combo)
-
-
 def has_excluded_code(combo: list[tuple[str, int]], exclude: set[str]) -> bool:
     """판매중지 등 사용자 지정 제외 코드 포함 시 True."""
     return any(code in exclude for code, _ in combo)
@@ -124,13 +118,12 @@ def make_cart_plan(
     channel_rates: list[float | None],
     combos: list[list[tuple[str, int]]],
     n: int,
-    stocks: dict[str, int],
     exclude_codes: set[str] | None = None,
     last_resort_codes: set[str] | None = None,
     cap_per_combo: int | None = None,
     max_per_product: dict[str, int] | None = None,
 ) -> dict[int, int]:
-    """sort + tiered round-robin + 재고 OVERSTOCK 스킵. 반환: {조합번호(1-based): 수량}.
+    """sort + tiered round-robin. 반환: {조합번호(1-based): 수량}.
 
     정렬 기준 (5/19): **상품별 수익금 × 회전율 가중합** 내림차순.
 
@@ -151,9 +144,7 @@ def make_cart_plan(
     if exc:
         indexed = [i for i in indexed if not has_excluded_code(combos[i], exc)]
     indexed.sort(key=lambda i: -_combo_score(combos[i]))
-    available = [i for i in indexed if not is_overstocked(combos[i], stocks)]
-    if not available:
-        available = indexed
+    available = indexed
     if not available:
         return {}
 
@@ -282,10 +273,7 @@ def main(argv=None) -> int:
     channel_rates = [row[channel_idx] for row in rates]
 
     stocks = read_stocks(gc)
-    print(f"  재고 (b~h): {stocks}")
-    over = sorted(c for c, q in stocks.items() if q > OVERSTOCK_THRESHOLD)
-    if over:
-        print(f"  ⚠️ 재고 > {OVERSTOCK_THRESHOLD}: {over} → 해당 코드 포함 조합 스킵")
+    print(f"  재고 (b~h): {stocks} (참고용 — 분배엔 미반영)")
 
     if exclude_codes:
         print(f"  ⊘ 제외 코드: {sorted(exclude_codes)} (포함 조합 스킵)")
@@ -293,7 +281,7 @@ def main(argv=None) -> int:
         print(f"  ▼ 보조(last-resort) 코드: {sorted(last_resort_codes)} — tier_a {args.cap_per_combo}회 cap 초과 분만 추가")
     if max_per_product:
         print(f"  ↧ 제품 상한: {max_per_product} — 누적 본품 cap 도달 조합 skip")
-    cart = make_cart_plan(channel_rates, C.COMBOS, n, stocks,
+    cart = make_cart_plan(channel_rates, C.COMBOS, n,
                           exclude_codes=exclude_codes,
                           last_resort_codes=last_resort_codes,
                           cap_per_combo=args.cap_per_combo,

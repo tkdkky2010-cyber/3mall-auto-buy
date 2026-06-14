@@ -205,12 +205,20 @@ def logout() -> bool:
     _adb().tap(*NAV_MY); time.sleep(2.0)
     dismiss_popups(2)
     dismiss_review_prompt()          # ★마이 진입 시 리뷰 프롬프트(지연 등장) 닫기 — 안 닫으면 톱니/로그아웃 막힘(#13)
+    # 이미 로그아웃 상태(직전 계정 로그인 실패 등)면 로그아웃할 세션 없음 → 톱니 탭 전에 조기 skip
+    if screen_has("아이디/비밀번호로 계속하기") or screen_has("통합회원"):
+        print("   [logout] 이미 로그아웃 상태 — skip", flush=True)
+        return True
     # ⚠️ 설정 톱니 = 헤더 아님! "고객님 반가워요!" 인사말 줄 우측(벨+톱니). (1010,150)은 장바구니라 누르면 안 됨.
     _adb().tap(1010, 336); time.sleep(1.5)   # 톱니 (6/1 실측)
     if not screen_has("로그아웃"):           # 설정화면 진입 검증
         _adb().tap(1010, 336); time.sleep(1.5)
     # 설정화면 상단 계정옆 "로그아웃"
     if not ocr_tap("로그아웃", contains=True, retries=4):
+        # 이미 로그아웃 상태(직전 계정 로그인 실패 등)면 로그아웃할 세션이 없음 → 로그인 지표 확인 후 skip
+        if screen_has("아이디/비밀번호로 계속하기") or screen_has("계속하기") or screen_has("통합회원"):
+            print("   [logout] 이미 로그아웃 상태 — skip", flush=True)
+            return True
         print("   ✗ 로그아웃 버튼 미발견", flush=True)
         return False
     time.sleep(1.0)
@@ -264,8 +272,11 @@ def login(idx: int) -> dict:
     _adb().tap(*pw_xy); time.sleep(0.8)
     _clear_field(); time.sleep(0.3)        # ★오염 가드 (PW칸에 ID 잘못 들어가 있어도 제거)
     _input_text(acc["pw"]); time.sleep(0.5)
-    # 로그인
-    _adb().tap(*login_xy); time.sleep(3.0)
+    # 로그인 — ★ID/PW 입력 후 '아이디에 대문자' 등 경고줄이 붙으면 레이아웃이 아래로 밀려(reflow)
+    #   타이핑 전 dump 의 login_xy 가 빗나감(#13 Lee0128 대문자 사례) → 버튼 좌표 재-dump 후 탭.
+    btn2 = _dump_find(_dump_nodes(), "로그인", cls="Button")
+    _adb().tap(btn2["cx"], btn2["cy"]) if btn2 else _adb().tap(*login_xy)
+    time.sleep(3.0)
     dismiss_popups()
     dismiss_review_prompt()          # ★로그인 직후에도 리뷰 프롬프트 등장 가능(#13)
     if screen_has("아이디") and screen_has("비밀번호"):
