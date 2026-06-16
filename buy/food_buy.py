@@ -148,6 +148,15 @@ def do_account(acct: int) -> bool:
         if not ok:
             print(f"  ⚠️ 적립신청 실패 — 중단 (결제는 됨, 적립만 재시도 필요)\n{log}"); return False
         _mark_done(acct, pid)
+        # 구매대장 기록 (JSON + 시트). 실패해도 흐름 무영향. 식품=today.json 즉시할인가(실제 qty 비례 환산).
+        try:
+            sys.path.insert(0, str(ROOT))
+            import purchase_ledger as PL
+            _accts = json.loads((ROOT / "hmall_config.json").read_text(encoding="utf-8"))["accounts"]
+            _aid = _accts[acct - 1]["id"] if 0 <= acct - 1 < len(_accts) else None
+            PL.record_food("현대Hmall", _aid, pid, qty=QTY)
+        except Exception as e:
+            print(f"  [ledger] 기록 실패(무시): {e}", flush=True)
         print(f"  ✓ product {pid} 완료(결제+적립)", flush=True)
     print(f"[계정 #{acct}] ✓ 완료")
     return True

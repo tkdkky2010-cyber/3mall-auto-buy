@@ -1212,9 +1212,9 @@ def handle_after_pay(timeout: float = 30) -> str:
 
 # ──────────────────────────── 1계정 오케스트레이션 ────────────────────────────
 
-def buy_one(idx: int, card: str | None = None) -> dict:
+def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None) -> dict:
     serial = hw._serial()
-    res = {"idx": idx, "status": None}
+    res = {"idx": idx, "status": None, "combo_idx": combo_idx}
     print(f"\n{'='*54}\n[#{idx}] 앱 콜드런치 → 로그인...", flush=True)
 
     def _launch_and_login():
@@ -1333,6 +1333,14 @@ def buy_one(idx: int, card: str | None = None) -> dict:
         _ledger_append(idx, res.get("id"), active)   # 누적 추적 (세션 릴레이)
     lap(f"뷰티포인트 재인증 → ★계정 #{idx} 총소요")
     res["status"] = "DONE" + ("" if bp.get("ok") else f"(beauty_fail:{bp.get('err')})")
+    # 구매대장 기록 (JSON + 시트). 실패해도 결제엔 영향 없음. (resume 경로 _do_beauty 는 미기록)
+    # ★설화수 전용 (식품은 buy/food_buy.py 가 기록 — 식품은 이 스크립트를 안 탐)
+    try:
+        import purchase_ledger as PL
+        PL.record_combo("현대Hmall", res.get("id"), combo_idx,
+                        order_no=(res.get("pay") or {}).get("order"), card=res.get("card"))
+    except Exception as e:
+        print(f"   [ledger] 기록 실패(무시): {e}", flush=True)
     return res
 
 
@@ -1450,12 +1458,13 @@ def main() -> int:
         return 0
     only = [int(a) for a in args if a.isdigit()]
     card_override = next((a for a in args if a in CARD_GRID_NAME), None)   # '현대'/'롯데' 강제 (없으면 당일 자동감지)
+    combo_idx = next((int(a.split("=", 1)[1]) for a in args if a.startswith("combo=")), None)  # 설화수 기록용
     plan = only or PLAN
     print(f"[serial] {hw._serial()}  plan={plan}  card={card_override or '당일 자동감지'}", flush=True)
     summary = []
     for idx in plan:
         try:
-            r = buy_one(idx, card=card_override)
+            r = buy_one(idx, card=card_override, combo_idx=combo_idx)
         except Exception as e:
             r = {"idx": idx, "status": f"EXC:{e}"}
         print(f"[#{idx}] => {r.get('status')}", flush=True)

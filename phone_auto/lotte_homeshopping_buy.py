@@ -1301,9 +1301,11 @@ def dismiss_card_register() -> dict:
     return out
 
 
-def buy_one(idx: int, card: str | None = None, goods_no: str | None = None) -> dict:
+def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
+            combo_idx: int | None = None) -> dict:
     """idx 계정 롯데홈쇼핑 1건 구매. card=당일카드 override(미지정 시 청구할인 배너 자동감지).
-    goods_no=구매사은 (옵션)상품번호 검색 override(미지정=기본: 주문완료의 구매상품 직접 탭)."""
+    goods_no=구매사은 (옵션)상품번호 검색 override(미지정=기본: 주문완료의 구매상품 직접 탭).
+    combo_idx=구매대장 기록용 조합번호(rate 시트에서 금액/조합명 조회). 미지정이면 금액 미상으로 기록."""
     res = {"idx": idx, "status": None}
     print(f"\n{'='*54}\n[#{idx}] 롯데홈쇼핑 구매 시작", flush=True)
     reset_lotte_app()
@@ -1355,6 +1357,14 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None) -> d
     if not pay.get("ok"):
         res["status"] = f"PAY_FAIL@{pay.get('step')}:{pay.get('err')}"; return res
     res["status"] = f"DONE(주문 {pay.get('order')})"
+    # 구매대장 기록 (JSON + 시트). 실패해도 결제 후처리엔 영향 없음.
+    try:
+        sys.path.insert(0, str(ROOT))
+        import purchase_ledger as PL
+        PL.record_combo("롯데홈쇼핑", res.get("id"), combo_idx,
+                        order_no=pay.get("order"), card=use_card)
+    except Exception as e:
+        print(f"   [ledger] 기록 실패(무시): {e}", flush=True)
     # F. 카드등록 안내(있으면 dismiss). 삼성/PAYCO 경로엔 안 뜸 → 보통 no-op.
     res["cardreg"] = dismiss_card_register()
     # E. 뷰티포인트 적립신청 (설화수=아모레퍼시픽, 주문완료 화면에서만 — now-or-never).
@@ -1378,9 +1388,10 @@ def main() -> int:
         return 0
     idxs = [int(x) for x in a if x.isdigit()]
     card = next((x for x in a if x in CARD_GRID_NAME), None)   # 당일카드 override (예: 삼성). 미지정=자동감지
+    combo_idx = next((int(x.split("=", 1)[1]) for x in a if x.startswith("combo=")), None)  # 구매대장 기록용
     results = []
     for i in idxs:
-        r = buy_one(i, card=card)
+        r = buy_one(i, card=card, combo_idx=combo_idx)
         results.append(r)
         print(f"[#{i}] → {r['status']}", flush=True)
     print("\n===== 요약 =====")
