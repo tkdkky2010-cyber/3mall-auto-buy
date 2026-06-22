@@ -11,17 +11,14 @@
 ## 0. 전제 / 환경
 
 - **ADB 무선 연결** (`adb devices` 로 device 1개). cart/checkout 화면은 ADB screencap OK (FLAG_SECURE 아님).
-- **iPhone Continuity 카메라** = PIN 단계에서만 필수. 폰 가로 마운트 + AVFoundation rotation 90 = portrait 1080x1920.
-  - ⚠️ 사용자가 폰 만지면 카메라 빠짐("나가리", AVF device 0). **PIN 직전 `AVCaptureDeviceTypeContinuityCamera` 잡히는지 확인.**
-  - iPhone 은 `External` 아니라 **`ContinuityCamera` type** 으로 enumerate (이거 빠뜨리면 device 0).
-- python3 = framework 3.13 으로 AVFoundation 실행됨 (SIGKILL 안 남, 5/27 확인).
+- **카메라 불필요** (2026-06 기준). PIN/보안 키패드(FLAG_SECURE)는 `screencap`이 검정이어도 **`uiautomator dump`(content-desc)** 로 입력 → 카메라/웹캠 없이 ADB만으로 완주. (현대/KB=dump source, 삼성=ADB screencap 셔플 OCR)
 - **PIN = 137601** (전 카드사 공통, 6자리).
 - 계정 = 폰에 로그인된 것 (5/27 = 김건엽). 카트는 **비운 상태에서 시작**.
 
 ## 0-1. ⏱️ 5분 결제 타임아웃 (★중요)
 
-**`결제하기` 눌러 삼성카드/monimo 진입한 순간부터 5분 내 PIN 완료 못 하면 세션 만료(나가리).**
-→ Phase 4 는 빠르게. PIN 은 멀티프레임 voting 말고 **1프레임 캡처 직탭** (아래 방식).
+**`결제하기` 눌러 카드앱/monimo 진입한 순간부터 5분 내 PIN 완료 못 하면 세션 만료(나가리).**
+→ Phase 4 는 빠르게. PIN 은 ADB `uiautomator dump` 로 즉시 입력 (셔플도 dump content-desc 로 슬롯 매핑).
 
 ---
 
@@ -81,18 +78,15 @@
 
 **금액 검증**: list 504,000 → 할인쿠폰 -50,400 = 453,600 → 플러스 -60,730 = **392,870** (결제하기 표시). 삼성 5%는 청구할인(→373,230 billed).
 
-## Phase 4 — 결제 + PIN (수동/관찰, 카메라 필수, ★5분 내)
+## Phase 4 — 결제 + PIN (당일 카드별 핸들러, ADB only, ★5분 내)
 
-1. **결제하기 (539,2173)** → "삼성카드 결제수단" 모달
-2. **"monimo pay 결제" (508,734)** (★ 삼성=monimo 경로. 삼성카드앱/오픈앱카드/간편결제 아님)
-3. monimo `MonimoPayPayActivity` (화면 보임, ADB OK). 카드 = American Express Reserve(삼성 신용카드, 5% 대상). 금액 "LOTTE Homeshopping에서 392,870원".
-4. **결제하기 (540,2130, dump_text "결제하기")** → `MonimoPayVerifyActivity` = **PIN 키패드 (FLAG_SECURE, ADB screencap 검정 0.0)**
-5. **PIN 입력 (셔플 6자리, 재셔플 없음):**
-   - `capture_portrait_frame()` 1프레임 → `ocr_text` 로 0~9 cam 좌표 (10개 다 잡힘)
-   - cam cols 3개 / rows 4개 → **검증된 monimo 버튼그리드 phone 좌표** 매핑:
-     `COL_X=[200,540,880]`, `ROW_Y=[1583,1765,1947,2129]` (cam cluster index 순서대로)
-   - **137601** 각 digit phone좌표 직탭, **매 tap 0.5초 페이싱**. (멀티프레임 voting 불필요 — 1캡처로 충분, 빠름)
-6. → lotte `SubActivity` 복귀 → **"주문완료" + 주문번호** 확인 (PIN 틀리면 verify 화면 잔류)
+`buy_one` 이 `detect_card_lotte()` (청구할인 배너 최고%) 로 당일카드 감지 후 분기. **전 경로 카메라 X — ADB dump/screencap.**
+
+- **현대** `pay_lotte_hyundai`: 결제하기 → 로카페이(앱카드) → 현대카드 앱 '결제 비밀번호 인증'(FLAG_SECURE→`dump` 전용) → 셔플키패드 pin6 `source:dump` → 주문완료. (2026-06-12 #1 B87302)
+- **KB** `pay_lotte_kb`: KB SDK 'KB Pay 결제' → KB앱(com.kbcard) 결제하기(dump) → 간편번호6 137601 `source:dump` 자동제출. (#13 G70658)
+- **삼성** `pay_lotte_samsung_general`: 삼성 SDK '다른결제' → 일반결제(카드번호 직접) → `_tap_shuffle`(ADB screencap OCR) 카드번호/CVC/pin6/cert_pw6 → 모니모 금융인증서. PAYCO·ARS 회피. (#12 G05038)
+- **롯데** `pay_loca`: 로카페이 앱카드 → LOCA앱 간편번호 137601 `dump`. 
+- PIN/간편번호 = **137601** 공통. → lotte `SubActivity` 복귀 → **"주문완료" + 주문번호** 확인.
 
 ---
 
@@ -109,6 +103,5 @@
 | 다른상품 % 라벨 오인 | 모달 덜 열린 채 OCR | 모달(닫기) 열린 뒤 + 닫기 위쪽만 |
 | 본윤에 15% 적용 실패 | best % 가 상품별로 적용 불가 | 모달 안닫히면 다음 % 시도 |
 | 카드 잘못 결제 | silent '삼성카드' default | default 제거, 반드시 지정 |
-| portrait 캡처 device 0 | iPhone = ContinuityCamera type | type 목록에 추가 |
 | `re` NameError | lotte_apply_coupons 중복 import re 가 함수전체 가림 | 중복 제거 |
-| 결제 만료 | 5분 초과 | PIN 1프레임 직탭으로 빠르게 |
+| 결제 만료 | 5분 초과 | PIN ADB dump 로 빠르게 |

@@ -671,6 +671,25 @@ def agree_required() -> bool:
 
 # ──────────────────────────── D. 결제 (LOCA 재사용) ────────────────────────────
 
+def _poll_order_complete(timeout: int) -> tuple[bool, str | None]:
+    """롯데 복귀 후 주문완료 폴링. ★주문완료 화면 감지(confirmed) 후에도 주문번호가 지연렌더될 수 있어,
+    번호 잡힐 때까지 계속 재OCR(첫 프레임 즉시 return 금지 — 2026-06-08/06-22 번호 None 사고).
+    Returns (confirmed, order_no|None). KB·현대·LOCA 공용(중복 분기로 한쪽만 고쳐지는 회귀 방지)."""
+    end = time.time() + timeout
+    confirmed = False
+    order = None
+    while time.time() < end:
+        t = _all_text()
+        if not confirmed and (("주문" in t and "완료" in t) or "주문번호" in t):
+            confirmed = True
+        if confirmed:
+            mo = re.search(r"(\d{4}-\d{2}-\d{2}-[A-Z]\d+)", t) or re.search(r"(20\d{12,})", t)
+            if mo:
+                order = mo.group(1); break
+        time.sleep(0.8)
+    return confirmed, order
+
+
 def pay_loca() -> dict:
     """결제하기(원결제하기) → 로카페이(앱카드) 결제하기 → LOCA앱 137601 → 확인 → 롯데 복귀 주문완료.
     LOCA 구간(com.lcacApp)은 lotte_card.json flow[14:22] 재사용. ⚠️실 결제."""
@@ -701,22 +720,7 @@ def pay_loca() -> dict:
     if not _wait_app(PKG, timeout=20):
         out["err"] = "롯데앱 복귀 실패(결제 미확정 가능)"; return out
     time.sleep(3.0)
-    # ★주문완료 화면 감지 후에도 주문번호가 아직 그 프레임에 안 떴을 수 있음(헤더 먼저 / 번호 지연 렌더)
-    #   → confirmed 후 번호 잡힐 때까지 계속 폴링(매 0.8s 재OCR). 못 잡으면 ok=True/order=None.
-    #   (2026-06-08 #3·4·5·7 번호 None 사고 수정 — 옛 코드는 첫 주문완료 프레임에서 즉시 return 해 번호 놓침.)
-    end = time.time() + 25
-    confirmed = False
-    order = None
-    while time.time() < end:
-        t = _all_text()
-        if not confirmed and (("주문" in t and "완료" in t) or "주문번호" in t):
-            confirmed = True
-        if confirmed:
-            mo = re.search(r"(\d{4}-\d{2}-\d{2}-[A-Z]\d+)", t) or re.search(r"(20\d{12,})", t)
-            if mo:
-                order = mo.group(1)
-                break
-        time.sleep(0.8)
+    confirmed, order = _poll_order_complete(25)
     if confirmed:
         out["ok"] = True
         out["order"] = order
@@ -843,14 +847,9 @@ def pay_lotte_payco(card: str = "삼성") -> dict:
         out["ars_call"] = handle_ars_call()
     # 7) 주문완료 폴링 (ARS 통화 인증 시간 고려해 길게)
     out["step"] = "order_complete"
-    end = time.time() + 180
-    while time.time() < end:
-        t = _all_text()
-        if "주문번호" in t or ("주문" in t and "완료" in t):
-            mo = re.search(r"(\d{4}-\d{2}-\d{2}-[A-Z]\d+)", t)
-            out["order"] = mo.group(1) if mo else None
-            out["ok"] = True; return out
-        time.sleep(1.5)
+    confirmed, order = _poll_order_complete(180)
+    if confirmed:
+        out["ok"] = True; out["order"] = order; return out
     out["err"] = "주문완료 미확인(timeout — ARS 미완료/지연 가능)"
     return out
 
@@ -988,14 +987,9 @@ def pay_lotte_samsung_general() -> dict:
     if not _wait_app(PKG, timeout=30):
         out["err"] = "롯데앱 복귀 실패(결제 미확정 가능)"; return out
     time.sleep(3.0)
-    end = time.time() + 60
-    while time.time() < end:
-        t = _all_text()
-        if "주문번호" in t or ("주문" in t and "완료" in t):
-            mo = re.search(r"(\d{4}-\d{2}-\d{2}-[A-Z]\d+)", t)
-            out["order"] = mo.group(1) if mo else None
-            out["ok"] = True; return out
-        time.sleep(1.5)
+    confirmed, order = _poll_order_complete(60)
+    if confirmed:
+        out["ok"] = True; out["order"] = order; return out
     out["err"] = "주문완료 미확인(timeout)"
     return out
 
@@ -1043,14 +1037,9 @@ def pay_lotte_kb() -> dict:
     if not _wait_app(PKG, timeout=20):
         out["err"] = "롯데앱 복귀 실패(결제 미확정 가능)"; return out
     time.sleep(3.0)
-    end = time.time() + 30
-    while time.time() < end:
-        t = _all_text()
-        if "주문번호" in t or ("주문" in t and "완료" in t):
-            mo = re.search(r"(\d{4}-\d{2}-\d{2}-[A-Z]\d+)", t)
-            out["order"] = mo.group(1) if mo else None
-            out["ok"] = True; return out
-        time.sleep(1.5)
+    confirmed, order = _poll_order_complete(30)
+    if confirmed:
+        out["ok"] = True; out["order"] = order; return out
     out["err"] = "주문완료 미확인(timeout)"
     return out
 
@@ -1103,21 +1092,16 @@ def pay_lotte_hyundai() -> dict:
     if not _wait_app(PKG, timeout=20):
         out["err"] = "롯데앱 복귀 실패(결제 미확정 가능)"; return out
     time.sleep(3.0)
-    end = time.time() + 75
-    while time.time() < end:
-        t = _all_text()
-        if "주문번호" in t or ("주문" in t and "완료" in t):
-            mo = re.search(r"(\d{4}-\d{2}-\d{2}-[A-Z]\d+)", t)
-            out["order"] = mo.group(1) if mo else None
-            out["ok"] = True; return out
-        time.sleep(1.5)
+    confirmed, order = _poll_order_complete(75)
+    if confirmed:
+        out["ok"] = True; out["order"] = order; return out
     out["err"] = "주문완료 미확인(timeout)"
     return out
 
 
 # ──────────────────────────── E. 뷰티포인트 적립신청 (nested-scroll 동의) ────────────────────────────
 
-def claim_beauty_point() -> dict:
+def claim_beauty_point(idx: int | None = None) -> dict:
     """주문완료 화면 뷰티포인트 적립신청. ★설화수(아모레퍼시픽)만, 본 주문완료 화면에서만(now-or-never).
     ★★순서(2026-06-03 #17 검증, 사용자 4회 지적): **동의 안 한 채 적립신청 먼저 누르기 금지.**
       ① 동의 박스를 **박스 안(540,1600) 잡고 800px swipe**(_box_fling)로 끝까지 → '동의함' 등장 (적립신청 누르지 않음).
@@ -1129,6 +1113,8 @@ def claim_beauty_point() -> dict:
     # ★★ 순서 (사용자 6/3 강조, 4회 지적): **동의 안 한 채 적립신청 먼저 누르기 금지.**
     #    스크롤 → '동의함' 체크 먼저 → 그 다음 적립신청. (적립신청 노출은 박스가 정말 없을 때만 폴백.)
     serial = hw._serial()
+    def _blog(m):
+        print(f"      [beauty] {m}", flush=True)
     def _agree_it():
         return _find("동의함", exact=True)
     def _box_fling():
@@ -1137,12 +1123,15 @@ def claim_beauty_point() -> dict:
         subprocess.run([hw.ADB, "-s", serial, "shell", "input", "swipe", "540", "1600", "540", "800", "300"])
         time.sleep(0.7)
     # 1) ★동의 먼저: **적립신청 누르지 말고** 동의 안내 박스를 스크롤해 '동의함' 찾기 (박스는 주문완료 화면에 이미 있음).
-    for _ in range(6):
+    found_at = None
+    for n in range(6):
         if _agree_it():
-            break
+            found_at = n; break
         _box_fling()
+    _blog(f"동의함 박스스크롤: {'발견(scroll '+str(found_at)+')' if found_at is not None else '6회 스크롤 미발견 → 폴백'}")
     # 2) [폴백] 스크롤해도 동의함 없으면(박스 미노출) → 적립신청 1회로 동의안내 노출('하셔야' 팝업 확인) 후 재스크롤.
     if not _agree_it():
+        _blog("폴백: 적립신청 1회 탭(동의 안내 노출용) → 확인 → 재스크롤")
         _tap_fresh("적립신청", retries=3); time.sleep(1.5)
         ocr_tap("확인", retries=2); time.sleep(1.5)
         for _ in range(6):
@@ -1150,10 +1139,10 @@ def claim_beauty_point() -> dict:
                 break
             _box_fling()
     if not _agree_it():
-        out["err"] = "동의함 미도달(박스 스크롤 실패)"; return out
+        out["err"] = "동의함 미도달(박스 스크롤 실패)"; _blog("✗ 동의함 미도달 → 적립 실패"); return out
     # 3) ★'동의함' 왼쪽 라디오 원(동의함 cx-86) 탭 + **픽셀로 선택검증**(채워지면 dark↑, 실측 미선택~0 / 선택~319). 미선택이면 재시도.
     ok = False
-    for _ in range(4):
+    for k in range(4):
         it = _agree_it()
         if not it:
             break
@@ -1162,19 +1151,34 @@ def claim_beauty_point() -> dict:
         im = Image.open(cap("/tmp/_lt_agree.png")).convert("L"); px = im.load(); W, H = im.size
         dark = sum(1 for yy in range(max(0, ry - 16), min(H, ry + 16))
                    for xx in range(max(0, rx - 18), min(W, rx + 18)) if px[xx, yy] < 120)
+        _blog(f"동의함 라디오 탭#{k} @({rx},{ry}) dark={dark} {'✓채움' if dark>=60 else '미채움 재시도'}")
         if dark >= 60:               # 라디오 채워짐 = 동의함 선택됨
             ok = True; break
     if not ok:
-        out["err"] = "동의함 라디오 선택 실패(픽셀 미채움)"; return out
+        out["err"] = "동의함 라디오 선택 실패(픽셀 미채움)"; _blog("✗ 라디오 선택 실패 → 적립 실패"); return out
     # 4) 적립신청 → '완료되었습니다' **폴링** 확인 (★완료팝업 지연렌더로 단발 체크가 false-negative[#19] → 최대 ~4s 폴링).
+    sj = next((it for it in _ocr_texts(cap()) if "적립신청" in it["text"]), None)
+    _blog(f"적립신청 버튼 {'발견 @('+str(sj['cx'])+','+str(sj['cy'])+')' if sj else 'OCR 미발견(_tap_fresh 재시도)'}")
     if not _tap_fresh("적립신청", retries=3):
-        out["err"] = "적립신청 버튼 미발견"; return out
-    completed = False
-    for _ in range(6):
+        out["err"] = "적립신청 버튼 미발견"; _blog("✗ 적립신청 버튼 미발견 → 적립 실패"); return out
+    # ★완료판정 = OCR 텍스트 1개 안에 '적립'+'완료' 동시 존재 (모달 "뷰티포인트 적립신청이 완료되었습니다").
+    #   주문완료 화면의 "주문이 완료 되었습니다"는 '적립'이 없어 자동 배제 → false-positive 차단.
+    done_text = None
+    for p in range(6):
         time.sleep(0.7)
-        if screen_has("적립신청이 완료") or screen_has("완료되었습니다"):
-            completed = True; break
+        its = _ocr_texts(cap())
+        hit = next((t for t in its if "적립" in t["text"] and "완료" in t["text"]), None)
+        if hit:
+            done_text = hit["text"]; break
+    shot = cap(f"/tmp/_lt_beauty_{idx if idx is not None else 'x'}.png")    # 계정별 스샷 (덮어쓰기 X)
+    completed = done_text is not None
+    if completed:
+        _blog(f"✓ 뷰티포인트 적립완료 문구 떴음: '{done_text}'  [스샷 {shot}]")
+    else:
+        cand = [t["text"] for t in _ocr_texts(cap()) if "완료" in t["text"] or "적립" in t["text"]]
+        _blog(f"✗ 뷰티포인트 적립완료 문구 안떴음 — 미적립 가능. 화면 '완료/적립' 텍스트={cand}  [스샷 {shot}]")
     out["completed"] = completed
+    out["done_text"] = done_text
     ocr_tap("확인", retries=2); time.sleep(1.0)
     if not completed:
         out["err"] = "적립신청 완료문구 미확인(미적립 가능)"
@@ -1370,9 +1374,13 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
     # E. 뷰티포인트 적립신청 (설화수=아모레퍼시픽, 주문완료 화면에서만 — now-or-never).
     #    ⚠️반드시 reward 보다 먼저: reward 가 홈으로 이동하면 주문완료 화면 이탈→뷰티 소실(#6 사례).
     print(f"[#{idx}] 뷰티포인트 적립신청 (nested-scroll 동의)", flush=True)
-    res["beauty"] = claim_beauty_point()
-    if not res["beauty"].get("completed") and not res["beauty"].get("skip"):
-        print(f"[#{idx}] ⚠️ 뷰티포인트 실패({res['beauty'].get('err')}) — 다음 단계 이동 시 소실됨. 수동 확인 권장.", flush=True)
+    res["beauty"] = claim_beauty_point(idx)
+    if res["beauty"].get("completed"):
+        print(f"[#{idx}] ✅ 뷰티포인트 적립 완료 (문구: '{res['beauty'].get('done_text')}')", flush=True)
+    elif res["beauty"].get("skip"):
+        print(f"[#{idx}] ⏭️ 뷰티포인트 SKIP ({res['beauty'].get('skip')})", flush=True)
+    else:
+        print(f"[#{idx}] ❌ 뷰티포인트 적립 실패({res['beauty'].get('err')}) — 완료문구 안떴음, 소실 가능. 수동확인.", flush=True)
     # G. 구매사은 적립금 신청 (★상품번호 검색=한글우회 → 구매사은 이벤트 → 혜택 신청하기).
     print(f"[#{idx}] 구매사은 적립금 신청", flush=True)
     res["reward"] = claim_lotte_reward(goods_no=goods_no)

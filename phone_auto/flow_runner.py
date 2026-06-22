@@ -116,36 +116,14 @@ class FlowRunner:
         self.adb = adb or ADB()
         self.verbose = verbose
         self._tmp_img = "/tmp/_flow.png"
-        # 카메라 모드 — FLAG_SECURE 화면 (monimo 등) screencap 이 검정이라 카메라 OCR 필요
-        # use_camera=None → FLOW_USE_CAMERA env var 또는 calibration.json 존재 시 자동 활성
-        if use_camera is None:
-            import os as _os
-            env = _os.environ.get("FLOW_USE_CAMERA", "").lower()
-            if env in ("1", "true", "yes"):
-                use_camera = True
-            elif env in ("0", "false", "no"):
-                use_camera = False
-            else:
-                use_camera = False  # 기본 = ADB screencap (호환성)
-        self.use_camera = use_camera
-        # portrait 캡처 모드 — 폰 가로 마운트 + cam rotation 90 = 1080x1920
-        # (memory: feedback_phone_landscape_mount_cam_portrait). FLAG_SECURE PIN 키패드용.
-        if use_portrait is None:
-            import os as _os
-            use_portrait = _os.environ.get("FLOW_PORTRAIT", "").lower() in ("1", "true", "yes")
-        self.use_portrait = use_portrait
+        # ★카메라 모드 영구 폐기 (2026-06-22): 모든 결제는 ADB(screencap / uiautomator dump).
+        #   FLAG_SECURE PIN 키패드도 dump(content-desc)로 입력 → 카메라/웹캠 절대 불필요.
+        #   use_camera / FLOW_USE_CAMERA / cam_idx / use_portrait 인자·env 는 하위호환 위해 받기만 하고 **무시**.
+        #   self.use_camera 는 항상 False → 모든 카메라 분기 미실행 (어떤 step·card 도 카메라 안 탐).
+        self.use_camera = False
+        self.use_portrait = False
         self.cam_idx = cam_idx
         self._calib = None
-        if self.use_camera:
-            try:
-                from .screen_ocr import load_calibration
-                self._calib = load_calibration()
-                if self._calib is None:
-                    raise RuntimeError("calibration.json 없음 — phone_auto/_tmp/calibration.json")
-                self._log(f"camera mode ON (cam_idx={cam_idx}, calib loaded)")
-            except Exception as e:
-                self._log(f"⚠ camera mode 활성화 실패: {e} — ADB screencap 으로 fallback")
-                self.use_camera = False
 
     def calibrate_from_home(self) -> bool:
         """홈화면 OCR + home_apps.json 알려진 좌표 매칭 → calibration auto-update.
@@ -240,21 +218,8 @@ class FlowRunner:
         if self.verbose: print(f"[flow] {msg}")
 
     def _cap(self):
-        if self.use_camera and self.use_portrait:
-            # portrait AVFoundation 캡처 (rotation 90 + zoom + AF). FLAG_SECURE 키패드용.
-            from .screen_ocr import capture_portrait_frame
-            if capture_portrait_frame(out_path=self._tmp_img, warmup_frames=30) is None:
-                raise FlowError("_cap: portrait 캡처 실패 (iPhone 카메라 미연결 — AVF device 0개)")
-        elif self.use_camera:
-            # 카메라 frame 캡쳐 → /tmp/_flow.png 저장 (OCR 함수가 path 받음)
-            from .screen_ocr import capture_phone_screen
-            img = capture_phone_screen(self.cam_idx, warmup_frames=3)
-            # capture_phone_screen 이 path string 반환하면 그대로 + 다른 위치면 _tmp_img 로 복사
-            if isinstance(img, str) and img != self._tmp_img:
-                import shutil
-                shutil.copy(img, self._tmp_img)
-        else:
-            self.adb.screencap(self._tmp_img)
+        # 카메라 폐기(2026-06-22) → 항상 ADB screencap (FLAG_SECURE PIN 도 dump 로 입력하므로 카메라 불필요).
+        self.adb.screencap(self._tmp_img)
 
     def run_action(self, action: dict, vars: dict | None = None) -> Any:
         vars = vars or {}
@@ -930,12 +895,8 @@ class FlowRunner:
                 raise FlowError(f"input_pin: value 없음 (kind={action.get('kind')})")
             # 페이싱: 카드사 PIN/결제코드 매 tap 사이 1.2초 (셔플 재배열 애니메이션 완료 wait)
             delay = action.get("tap_delay_sec", 1.2)
-            # step 별 use_camera override — BC 같이 mixed (PIN=ADB, 7자리/결제PIN=camera) 카드 지원
-            # 예: {"action":"input_pin", "kind":"bc_login6", "use_camera": false} → 이 step 만 ADB screencap
-            _saved_use_camera = self.use_camera
-            if "use_camera" in action:
-                self.use_camera = bool(action["use_camera"])
-                self._log(f"input_pin use_camera override → {self.use_camera}")
+            # step 별 use_camera override 폐기 (2026-06-22): 카메라 영구 미사용 → action 의 use_camera 무시, 항상 False 유지.
+            _saved_use_camera = self.use_camera   # 항상 False (아래 복원 코드 무회귀용 보존)
             # source=="dump": content-desc 기반 키패드 (롯데 로카페이 간편번호 등).
             # 셔플이어도 uiautomator dump 의 content-desc 로 숫자 위치 정확 — OCR/카메라 불필요.
             # 셔플은 화면 로드시 1회뿐([[feedback_shuffle_keypad_ocr_once]]) → 1회 dump 후 value 연속탭.
