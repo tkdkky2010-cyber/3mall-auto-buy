@@ -5,7 +5,8 @@ Step 1 substep #5 의 active script. 2026-05-17 _tmp/lotte_all.py 에서 승격 
 흐름:
 - 쿠폰%: 상품 페이지 쿠폰받기 클릭 → 팝업 안의 가장 위 (다운로드 가능 최대) 쿠폰만 읽음 (배너 "할인" X)
 - 카드 청구할인: 상품 페이지 "청구할인" 텍스트 추출
-- 적립금: _check_lotte_reward.py를 subprocess로 호출 → stdout JSON_DUMP 파싱 (캐시 파일 X)
+- 적립금: store-wide 이벤트라 상품 1개(b)의 #eventBanner→이벤트페이지를 **같은 driver로 in-process** 조회.
+          최고 tier(최대 임계↔최대 적립) 1개를 전 조합 공통 적용. (subprocess 방식=드라이버 2개 9222 충돌로 폐기)
 - 추증/GWP: galleria가 sheet에 쓴 결과를 load_galleria_composition_from_sheet(ws)로 직접 읽음 (캐시 X)
 - 적립금은 조합당 1회 적용 (sum × qty 잘못 — 결제 1회 = 이벤트 1회)
 """
@@ -50,10 +51,7 @@ for code in 'bcdefgh':
     driver.get(url)
     time.sleep(3)
     block_dialogs()
-    # 스크롤
-    for y in (0, 800, 1600, 2400, 3200, 0):
-        driver.execute_script(f"window.scrollTo(0, {y})"); time.sleep(0.3)
-    block_dialogs()
+    # 스크롤 불필요 — 쿠폰받기는 아래 JS el.click() 로 스크롤 위치 무관하게 클릭됨. 바로 쿠폰 단계로.
 
     # 쿠폰받기 클릭 — 팝업/레이어 등장
     # ★ 사용자 5/15 지시: body 전체 max % 수집 X (배너 "N% 할인" 같은 행사 표시 포함됨).
@@ -147,50 +145,88 @@ for code in 'bcdefgh':
 print(f"\n쿠폰: {coupons}")
 print(f"카드: {card_info}")
 
-# 적립 확인 — _check_lotte_reward.py 를 subprocess로 호출 + stdout JSON 파싱.
-# ★ 결과파일(_lotte_reward_dump.json) 절대 사용 X — sheet가 SoT.
-# tiers[code] = [{'threshold': int, 'reward': int}, ...] — threshold 오름차순.
-# compute() 가 조합 결제금액 vs threshold 비교해서 max 1회 적립 (RULES §7-3).
-import os, subprocess, sys
-tiers: dict[str, list[dict]] = {code: [] for code in 'bcdefgh'}
+# 적립 확인 — store-wide 이벤트(설화수 일반상품 전체 공통)라 상품 1개(b)만 조회 후 전 조합에 동일 적용.
+# ★ subprocess(2번째 selenium 드라이버) 대신 이 스크립트의 driver 재사용 = 드라이버 1개 → 9222 윈도우 충돌 회피.
+#   (subprocess 방식은 부모 driver 가 9222에 붙어있는 채로 자식이 2번째 driver 를 띄워 같은 윈도우를 두고 싸워 0개 오판.)
+# GLOBAL_TIERS = [{'threshold': int, 'reward': int}, ...] 오름차순. compute() 가 결제금액 vs threshold 로 max 1회 적립 (RULES §7-3).
+# ★ 결과파일 절대 사용 X — sheet가 SoT.
+IGNORE_KW = [l.strip() for l in open(
+    '/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/lotte_ignore_keywords.txt',
+    encoding='utf-8') if l.strip()]
+
+_COLLECT_JS = r"""
+    const banner = document.querySelector('#eventBanner');
+    if (!banner) return [];
+    const out = [];
+    for (const li of banner.querySelectorAll('li.swiper_slide, li.swiper-slide, li')) {
+        const a = li.querySelector('a[data-url], a[href]');
+        const img = li.querySelector('img[alt]');
+        const strong = li.querySelector('strong');
+        const p = li.querySelector('p');
+        const text = li.textContent.replace(/\s+/g, ' ').trim();
+        if (!text || text.length < 3) continue;
+        out.push({text, alt: img?img.alt:'', title: strong?strong.textContent.trim():'',
+                  subtitle: p?p.textContent.trim():'',
+                  data_url: a?(a.getAttribute('data-url')||a.getAttribute('href')):null});
+    }
+    return out;
+"""
+_VERIFY_JS = r"""
+    const body = document.body ? document.body.innerText : '';
+    // 임계값/적립금 독립 matchAll 후 페어링 (lazy regex 누락 방지, RULES §7-2/§P8).
+    const reThr = /([\d,]{3,})\s*원\s*이상/g, reRwd = /([\d,]{2,})\s*(?:원|P)\s*적립(?!금)/g, reRwdAlt = /적립금\s*([\d,]{2,})\s*원/g;
+    const thr = [], rwd = []; let m;
+    while ((m = reThr.exec(body)) !== null) { const v = parseInt(m[1].replace(/,/g,'')); if (v>=1000) thr.push(v); if (thr.length>=20) break; }
+    while ((m = reRwd.exec(body)) !== null) { const v = parseInt(m[1].replace(/,/g,'')); if (v>=100) rwd.push(v); if (rwd.length>=20) break; }
+    while ((m = reRwdAlt.exec(body)) !== null) { const v = parseInt(m[1].replace(/,/g,'')); if (v>=100 && !rwd.includes(v)) rwd.push(v); if (rwd.length>=20) break; }
+    return {thr, rwd};
+"""
+
+def fetch_global_tiers():
+    """상품 b 1개의 #eventBanner 에서 적립 이벤트 발견 → 이벤트 페이지 tier표 파싱. driver 재사용(단일)."""
+    url0 = f"https://www.lotteimall.com/goods/viewGoodsDetail.lotte?goods_no={IDS['b']['lotte']}"
+    driver.get(url0); time.sleep(4); block_dialogs()
+    for y in range(0, 10000, 700):
+        driver.execute_script(f"window.scrollTo(0, {y})"); time.sleep(0.2)
+    driver.execute_script("window.scrollTo(0, 0)"); time.sleep(0.6)
+    items = driver.execute_script(_COLLECT_JS) or []
+    print(f"  #eventBanner 슬라이드 {len(items)}개")
+    cands = []
+    for it in items:
+        blob = f"{it.get('text','')} {it.get('alt','')} {it.get('subtitle','')} {it.get('title','')}"
+        if '적립' not in blob:
+            continue
+        if any(kw in blob for kw in IGNORE_KW):
+            continue
+        if it.get('data_url'):
+            cands.append(it)
+    print(f"  적립 후보 {len(cands)}건 (ignore 제외 후)")
+    for c in cands:
+        du = c['data_url']
+        ev_url = du if du.startswith('http') else 'https://www.lotteimall.com' + du
+        driver.get(ev_url); time.sleep(3.5); block_dialogs()
+        # ★ 이벤트 페이지 스크롤 필수 — 안 하면 tier표가 덜 렌더돼 body 순서가 어긋나 reward 페어링 뒤섞임.
+        for y in range(0, 6000, 600):
+            driver.execute_script(f"window.scrollTo(0, {y})"); time.sleep(0.2)
+        driver.execute_script("window.scrollTo(0, 0)"); time.sleep(0.5)
+        res = driver.execute_script(_VERIFY_JS) or {}
+        thr = sorted({int(x) for x in (res.get('thr') or []) if int(x) > 0})
+        rwd = sorted({int(x) for x in (res.get('rwd') or []) if int(x) > 0})
+        if thr and rwd:
+            # 임계값/적립금 독립 matchAll 의 순서 페어링은 본문 텍스트 순서가 어긋나 불안정.
+            # store-wide 이벤트는 결제액↑ = 적립↑ 구조라 '최고 임계 ↔ 최고 적립'만 신뢰 = 최고 tier 1개.
+            # 오늘 전 조합 결제액 > 최고 임계라 모든 조합에 최대 적립 적용 (사용자 지시 6/23, RULES §7-3 1회).
+            top = {'threshold': max(thr), 'reward': max(rwd)}
+            print(f"    ✓ {c.get('subtitle') or c.get('title')} → 최고 tier {top} (raw 임계 {thr}, 적립 {rwd})")
+            return [top]
+    return []
+
 try:
-    reward_script = '/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/rate-check/_check_lotte_reward.py'
-    if os.path.exists(reward_script):
-        proc = subprocess.run(
-            [sys.executable, reward_script, 'all'],
-            capture_output=True, text=True, timeout=300,
-        )
-        out = proc.stdout
-        # JSON_DUMP_BEGIN ... JSON_DUMP_END 사이 한 줄 파싱
-        if 'JSON_DUMP_BEGIN' in out and 'JSON_DUMP_END' in out:
-            jstr = out.split('JSON_DUMP_BEGIN')[1].split('JSON_DUMP_END')[0].strip().strip('=').strip()
-            rd = json.loads(jstr)
-            for code in 'bcdefgh':
-                code_tiers: list[dict] = []
-                for ev in rd.get(code, {}).get('confirmed', []) or []:
-                    for tr in ev.get('verification', {}).get('tier_rows', []) or []:
-                        try:
-                            t = int(str(tr.get('min', 0)).replace(',', ''))
-                            r = int(str(tr.get('reward', 0)).replace(',', ''))
-                        except (ValueError, TypeError):
-                            continue
-                        if t > 0 and r > 0:
-                            code_tiers.append({'threshold': t, 'reward': r})
-                # threshold 오름차순 정렬, 중복 제거
-                seen = set()
-                code_tiers.sort(key=lambda x: x['threshold'])
-                tiers[code] = [t for t in code_tiers
-                               if (t['threshold'], t['reward']) not in seen
-                               and not seen.add((t['threshold'], t['reward']))]
-            print("적립 tiers (subprocess):")
-            for c in 'bcdefgh':
-                print(f"  {c}: {tiers[c]}")
-        else:
-            print("⚠️ _check_lotte_reward stdout JSON_DUMP 못 찾음 — tiers 빈 dict")
-    else:
-        print(f"⚠️ {reward_script} 없음 — tiers 빈 dict")
+    GLOBAL_TIERS = fetch_global_tiers()
 except Exception as e:
-    print(f"⚠️ 적립금 subprocess 실패 ({e}) — tiers 빈 dict")
+    print(f"⚠️ 적립 조회 실패 ({e}) — GLOBAL_TIERS 빈 리스트")
+    GLOBAL_TIERS = []
+print(f"적립 tiers (store-wide, 전 조합 공통): {GLOBAL_TIERS}")
 
 # 카드 결정 (단일 카드 가정). brand = "청구할인" 라인에서 stem 매칭.
 # 롯데홈쇼핑 결제수단 카드: 현대 / 하나 / NHPay / KBPay / 롯데 / 삼성 / BC(ISP·페이북) (사용자 6/4).
@@ -240,13 +276,8 @@ def compute(combo):
         final += item_final
     final = round(final)
     # 2) ★ 적립금: 조합당 1회 적용 (RULES §7-3). 결제 1회 = 이벤트 1회 발생.
-    # 조합 상품별 tier 중 final >= threshold 인 것의 reward 모은 후 max 1개.
-    applicable = []
-    for c, _ in combo:
-        for t in tiers.get(c, []):
-            if final >= t['threshold']:
-                applicable.append(t['reward'])
-    적립 = max(applicable) if applicable else 0
+    # store-wide 이벤트라 GLOBAL_TIERS 1개를 모든 조합에 공통 적용 — final >= threshold 인 tier 중 max reward.
+    적립 = max([t['reward'] for t in GLOBAL_TIERS if final >= t['threshold']], default=0)
     순 = final - 총샘플 - 적립
     rate = 순 / 소비자
     return {'소비자가':소비자,'추증':추증,'총샘플':총샘플,'적립':적립,'최종':final,'순':순,'공급률':rate}
@@ -275,7 +306,7 @@ data.append([])
 coupon_str = ", ".join(f"{c}={coupons[c]}%" for c in 'bcdefgh')
 data.append([f"상품별 쿠폰: {coupon_str}"])
 data.append([f"카드 청구할인: {CARD_NAME} {CARD_PCT}% (페이백 {round(PAYBACK*100,1)}%)"])
-data.append([f"적립금 tiers: {', '.join(f'{c}={tiers[c]}' for c in 'bcdefgh' if tiers[c])}"])
+data.append([f"적립금 tiers (전 조합 공통): {GLOBAL_TIERS}"])
 data.append([])
 data.append(['조합번호','조합','소비자가','추증','GWP','총샘플','적립','최종구매가','순구매가','공급률',
              '', '상품', '쿠폰%'])
