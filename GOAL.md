@@ -46,6 +46,8 @@
 
 ## 원칙
 
-- **PRIVATE 100%** — 외부 공개 절대 금지 (커밋 메시지에도 비밀번호/계정 노출 X)
+- **PRIVATE 100%** — 외부 공개 절대 금지 (이 레포는 단독 사용·비공개).
+  - **노출 금지 = 인증정보 한정**: 비밀번호·카드번호·CVC·PIN·인증서·세션. 코드·커밋·커밋메시지 어디에도 평문 금지 (`.gitignore` 가 `hmall_config.json`·`lotte.json`·`galleria.json`·`credentials.json`·`secrets/`·`card_pins.json` 차단).
+  - **계정 ID(식별자)는 허용**: 작업 기록·검증 결과·1회용 정리 스크립트에 계정 ID 남겨도 됨 (단독 사용자가 자기 기록을 읽으려면 필요). → 계정 ID 박혀 있다는 이유만으로 파일 삭제/커밋제외 판단 금지.
 - **로그인 세션 유지** — `~/HmallChrome` 영구 프로필 + Chrome for Testing (메인 Chrome 분리)
 - **DRY_PAYMENT=true** 안전장치 — 7자리 추출까지만, 실 결제 X (Phase 3-B 완성 전)
