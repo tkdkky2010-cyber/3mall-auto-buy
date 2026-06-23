@@ -45,6 +45,41 @@ def run_hyundai(serial: str) -> tuple[int, str]:
     return r.returncode, tail
 
 
+def _dismiss_launch_ad(serial: str, max_iter: int = 4) -> int:
+    """앱 콜드런치 시 뜨는 홈 광고 모달 닫기 — 안 닫으면 webview 로그인이 막힘(실측 2026-06-17).
+    광고는 WebView라 uiautomator 텍스트 미노출 → screencap OCR 로 검출.
+    ★반드시 '오늘 그만 보기'(당일 재등장 방지)로 닫는다 — '닫기'/'X'는 로그인 후 같은 팝업 재등장하므로 사용 금지.
+    '오늘 그만 보기'/'그만 보기'/'보지 않기'/'오늘 하루' 류만 탭."""
+    from phone_auto.screen_ocr import ocr_text
+    png = "/tmp/_hmall_ad.png"
+    norm = lambda s: s.replace(" ", "")
+    closed = 0
+    for _ in range(max_iter):
+        r = subprocess.run([hw.ADB, "-s", serial, "exec-out", "screencap", "-p"],
+                           capture_output=True, timeout=20)
+        with open(png, "wb") as f:
+            f.write(r.stdout)
+        try:
+            items = ocr_text(png)
+        except Exception as e:
+            print(f"   [popup] OCR 실패({e}) — 광고닫기 skip", flush=True); break
+        hit = None
+        for key in ("오늘그만보기", "그만보기", "보지않기", "오늘하루"):   # ★'닫기'는 의도적으로 제외(재등장 방지)
+            hit = next((it for it in items if key in norm(it["text"])), None)
+            if hit:
+                break
+        if not hit:
+            break
+        subprocess.run([hw.ADB, "-s", serial, "shell", "input", "tap", str(hit["cx"]), str(hit["cy"])],
+                       capture_output=True, timeout=10)
+        print(f"   [popup] 광고 닫기 '{hit['text']}' @({hit['cx']},{hit['cy']})", flush=True)
+        closed += 1
+        time.sleep(1.2)
+    if closed == 0:
+        print("   [popup] 시작 광고 없음 — 통과", flush=True)
+    return closed
+
+
 def main() -> int:
     serial = hw._serial()
     only = [int(a) for a in sys.argv[1:] if a.isdigit()]
@@ -53,6 +88,8 @@ def main() -> int:
     summary: list[tuple[int, str, str]] = []
     for pos, idx in enumerate(plan):
         print(f"\n{'='*52}\n[{pos+1}/{len(plan)}] #{idx} 로그인 중...", flush=True)
+        hw.reset_to_main(serial)          # 콜드런치 → 클린 메인 (광고 모달 등장 유도)
+        _dismiss_launch_ad(serial)        # ★앱 켜자마자 광고 닫고 시작 (안 닫으면 webview 로그인 막힘)
         try:
             lr = hw.login_account(idx, serial)
         except Exception as e:
