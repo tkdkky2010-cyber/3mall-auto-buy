@@ -40,7 +40,7 @@ ACCOUNTS_FILE = Path(os.environ.get("HMALL_CONFIG_PATH") or (PROJECT_ROOT / "hma
 PRODUCTS_FILE = ROOT / "products.json"
 PLAN_FILE = ROOT / "cart_plan.json"
 
-INACTIVE_ACCOUNTS: list[int] = [6]
+INACTIVE_ACCOUNTS: list[int] = []  # 2026-06-23: #6 구매금지 해제 (사용자 지시, 다시 사용 가능)
 
 LOGIN_URL = "https://www.hmall.com/mo/cob/loginForm"
 CART_URL = "https://www.hmall.com/mo/odb/basktList"

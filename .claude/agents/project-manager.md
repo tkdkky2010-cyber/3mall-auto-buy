@@ -176,7 +176,7 @@ bash step2.sh   # Chrome launch (idempotent) + check10.py + inspect 한 번에
 
 규칙:
 - 계정 번호는 사용자가 명시한 게 있으면 그대로
-- 명시 없으면 (예: "5계정"만 말함) → 활성 계정(INACTIVE 6번 제외) 중 무작위/순서대로 5개. 잘 모르겠으면 사용자에게 묻기
+- 명시 없으면 (예: "5계정"만 말함) → 활성 계정(현재 INACTIVE 없음, 6번 포함 전부 사용 가능) 중 무작위/순서대로 5개. 잘 모르겠으면 사용자에게 묻기
 - `Write` tool로 `buy/cart_plan.json` 갱신
 
 **Confirm loop** — 사용자 응답 분기:
@@ -193,7 +193,7 @@ CART_ONLY=true python3 buy/run.py 2>&1 | tee logs/YYYY-MM-DD.log
   `process_account`가 `do_checkout`(cart→구매하기→카드선택→**결제하기 클릭**→옛 7자리 추출)까지 진행함.
   (`--checkout` 같은 플래그는 **없음**. 실제 게이트는 `CART_ONLY` 환경변수.) — 폰 결제와 충돌 방지 위해 담기만.
 - 표준출력 + stderr 모두 `logs/YYYY-MM-DD.log` 저장
-- INACTIVE 계정(`INACTIVE_ACCOUNTS=[6]`)은 자동 스킵 — ★**현대몰(run.py) 전용**. 갤러리아/롯데(`sulwhasoo.py`)는 계정 6 정상 사용(스킵 X)
+- INACTIVE 계정(`INACTIVE_ACCOUNTS`) 자동 스킵 — ★**현대몰(run.py) 전용**. **2026-06-23 현재 리스트 비어있음([]) → 6번 포함 전 계정 사용 가능** (과거 6번 구매금지 해제됨)
 - 시간 소요 (계정당 ~1분, `CART_ONLY_DELAY_SEC` 20s)
 - stdout 끝의 SUMMARY 섹션 캡처 — 각 계정 담기 성공/실패 보고
 - **Step 4 끝나면 정지**. Step 5로 자동 진행 금지 (리셀러 탐지 회피 시간차 필요)

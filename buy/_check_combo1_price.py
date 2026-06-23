@@ -3,7 +3,7 @@
 결제 클릭 X (금액 확인 only). 카트는 f×5 담긴 채로 유지.
 기대값: 507,680원 (현대 5%).
 
-사용: python3 buy/_check_combo1_price.py          # 1~19 전체 (#6 INACTIVE skip)
+사용: python3 buy/_check_combo1_price.py          # 1~19 전체 (INACTIVE 없음, #6 포함)
       python3 buy/_check_combo1_price.py 1 2 3   # 지정 계정
 """
 from __future__ import annotations
