@@ -1052,6 +1052,259 @@ def pay_nh() -> dict:
     return out
 
 
+def _card_no_boxes() -> list[tuple[int, int]]:
+    """카드번호 4칸 중심좌표(좌→우). resource-id 'cardno1~4' 우선(2026-06-25 NH 실측 anchor) —
+    상단에 다른 EditText(stray)가 끼어도 정확. 없으면 EditText 를 y로 그룹핑해 '4칸 이상인 행' 폴백."""
+    import xml.etree.ElementTree as ET
+    p = "/tmp/_nh_cardno.xml"
+    _adb().dump_ui(p)
+    by_id: dict[int, tuple[int, int]] = {}
+    edits: list[tuple[int, int]] = []
+    try:
+        root = ET.parse(p).getroot()
+        for n in root.iter():
+            if "EditText" not in n.attrib.get("class", ""):
+                continue
+            m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", n.attrib.get("bounds", ""))
+            if not m:
+                continue
+            x1, y1, x2, y2 = map(int, m.groups())
+            c = ((x1 + x2) // 2, (y1 + y2) // 2)
+            edits.append(c)
+            mm = re.search(r"cardno(\d)", n.attrib.get("resource-id", ""))
+            if mm:
+                by_id[int(mm.group(1))] = c
+    except Exception:
+        return []
+    if len(by_id) >= 4:
+        return [by_id[i] for i in sorted(by_id)[:4]]
+    # 폴백: y 근접(±30) 그룹 중 4칸 이상인 가장 위 행 (stray box 배제)
+    rows: list[list[tuple[int, int]]] = []
+    for b in sorted(edits, key=lambda b: (b[1], b[0])):
+        for row in rows:
+            if abs(row[0][1] - b[1]) < 30:
+                row.append(b); break
+        else:
+            rows.append([b])
+    cand = [r for r in rows if len(r) >= 4]
+    if not cand:
+        return []
+    row = sorted(cand, key=lambda r: r[0][1])[0]
+    row.sort(key=lambda b: b[0])
+    return row[:4]
+
+
+def _edit_box_by_id(substr: str) -> tuple[int, int] | None:
+    """resource-id 에 substr(소문자 비교) 포함된 EditText 중심좌표 (dump). 없으면 None."""
+    import xml.etree.ElementTree as ET
+    p = "/tmp/_nh_edit.xml"
+    _adb().dump_ui(p)
+    try:
+        root = ET.parse(p).getroot()
+        for n in root.iter():
+            if "EditText" not in n.attrib.get("class", ""):
+                continue
+            if substr.lower() in n.attrib.get("resource-id", "").lower():
+                m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", n.attrib.get("bounds", ""))
+                if m:
+                    x1, y1, x2, y2 = map(int, m.groups())
+                    return ((x1 + x2) // 2, (y1 + y2) // 2)
+    except Exception:
+        pass
+    return None
+
+
+def _wait_keypad(timeout: float = 6) -> bool:
+    """nppfs 보안 가상키패드(content-desc='키패드' 또는 resource-id 'keypad') 등장 대기.
+    칸 탭 후 렌더에 ~2.5s 걸려, 폴링으로 정확히 등장 시점까지만 대기."""
+    p = "/tmp/_nh_kpwait.xml"
+    end = time.time() + timeout
+    while time.time() < end:
+        _adb().dump_ui(p)
+        try:
+            t = Path(p).read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            t = ""
+        if 'content-desc="키패드"' in t or "keypad" in t:
+            return True
+        time.sleep(0.3)
+    return False
+
+
+def _kp_read() -> dict:
+    """nppfs 보안키패드 현재 셔플 OCR(로컬 3엔진 voting) → {숫자: (x,y)}. ★무인 폴백용.
+    정본은 에이전트(클로드) 비전 — _grid_tap 참조. 로컬 3엔진(easyocr+vision+gcv)은 nppfs 키패드 정확도 낮음(실측).
+    ROI=하단(0.45,0.98)만 — 카드 키패드(y~0.46-0.63)는 잡고 상단 금액·카드칸 숫자(y<0.40)는 제외."""
+    from phone_auto.ocr_keypad import vote_digits
+    return vote_digits(cap("/tmp/_nh_sec.png"), flip_h=False, roi_y_frac=(0.45, 0.98),
+                       engines=("easyocr", "vision", "gcv"), allow_partial=True) or {}
+
+
+# ───── nppfs 보안키패드 고정 그리드 (에이전트=클로드 비전 정본, 2026-06-26 라이브 확정) ─────
+# 키패드 셀 위치는 고정, 숫자 라벨만 셔플. 6열 x(device px) 고정 / 2 숫자행 = 컨테이너 top + 오프셋.
+# 같은 칸 4자리는 동안 셔플 안 됨 → 칸마다 1회만 읽으면 됨. 칸 바뀌면(또는 CVC/비번칸) 재셔플.
+KP_COLS = (173, 320, 467, 614, 761, 908)     # 6열 중심 x
+KP_ROW_OFF = (217, 362)                       # 숫자 2행 y = 컨테이너 top + 이 오프셋 (실측: 카드top893→1110/1255, CVC1005→1222/1367, 비번963→1180/1325)
+
+
+def _kp_top() -> int:
+    """현재 nppfs 보안키패드 컨테이너 top y (dump). 미발견 -1."""
+    p = "/tmp/_nh_kptop.xml"
+    _adb().dump_ui(p)
+    try:
+        t = Path(p).read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return -1
+    m = re.search(r'(?:nppfs-keypad[^"]*"|content-desc="키패드")[^>]*bounds="\[\d+,(\d+)\]', t)
+    return int(m.group(1)) if m else -1
+
+
+def _grid_tap(value: str, layout: list, top: int = -1, delay: float = 0.6) -> dict:
+    """★에이전트(클로드)가 스샷에서 읽은 키패드 배열로 value 입력 — 고정그리드 셀좌표 탭.
+    layout = [[행1 6칸], [행2 6칸]] 각 칸 = 숫자문자 또는 None(방패/공란). top 미지정 시 dump 자동.
+    같은 칸은 셔플 안 되므로 한 배열로 4(또는 3/6)자리 연속 탭."""
+    if top < 0:
+        top = _kp_top()
+    if top < 0:
+        return {"err": "키패드 컨테이너 미발견"}
+    rows = (top + KP_ROW_OFF[0], top + KP_ROW_OFF[1])
+    pos = {}
+    for r in range(2):
+        for c in range(6):
+            d = layout[r][c]
+            if d not in (None, "", "shield", "🛡"):
+                pos[str(d)] = (KP_COLS[c], rows[r])
+    for ch in value:
+        if ch not in pos:
+            return {"err": f"'{ch}' 가 배열에 없음 — 재읽기 필요", "pos": pos}
+        _adb().tap(*pos[ch]); time.sleep(delay)
+    return {"ok": True, "digits": len(value), "top": top}
+
+
+def _tap_secure_each(value: str) -> dict:
+    """★매 키 입력마다 재셔플되는 nppfs 보안키패드 입력 — 자리마다 검증식(2026-06-25 NH카드 실측):
+       ① 현재 셔플 OCR → 숫자 위치 찾기(못 읽으면 재캡처)
+       ② 탭 → ③ 키패드가 재셔플됐는지 재OCR로 확인 = '탭이 등록됐다'는 확실한 신호
+       ④ 안 바뀌었으면(=탭 미등록) 재탭. → OCR 실수/탭 드롭 자동복구.
+    (_tap_shuffle 의 '1회 OCR 후 연속탭'은 매 키 셔플 키패드엔 부적합: 첫 자리만 맞고 나머지 깨짐.)"""
+    for i, d in enumerate(value):
+        ok = False
+        for _att in range(8):
+            snap = _kp_read()
+            if d not in snap:                 # OCR 미검출 → 같은 셔플 재캡처(렌더 중일 수 있음)
+                time.sleep(0.6); continue
+            _adb().tap(*snap[d]); time.sleep(1.2)   # 탭 후 재셔플+렌더 안정 대기
+            after = _kp_read()
+            common = [k for k in snap if k in after]
+            # ★캡처 노이즈(±몇 px) vs 실제 셀이동(키패드 셀폭 ~145px) 구분 — 50px 초과 이동만 '재셔플'로 카운트.
+            moved = sum(1 for k in common
+                        if abs(snap[k][0] - after[k][0]) + abs(snap[k][1] - after[k][1]) > 50)
+            if len(common) < 4 or moved >= 3:  # 재셔플 감지 = 탭 등록 완료
+                ok = True; break
+            # 키패드 그대로 = 탭 미등록 → 재시도
+        if not ok:
+            return {"err": f"{i + 1}번째 자리 '{d}' 입력/검증 실패"}
+    return {"ok": True, "digits": len(value)}
+
+
+def pay_nh_general() -> dict:
+    """NH농협카드 **일반결제(카드번호 직접 입력)** — 사용자 지정 경로(2026-06-25). PAYCO/모니모/금융인증서 없음.
+    따옴표=실제 버튼 텍스트. NH카드 선택된 주문서에서 호출:
+      1) '결제하기' → 2) 우측상단 '다른 결제' → 3) '일반결제'(카드번호+결제비밀번호)
+      → 4) 카드번호 4칸(4자리씩) → 5) CVC → 6) '확인' → 7) '숫자 6자리' 결제비밀번호 팝업 → 6자리.
+    고정값=secrets/card_secrets.json['NH'](card_no 16 / cvc 3 / pin6 6). 입력칸=dump EditText, 키패드=스크린샷 OCR(_tap_shuffle).
+    ⚠️ 실 결제 · 첫 라이브 시 화면별 screencap 관찰 필수(4칸 dump 가독성 / '확인'·'숫자 6자리' 라벨 / 비번 뒤 종료 확정)."""
+    sec = _card_secrets().get("NH", {})
+    card_no, cvc, pin6 = sec.get("card_no"), sec.get("cvc"), sec.get("pin6")
+    if not all([card_no, cvc, pin6]):
+        return {"step": "secrets", "err": "card_secrets['NH'] 필드 부족(card_no/cvc/pin6)"}
+    out = {"step": "nh_general"}
+    # 1) 원 결제하기
+    if not ocr_tap("결제하기", contains=True):
+        out["err"] = "원결제하기 실패"; return out
+    lap("NH일반: 원결제하기")
+    time.sleep(3.0)
+    # 2) 우측상단 '다른 결제'
+    out["step"] = "other_pay"
+    if not wait_text("다른 결제", timeout=12):
+        out["err"] = "'다른 결제' 미도달"; return out
+    if not ocr_tap("다른 결제", contains=True):
+        out["err"] = "'다른 결제' 탭 실패"; return out
+    time.sleep(2.0)
+    # 3) '일반결제'(카드번호+결제비밀번호)  ❌간편/PAYCO/SMS
+    out["step"] = "general_select"
+    if not wait_text("일반결제", timeout=10):
+        out["err"] = "'일반결제' 미도달"; return out
+    gn = next((it for it in _ocr_texts(cap())
+               if "일반결제" in it["text"].replace(" ", "") and "SMS" not in it["text"].upper()), None)
+    if gn:
+        _adb().tap(gn["cx"], gn["cy"])
+    elif not ocr_tap("일반결제", contains=True, retries=3):
+        out["err"] = "'일반결제' 선택 실패"; return out
+    time.sleep(2.5)
+    # 4) 카드번호 4칸(4자리씩) — 각 입력란 탭 → 그 4자리 키패드 입력
+    out["step"] = "card_no"
+    if not wait_text("카드번호", timeout=12):
+        out["err"] = "카드번호 화면 미도달"; return out
+    if os.environ.get("NH_VISION_MODE") == "1":     # 카드창 도달 후 정지 — 카드/CVC/비번은 외부(클로드 비전)가 입력
+        out["step"] = "card_screen_ready"; out["manual"] = True; return out
+    boxes = _card_no_boxes()
+    if len(boxes) < 4:
+        out["err"] = f"카드번호 입력칸 {len(boxes)}개(4 기대) — dump 미검출, 라이브 화면 확인 필요"; return out
+    groups = [card_no[i:i + 4] for i in range(0, 16, 4)]
+    # box1(cardno1)=비보안 IME칸 → adb input text. ★이 IME 입력완료가 box2 nppfs 보안키패드를 자동 소환함
+    #   (2026-06-25 실측: _tap_shuffle 키 탭으로 box1 채우면 다음 칸 키패드가 안 떠 box2에서 막힘).
+    _adb().tap(boxes[0][0], boxes[0][1]); time.sleep(1.0)
+    subprocess.run(["adb", "shell", "input", "text", groups[0]], capture_output=True)
+    time.sleep(1.5)
+    # box2~4=보안 nppfs 셔플 → 칸 탭 → 키패드 등장 폴링(~2.5s) → _tap_shuffle. 재탭 금지(키패드 리셋).
+    # ★칸 좌표를 매번 fresh 재검출 — box1 입력 후 카드칸 레이아웃이 아래로 이동함(2026-06-25 실측 y721→y856).
+    #   로드 시점 좌표를 재사용하면 box2를 빗나가 키패드가 안 떠 실패.
+    for bi in range(2, 5):
+        bx = _card_no_boxes()
+        if len(bx) < 4:
+            out["err"] = f"카드번호 {bi}칸 재검출 실패({len(bx)}개)"; return out
+        box, grp = bx[bi - 1], groups[bi - 1]
+        _adb().tap(box[0], box[1])
+        _wait_keypad(timeout=6); time.sleep(1.0)    # 보안키패드 렌더 완전 안정 후 OCR
+        r = _tap_secure_each(grp)                   # 매 자리 재OCR (키패드가 키마다 재셔플되므로)
+        if not r.get("ok"):
+            out["err"] = f"카드번호 {bi}칸 입력 실패: {r.get('err')}"; return out
+    time.sleep(1.0)
+    # 5) CVC — 입력칸 resource-id 'inputCVC' 우선, 없으면 OCR 'CVC' 라벨 폴백 (보안키패드 셔플)
+    out["step"] = "cvc"
+    cbox = _edit_box_by_id("cvc")
+    if cbox is None:
+        cf = next((it for it in _ocr_texts(cap()) if "CVC" in it["text"].upper()), None)
+        if not cf:
+            out["err"] = "CVC 칸 미발견"; return out
+        cbox = (cf["cx"], cf["cy"])
+    _adb().tap(cbox[0], cbox[1])
+    _wait_keypad(timeout=6); time.sleep(1.0)        # 보안키패드 렌더 안정 후 OCR
+    r = _tap_secure_each(cvc)                       # 매 자리 재OCR (보안키패드 매 키 재셔플)
+    if not r.get("ok"):
+        out["err"] = f"CVC 입력 실패: {r.get('err')}"; return out
+    time.sleep(1.0)
+    # 6) '확인'
+    out["step"] = "confirm"
+    if not ocr_tap("확인", contains=True, retries=4):
+        out["err"] = "'확인' 탭 실패"; return out
+    time.sleep(2.5)
+    # 7) '숫자 6자리' 결제비밀번호 칸 → 팝업 키패드 → 6자리
+    out["step"] = "pin6"
+    if not wait_text("6자리", timeout=12) and not screen_has("비밀번호"):
+        out["err"] = "결제비밀번호 팝업 미도달"; return out
+    pf = next((it for it in _ocr_texts(cap()) if "6자리" in it["text"] or "숫자" in it["text"]), None)
+    if pf:
+        _adb().tap(pf["cx"], pf["cy"]); time.sleep(1.0)
+    _wait_keypad(timeout=6); time.sleep(1.0)        # 6자리 팝업 보안키패드 렌더 대기
+    r = _tap_secure_each(pin6)                       # ★카드와 동일 검증식 — 6자리 팝업도 매 키 재셔플 가정 (옛 _tap_shuffle 은 첫자리만 맞고 실패)
+    if not r.get("ok"):
+        out["err"] = f"결제비번 입력 실패: {r.get('err')}"; return out
+    out["ok"] = True
+    return out
+
+
 def detect_card() -> str | None:
     """주문서에서 '카드할인' 섹션까지 **스크롤하며** 금액행 카드사 토큰 추출 ('현대 5% 즉시할인'→'현대').
     구매하기 직후 주문서 상단엔 상품정보뿐 → 카드할인은 아래라 스크롤 필수(#4 실측). 없으면 None."""
@@ -1308,7 +1561,7 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None) -> 
         if not sp.get("ok"):
             res["status"] = f"SAMSUNG_FAIL@{sp.get('step')}:{sp.get('err')}"; return res
     elif use_card == "NH":
-        np_ = pay_nh()
+        np_ = pay_nh_general()          # 일반결제(카드번호 직접) — 사용자 지정 2026-06-25. (구 PAYCO=pay_nh 폴백)
         res["pay"] = np_
         if not np_.get("ok"):
             res["status"] = f"NH_FAIL@{np_.get('step')}:{np_.get('err')}"; return res

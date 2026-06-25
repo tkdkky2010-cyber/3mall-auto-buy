@@ -442,7 +442,7 @@ def _vote_cluster(cluster: dict) -> tuple[str, float, dict]:
 def vote_digits(
     image_path: str | Path,
     dist_threshold: int = 60,
-    engines: tuple[str, ...] = ("easyocr", "tesseract", "vision", "gcv"),
+    engines: tuple[str, ...] = ("easyocr", "vision", "gcv"),   # tesseract 제거(2026-06-26): 최약체(0x89 버그·최저정확·최느림). 키패드 정확도 정본=에이전트(클로드) 비전, 로컬 3엔진은 무인 폴백.
     min_width: int = 720,
     flip_h: bool = False,
     roi_y_frac: Optional[tuple[float, float]] = None,

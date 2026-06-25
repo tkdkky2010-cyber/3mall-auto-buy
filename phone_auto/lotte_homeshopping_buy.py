@@ -46,6 +46,7 @@ from phone_auto.hmall_hyundai_buy import (
     cap, _adb, ocr_find, ocr_tap, wait_text, screen_has, _resolve_serial, _wait_app,
     CARD_ALIASES, CARD_GRID_NAME,
     _card_secrets, _tap_shuffle,        # 삼성 일반결제 공용 헬퍼 (hmall=정본, 양 몰 공용)
+    pay_nh_general,                     # NH 일반결제 SDK(다른결제→일반결제→카드4칸→CVC→확인→6자리) — 몰 무관 공용
 )
 from phone_auto.flow_runner import _ocr_texts, FlowRunner
 # PATH(bare adb)는 hmall_hyundai_buy import 시 이미 설정됨.
@@ -1355,6 +1356,8 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
         pay = pay_lotte_kb()                    # ✅ #13 G70658 라이브검증 (KB Pay 간편결제)
     elif use_card == "현대":
         pay = pay_lotte_hyundai()               # ✅ 2026-06-12 #1 B87302 라이브검증 (앱카드)
+    elif use_card == "NH":
+        pay = pay_nh_general()                  # 일반결제(카드번호 직접) — 사용자 지정 2026-06-25. ⚠️라이브 첫검증 필요
     else:
         res["status"] = f"UNVERIFIED_CARD:{use_card}(롯데 결제경로 미검증 — 라이브 필요)"; return res
     res["pay"] = pay

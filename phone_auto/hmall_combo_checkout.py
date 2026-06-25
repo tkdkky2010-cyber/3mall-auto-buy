@@ -80,6 +80,50 @@ def _dismiss_launch_ad(serial: str, max_iter: int = 4) -> int:
     return closed
 
 
+def _apply_account_rewards(idx: int) -> tuple[bool, str]:
+    """결제 완료 후 PC(run.py CDP 9222)로 그 계정이 산 식품들의 distinct 적립이벤트(prmo)를 각각 신청.
+    출처: buy/cart_plan.json(계정→제품) + cart/today.json(제품→events.prmo). 같은 prmo=1회, 다르면 각각.
+    설화수 등 today.json 에 없는 제품은 prmo 0 → skip. food_buy.pc_apply_reward 와 동일한 PC 서브프로세스 패턴."""
+    import json as _json
+    plan_p = ROOT / "buy" / "cart_plan.json"
+    today_p = ROOT / "cart" / "today.json"
+    if not plan_p.exists() or not today_p.exists():
+        return True, "plan/today.json 없음 — 적립신청 skip"
+    plan = _json.loads(plan_p.read_text(encoding="utf-8"))
+    pids = [it["product"] for it in plan.get("items", []) if idx in it.get("accounts", [])]
+    if not pids:
+        return True, f"계정 {idx} 플랜 제품 없음 — skip"
+    today = _json.loads(today_p.read_text(encoding="utf-8"))
+    ev_by_pid = {str(p.get("id")): [e.get("prmo") for e in (p.get("events") or []) if e.get("prmo")]
+                 for p in today.get("products", [])}
+    prmos: list[str] = []
+    for pid in pids:
+        for pr in ev_by_pid.get(str(pid), []):
+            if pr and pr not in prmos:        # distinct: 같은 이벤트는 1회만
+                prmos.append(pr)
+    if not prmos:
+        return True, f"계정 {idx} 적립이벤트(prmo) 없음 — skip"
+    code = (
+        "import sys; sys.path.insert(0,'buy'); import run\n"
+        "from playwright.sync_api import sync_playwright\n"
+        f"acc=run.load_json(run.ACCOUNTS_FILE)['accounts'][{idx}-1]\n"
+        "with sync_playwright() as p:\n"
+        " br=p.chromium.connect_over_cdp(run.CDP_ENDPOINT); ctx=br.contexts[0] if br.contexts else br.new_context(); page=ctx.new_page()\n"
+        " run._hmall_clean(ctx,page,deep=True)\n"
+        " ok=run.login(page,acc['id'],acc['pw']); print('login',ok)\n"
+        f" for prmo in {prmos}:\n"
+        "  print('HP', prmo, run.apply_hpoint(page,prmo))\n"
+        " page.close()\n"
+    )
+    try:
+        r = subprocess.run(["python3", "-c", code], cwd=str(ROOT),
+                           capture_output=True, text=True, timeout=240)
+    except subprocess.TimeoutExpired:
+        return False, f"적립신청 TIMEOUT (prmos={prmos})"
+    ok = ("신청 완료" in r.stdout) or ("already_done" in r.stdout) or ("success" in r.stdout)
+    return ok, f"prmos={prmos} | " + (r.stdout or "")[-240:]
+
+
 def main() -> int:
     serial = hw._serial()
     only = [int(a) for a in sys.argv[1:] if a.isdigit()]
@@ -112,6 +156,11 @@ def main() -> int:
         rc, log = run_hyundai(serial)
         status = "PAID" if rc == 0 else f"PAY_FAIL(rc={rc})"
         print(f"#{idx} {aid}: {status}\n--- flow log tail ---\n{log}\n--- end ---", flush=True)
+        if rc == 0:
+            # 식품 우수몰: 결제 완료 후 그 계정이 산 제품들의 distinct 적립이벤트를 각각 신청
+            # (설화수는 today.json prmo 없어 자동 skip). 같은 이벤트=1회 / 다른 이벤트=각각.
+            rok, rlog = _apply_account_rewards(idx)
+            print(f"#{idx} {aid}: 적립신청 {'OK' if rok else '⚠️FAIL'} — {rlog}", flush=True)
         summary.append((idx, aid, status))
         time.sleep(PAY_DELAY if rc == 0 else SKIP_DELAY)
     print(f"\n{'='*52}\nSUMMARY ({len(summary)}):", flush=True)

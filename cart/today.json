@@ -1,5 +1,5 @@
 {
-  "date": "2026-06-23",
+  "date": "2026-06-25",
   "account_used": "tkdkky2002",
   "products": [
     {
@@ -82,16 +82,27 @@
         "member_price": 161820,
         "card_slides": [
           {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 6/1~6/30 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
+          },
+          {
+            "alt": "토스페이 1만 토스포인트 적립",
+            "text": "토스페이 1만 토스포인트 적립 1만원 이상 결제 시, 추첨 100명 한정",
+            "percent": null,
+            "price": null
+          },
+          {
+            "alt": "네이버페이 최대 3%적립",
+            "text": "네이버페이 최대 3%적립 기본 적립 + 추가적립 (6/1~6/30)",
+            "percent": null,
+            "price": null
           }
         ],
         "kakao_price": 161820,
         "kakao_reward_pt": 15000,
-        "kakao_final_cost": 135493,
+        "kakao_final_cost": 146820,
         "paybacks": {},
         "optimal_tier": {
           "qty": 2,
@@ -194,16 +205,27 @@
         "member_price": 159300,
         "card_slides": [
           {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 6/1~6/30 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
+          },
+          {
+            "alt": "토스페이 1만 토스포인트 적립",
+            "text": "토스페이 1만 토스포인트 적립 1만원 이상 결제 시, 추첨 100명 한정",
+            "percent": null,
+            "price": null
+          },
+          {
+            "alt": "네이버페이 최대 3%적립",
+            "text": "네이버페이 최대 3%적립 기본 적립 + 추가적립 (6/1~6/30)",
+            "percent": null,
+            "price": null
           }
         ],
         "kakao_price": 159300,
         "kakao_reward_pt": 15000,
-        "kakao_final_cost": 133149,
+        "kakao_final_cost": 144300,
         "paybacks": {},
         "optimal_tier": {
           "qty": 2,
@@ -266,7 +288,7 @@
       "id": 8,
       "name": "이디야 디카페인",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244409628&sectId=3059445",
-      "ten_percent": false,
+      "ten_percent": true,
       "phrase": "릴레이푸드 최대 10%적립",
       "events": [
         {
@@ -333,7 +355,7 @@
       "max_reward": "15,000P",
       "event_end": "6.30 23:59",
       "has_coupon": false,
-      "error": "일시중단(옵션1 디카페인 아메리카노)",
+      "error": null,
       "coupon_claimed": false,
       "simple_ranges": [],
       "payment": {
@@ -354,8 +376,8 @@
           "actual_reward": 10000,
           "effective_pct": 8.599931200550396
         },
-        "effective_ten_percent": false,
-        "error": "일시중단(옵션1)",
+        "effective_ten_percent": true,
+        "error": "바로구매 실패",
         "benefit_unit_price": 29070,
         "options": [
           {
@@ -451,16 +473,27 @@
         "member_price": 131920,
         "card_slides": [
           {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 6/1~6/30 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
+          },
+          {
+            "alt": "토스페이 1만 토스포인트 적립",
+            "text": "토스페이 1만 토스포인트 적립 1만원 이상 결제 시, 추첨 100명 한정",
+            "percent": null,
+            "price": null
+          },
+          {
+            "alt": "네이버페이 최대 3%적립",
+            "text": "네이버페이 최대 3%적립 기본 적립 + 추가적립 (6/1~6/30)",
+            "percent": null,
+            "price": null
           }
         ],
         "kakao_price": 131920,
         "kakao_reward_pt": 10000,
-        "kakao_final_cost": 112686,
+        "kakao_final_cost": 121920,
         "paybacks": {},
         "optimal_tier": {
           "qty": 4,
@@ -513,45 +546,18 @@
       "name": "이경제 더힘찬녹용 30포",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2240802022&ordpreview=true",
       "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
+          "prmo": "P202606194752",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "6.25 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
         },
         {
           "prmo": "P202606163680",
@@ -561,74 +567,32 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "6.25 23:59 / 6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
       "payment": {
         "qty": 1,
-        "list_price": 132900,
-        "member_price": 112970,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 112970,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 95062,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
         "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 112970,
-          "actual_reward": 10000,
-          "effective_pct": 8.8519075860848
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 112970,
-        "options": []
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 112970
       }
     },
     {
@@ -636,45 +600,18 @@
       "name": "라메종드미엘 프랑스 라벤더 천연꿀 8병",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2246845189&sectId=3059445",
       "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
+          "prmo": "P202606194752",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "6.25 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
         },
         {
           "prmo": "P202606163680",
@@ -684,74 +621,32 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "6.25 23:59 / 6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
       "payment": {
         "qty": 1,
-        "list_price": 328000,
-        "member_price": 262400,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 262400,
-        "kakao_reward_pt": 20000,
-        "kakao_final_cost": 224032,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
         "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 262400,
-          "actual_reward": 20000,
-          "effective_pct": 7.621951219512195
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 262400,
-        "options": []
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 262400
       }
     },
     {
@@ -759,45 +654,18 @@
       "name": "갱년기 다이어트 리얼퀸 3병",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847&sectId=3059445",
       "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
+          "prmo": "P202606194752",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "6.25 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
         },
         {
           "prmo": "P202606163680",
@@ -807,136 +675,51 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "6.25 23:59 / 6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
       "payment": {
-        "qty": 2,
-        "list_price": 99000,
-        "member_price": 88120,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 88120,
-        "kakao_reward_pt": 5000,
-        "kakao_final_cost": 76952,
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
         "paybacks": {},
-        "optimal_tier": {
-          "qty": 2,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 88120,
-          "actual_reward": 5000,
-          "effective_pct": 5.674080798910577
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 44060,
-        "options": [
-          {
-            "idx": 1,
-            "name": "갱년기 다이어트 리얼퀸 3병",
-            "list_price": 49500
-          },
-          {
-            "idx": 2,
-            "name": "[GRN] 벨리곰 x GRN 콜라보 슬림밸런스 분홍이 초록이 SET",
-            "list_price": 26900
-          },
-          {
-            "idx": 3,
-            "name": "GRN 흡수빠른 쾌변다이어트 분홍이+ 초록이 쓰리데이즈 시즌2 1BOX",
-            "list_price": 17800
-          }
-        ]
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 44060
       }
     },
     {
       "id": 13,
       "name": "GRN 핑크 초록이",
-      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847&sectId=3059445",
       "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
+          "prmo": "P202606194752",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "6.25 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
         },
         {
           "prmo": "P202606163680",
@@ -946,63 +729,32 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "6.25 23:59 / 6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
       "payment": {
-        "qty": 3,
-        "list_price": 80700,
-        "benefit_unit_price": 23944,
-        "member_price": 71832,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 66804,
-        "kakao_reward_pt": 5000,
-        "kakao_final_cost": 61804,
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
         "paybacks": {},
-        "error": null
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 44060
       },
       "alias_of": 12
     },
@@ -1011,45 +763,18 @@
       "name": "GRN 곰돌이",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847&sectId=3059445",
       "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
+          "prmo": "P202606194752",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "6.25 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
         },
         {
           "prmo": "P202606163680",
@@ -1059,63 +784,32 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "6.25 23:59 / 6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
       "payment": {
-        "qty": 3,
-        "list_price": 80700,
-        "benefit_unit_price": 23944,
-        "member_price": 71832,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 66804,
-        "kakao_reward_pt": 5000,
-        "kakao_final_cost": 61804,
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
         "paybacks": {},
-        "error": null
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 44060
       },
       "alias_of": 12
     },
@@ -1242,16 +936,27 @@
         "member_price": 46350,
         "card_slides": [
           {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 6/1~6/30 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
+          },
+          {
+            "alt": "토스페이 1만 토스포인트 적립",
+            "text": "토스페이 1만 토스포인트 적립 1만원 이상 결제 시, 추첨 100명 한정",
+            "percent": null,
+            "price": null
+          },
+          {
+            "alt": "네이버페이 최대 3%적립",
+            "text": "네이버페이 최대 3%적립 기본 적립 + 추가적립 (6/1~6/30)",
+            "percent": null,
+            "price": null
           }
         ],
         "kakao_price": 46350,
         "kakao_reward_pt": 3000,
-        "kakao_final_cost": 40106,
+        "kakao_final_cost": 43350,
         "paybacks": {},
         "optimal_tier": {
           "qty": 1,
@@ -1376,16 +1081,27 @@
         "member_price": 95840,
         "card_slides": [
           {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 6/1~6/30 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
+          },
+          {
+            "alt": "토스페이 1만 토스포인트 적립",
+            "text": "토스페이 1만 토스포인트 적립 1만원 이상 결제 시, 추첨 100명 한정",
+            "percent": null,
+            "price": null
+          },
+          {
+            "alt": "네이버페이 최대 3%적립",
+            "text": "네이버페이 최대 3%적립 기본 적립 + 추가적립 (6/1~6/30)",
+            "percent": null,
+            "price": null
           }
         ],
         "kakao_price": 95840,
         "kakao_reward_pt": 5000,
-        "kakao_final_cost": 84131,
+        "kakao_final_cost": 90840,
         "paybacks": {},
         "optimal_tier": {
           "qty": 2,
@@ -1407,45 +1123,18 @@
       "name": "바디랩 유기농 레몬즙 1박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244671296&sectId=3059445",
       "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
+          "prmo": "P202606194752",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "6.25 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
         },
         {
           "prmo": "P202606163680",
@@ -1455,74 +1144,32 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "6.25 23:59 / 6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
       "payment": {
-        "qty": 3,
-        "list_price": 78000,
-        "member_price": 62400,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 62400,
-        "kakao_reward_pt": 5000,
-        "kakao_final_cost": 53032,
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
         "paybacks": {},
-        "optimal_tier": {
-          "qty": 3,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 62400,
-          "actual_reward": 5000,
-          "effective_pct": 8.012820512820513
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 20800,
-        "options": []
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 20800
       }
     },
     {
@@ -1530,45 +1177,18 @@
       "name": "올바른건강식품 와이 9박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244934734&sectId=3059445",
       "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
+          "prmo": "P202606194752",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "6.25 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
         },
         {
           "prmo": "P202606163680",
@@ -1578,85 +1198,32 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "6.25 23:59 / 6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
       "payment": {
         "qty": 1,
-        "list_price": 77667,
-        "member_price": 66020,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 66020,
-        "kakao_reward_pt": 5000,
-        "kakao_final_cost": 56399,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
         "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 66020,
-          "actual_reward": 5000,
-          "effective_pct": 7.57346258709482
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 66020,
-        "options": [
-          {
-            "idx": 1,
-            "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 9박스 (총 27개월분)",
-            "list_price": 77667
-          },
-          {
-            "idx": 2,
-            "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 6박스 (총 18개월분)",
-            "list_price": 55444
-          }
-        ]
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 66340
       }
     },
     {
@@ -1677,45 +1244,18 @@
       "name": "유기농 석류젤리 9박(90개)",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445",
       "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
+          "prmo": "P202606194752",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "6.25 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
         },
         {
           "prmo": "P202606163680",
@@ -1725,121 +1265,41 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "6.25 23:59 / 6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
       "payment": {
         "qty": 1,
-        "list_price": 68900,
-        "member_price": 55120,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 55120,
-        "kakao_reward_pt": 5000,
-        "kakao_final_cost": 46262,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
         "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 55120,
-          "actual_reward": 5000,
-          "effective_pct": 9.071117561683598
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 55120,
-        "options": []
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 55120
       }
     },
     {
       "id": 26,
       "name": "오라틱스 구강유산균 10박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244032427&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "ten_percent": false,
+      "phrase": "더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
-        {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
-        },
         {
           "prmo": "P202606163680",
           "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
@@ -1848,120 +1308,31 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": null,
+      "event_end": "6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 1,
-        "list_price": 299000,
-        "member_price": 206310,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 206310,
-        "kakao_reward_pt": 20000,
-        "kakao_final_cost": 171868,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 206310,
-          "actual_reward": 20000,
-          "effective_pct": 9.69414958072803
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 206310,
-        "options": []
-      }
+      "simple_ranges": []
     },
     {
       "id": 28,
       "name": "스키니랩 시서스 다이어트 11박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202464603&sectId=3059445",
       "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
+          "prmo": "P202606194752",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "6.25 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
         },
         {
           "prmo": "P202606163680",
@@ -1971,74 +1342,32 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "6.25 23:59 / 6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
       "payment": {
         "qty": 1,
-        "list_price": 169000,
-        "member_price": 143650,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 143650,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 123594,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
         "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 143650,
-          "actual_reward": 10000,
-          "effective_pct": 6.9613644274277755
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 143650,
-        "options": []
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 143650
       }
     },
     {
@@ -2046,45 +1375,18 @@
       "name": "아이클타임 키성장 에프지오 6박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2237140367",
       "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
+          "prmo": "P202606194752",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "6.25 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
         },
         {
           "prmo": "P202606163680",
@@ -2094,44 +1396,19 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "6.25 23:59 / 6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
       "payment": {
         "qty": 1,
         "list_price": null,
@@ -2152,45 +1429,18 @@
       "name": "셀게이트 엑스트라버진 올리브오일 그리스 30포 6박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244447362",
       "ten_percent": true,
-      "phrase": "올인데이 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202606173929",
-          "name": "올인데이 10%적립",
-          "event_end": "6.23 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
+          "prmo": "P202606194752",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "6.25 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
         },
         {
           "prmo": "P202606163680",
@@ -2200,80 +1450,39 @@
           "simple_range": null
         }
       ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "6.23 23:59 / 6.28 23:59",
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "6.25 23:59 / 6.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
       "payment": {
         "qty": 1,
-        "list_price": 74900,
-        "member_price": 63670,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 63670,
-        "kakao_reward_pt": 5000,
-        "kakao_final_cost": 54213,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
         "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 63670,
-          "actual_reward": 5000,
-          "effective_pct": 7.85299198994817
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 63670,
-        "options": []
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 63670
       }
     }
   ],
   "ten_percent_ids": [
     2,
     3,
+    8,
     9,
     10,
     11,
@@ -2285,7 +1494,6 @@
     20,
     22,
     25,
-    26,
     28,
     29,
     32

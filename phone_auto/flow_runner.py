@@ -495,6 +495,17 @@ class FlowRunner:
                         return int(mm.group(1).replace(",", ""))
                 return None
 
+            def _ocr_nodes():
+                # 카드할인 캐러셀이 WebView 로 렌더되면 uiautomator dump 에 텍스트 미노출(2026-06-25 실측:
+                # dump 5KB·'즉시할인' 0건인데 화면엔 'NH 5% 즉시할인 136,468원' 존재) → OCR 폴백.
+                # OCR(cx,cy,w,h) → dump 와 동일한 (text,x1,y1,x2,y2) 형태로 변환해 _row_amt/_pay 재사용.
+                self.adb.screencap(self._tmp_img)
+                out = []
+                for it in _ocr_texts(self._tmp_img):
+                    cx, cy, w, h = it["cx"], it["cy"], it["w"], it["h"]
+                    out.append((it["text"], cx - w // 2, cy - h // 2, cx + w // 2, cy + h // 2))
+                return out
+
             # 맨 위로 → 700px 1회 고정 스크롤
             for _ in range(4):
                 self.adb.swipe(540, 700, 540, 1900, 300); time.sleep(0.7)
@@ -523,6 +534,10 @@ class FlowRunner:
             for _ in range(9):
                 nodes = _nodes()
                 cand = next(((x1, y1, x2, y2) for t, x1, y1, x2, y2 in nodes if t.strip() == "즉시할인"), None)
+                if cand is None:
+                    # dump 가 '즉시할인' 미검출(WebView) → OCR 폴백. OCR 행은 'NH 5% 즉시할인' 식이라 substring 매칭.
+                    nodes = _ocr_nodes()
+                    cand = next(((x1, y1, x2, y2) for t, x1, y1, x2, y2 in nodes if "즉시할인" in t), None)
                 if not cand or (cand[1] + cand[3]) // 2 > 1900:   # 안전위치 미확보 → 캐러셀 위로 끌어올림
                     cy = (cand[1] + cand[3]) // 2 if cand else None
                     self._log(f"  즉시할인 위치 {cy} 미확보(결제버튼 근처/미발견) → 더 스크롤(위로 끌어올림)")
