@@ -1,16 +1,16 @@
 {
   "date": "2026-06-29",
-  "_comment": "오늘 장바구니에 담은 카트 단일 기록(SoT). buy.py 가 paid:false 를 찾아 결제. 담을 때 append, 결제 성공 시 paid:true.",
+  "_comment": "오늘 장바구니에 담은 카트 단일 기록(SoT). buy.py 가 paid:false 를 찾아 결제. 담을 때 append, 결제 성공 시 paid:true. items[].prmo = 10% 적립이벤트(있을 때만, 쿠폰만이면 생략).",
   "carts": [
-    {"mall": "현대", "account": 8,  "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2}], "paid": false},
-    {"mall": "현대", "account": 10, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2}], "paid": false},
-    {"mall": "현대", "account": 11, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2}], "paid": false},
-    {"mall": "현대", "account": 13, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2}], "paid": false},
-    {"mall": "현대", "account": 14, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2}], "paid": false},
-    {"mall": "현대", "account": 15, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2}], "paid": false},
-    {"mall": "현대", "account": 16, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2}], "paid": false},
-    {"mall": "현대", "account": 17, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2}], "paid": false},
-    {"mall": "현대", "account": 18, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2}], "paid": false},
-    {"mall": "현대", "account": 19, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2}], "paid": false}
+    {"mall": "현대", "account": 8,  "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2, "prmo": "P202606041140"}], "paid": false},
+    {"mall": "현대", "account": 10, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2, "prmo": "P202606041140"}], "paid": false},
+    {"mall": "현대", "account": 11, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2, "prmo": "P202606041140"}], "paid": false},
+    {"mall": "현대", "account": 13, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2, "prmo": "P202606041140"}], "paid": false},
+    {"mall": "현대", "account": 14, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2, "prmo": "P202606041140"}], "paid": false},
+    {"mall": "현대", "account": 15, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2, "prmo": "P202606041140"}], "paid": false},
+    {"mall": "현대", "account": 16, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2, "prmo": "P202606041140"}], "paid": false},
+    {"mall": "현대", "account": 17, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2, "prmo": "P202606041140"}], "paid": false},
+    {"mall": "현대", "account": 18, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2, "prmo": "P202606041140"}], "paid": false},
+    {"mall": "현대", "account": 19, "items": [{"name": "하루견과", "slitmCd": "2151046312", "qty": 2, "prmo": "P202606041140"}], "paid": false}
   ]
 }

@@ -650,7 +650,7 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
         page.close()
         return (0, len(items), False, None)
 
-    # run.py = 현대몰 PC 장바구니 채우기 전용. 결제는 buy.py → 폰 앱 인앱(현대=hmall_combo_checkout).
+    # run.py = 현대몰 PC 장바구니 채우기 전용. 결제는 buy.py → 폰 앱 인앱(현대=hmall_hyundai_buy).
     # clear 1회 → plan 전 상품 누적 담기 (checkout/결제 없음).
     clear_cart(page)
     success = 0

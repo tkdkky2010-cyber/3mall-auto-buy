@@ -451,7 +451,9 @@ def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_
                 if matched:
                     print(f"    [OK] 카드 선택: {_active_card()}")
                 else:
-                    print(f"    [WARN] 카드 '{TARGET_CARD}' 못 찾음 — 현재 활성: {_active_card()}")
+                    out["error"] = f"카드 '{TARGET_CARD}' 못 찾음 (현재 활성: {_active_card()}) — 오결제 방지 위해 결제 중단"
+                    print(f"    [ABORT] {out['error']}")
+                    return out
 
                 # 동의하고 결제하기
                 try:

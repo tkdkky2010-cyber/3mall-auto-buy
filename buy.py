@@ -2,7 +2,8 @@
 # ──────────────────────────────────────────────────────────────────
 #  유일한 "구매(결제) 시작" 진입점.  (그날 담아둔 장바구니를 결제만 한다)
 # ──────────────────────────────────────────────────────────────────
-#   현대몰(식품·설화수 모두)  = 무조건 폰 앱 결제   → phone_auto.hmall_combo_checkout
+#   현대몰(식품·설화수 모두)  = 무조건 폰 앱 결제   → phone_auto.hmall_hyundai_buy
+#                              (주문완료검증 wait_order_complete + 뷰티포인트 + 당일카드 자동감지)
 #   롯데홈쇼핑               = 무조건 폰 앱 결제   → phone_auto.lotte_homeshopping_buy
 #   갤러리아몰               = PC 결제            → buy/sulwhasoo.py galleria
 # ──────────────────────────────────────────────────────────────────
@@ -47,17 +48,41 @@ def _save(data: dict) -> None:
 
 # ───────────── 몰별 결제 (담긴 카트 결제만) ─────────────
 
+def _free_port() -> int:
+    """폰 webview adb-forward 용 빈 TCP 포트 — 데스크톱 Chrome(9222/9223) 충돌 회피."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
+def _run(args, timeout, extra_env=None) -> tuple[int, str, bool]:
+    """subprocess 실행 + timeout 안전처리. 반환 (returncode, stdout, timed_out)."""
+    env = {**os.environ, "PYTHON_BIN": PHONE_PY}
+    if extra_env:
+        env.update(extra_env)
+    try:
+        r = subprocess.run(args, cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, r.stdout, False
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout if isinstance(e.stdout, str) else (e.stdout.decode() if e.stdout else "")
+        return 124, (out or "") + "\n[TIMEOUT]", True
+
+
 def pay_hmall(cart: dict) -> tuple[bool, str]:
-    """현대몰 폰 앱 인앱 결제 (식품·설화수 공통)."""
+    """현대몰 폰 앱 인앱 결제 (식품·설화수 공통) — hmall_hyundai_buy.
+    주문완료 검증(wait_order_complete)+뷰티포인트+당일카드 자동감지. status 'DONE'/'SKIP_EMPTY'만 성공."""
     acct = cart["account"]
-    r = subprocess.run(
-        [PHONE_PY, "-m", "phone_auto.hmall_combo_checkout", str(acct)],
-        cwd=str(ROOT), env={**os.environ, "PYTHON_BIN": PHONE_PY},
-        capture_output=True, text=True, timeout=600,
+    rc, out, timed = _run(
+        [PHONE_PY, "-m", "phone_auto.hmall_hyundai_buy", str(acct)],
+        timeout=900, extra_env={"HMALL_CDP_PORT": str(_free_port())},
     )
-    summary = r.stdout.split("SUMMARY")[-1]
-    ok = (r.returncode == 0) and ("PAID" in summary) and ("FAIL" not in summary)
-    return ok, r.stdout[-600:]
+    if timed:
+        return False, out[-800:] + "\n⚠️ 타임아웃 — 폰에서 주문 완료됐을 수 있음, 수동확인 필요(중복결제 주의)"
+    ok = (rc == 0) and (("=> DONE" in out) or ("SKIP_EMPTY" in out))
+    return ok, out[-800:]
 
 
 def pay_lotte(cart: dict) -> tuple[bool, str]:
@@ -68,22 +93,53 @@ def pay_lotte(cart: dict) -> tuple[bool, str]:
         args.append(cart["card"])
     if cart.get("combo"):
         args.append(f"combo={cart['combo']}")
-    r = subprocess.run(args, cwd=str(ROOT), env={**os.environ, "PYTHON_BIN": PHONE_PY},
-                       capture_output=True, text=True, timeout=900)
-    ok = (r.returncode == 0) and ("DONE(주문" in r.stdout)
-    return ok, r.stdout[-600:]
+    rc, out, timed = _run(args, timeout=900)
+    if timed:
+        return False, out[-800:] + "\n⚠️ 타임아웃 — 수동확인 필요"
+    ok = (rc == 0) and ("DONE(주문" in out)
+    return ok, out[-800:]
 
 
 def pay_galleria(cart: dict) -> tuple[bool, str]:
-    """갤러리아몰 PC 결제."""
+    """갤러리아몰 PC 결제 (네이버페이 → 롯데2224)."""
     acct = cart["account"]
     combo = str(cart.get("combo", 1))
-    r = subprocess.run(
+    rc, out, timed = _run(
         [BROWSER_PY, str(ROOT / "buy" / "sulwhasoo.py"), "galleria", str(acct), combo],
-        cwd=str(ROOT), capture_output=True, text=True, timeout=600,
+        timeout=600,
     )
-    ok = (r.returncode == 0) and ("결제 진행 완료" in r.stdout)
-    return ok, r.stdout[-600:]
+    if timed:
+        return False, out[-800:] + "\n⚠️ 타임아웃 — 수동확인 필요"
+    ok = (rc == 0) and ("결제 진행 완료" in out)
+    return ok, out[-800:]
+
+
+def apply_reward(cart: dict) -> None:
+    """결제 성공 후 H.Point 적립신청 — 그 상품에 10% prmo 있을 때만.
+    쿠폰만 있거나 적립이벤트 없으면(prmo 없음) skip. 결제 성공/실패 판정과 무관(best-effort)."""
+    prmos = [it["prmo"] for it in cart.get("items", []) if it.get("prmo")]
+    if not prmos:
+        print("  [적립] 10% prmo 없음 (쿠폰만/적립없음) — 적립단계 skip", flush=True)
+        return
+    acct = cart["account"]
+    code = (
+        "import sys; sys.path.insert(0,'buy'); import run\n"
+        "from playwright.sync_api import sync_playwright\n"
+        f"acc=run.load_json(run.ACCOUNTS_FILE)['accounts'][{acct}-1]\n"
+        "with sync_playwright() as p:\n"
+        " br=p.chromium.connect_over_cdp(run.CDP_ENDPOINT); ctx=br.contexts[0] if br.contexts else br.new_context(); page=ctx.new_page()\n"
+        " run._hmall_clean(ctx,page,deep=True)\n"
+        " ok=run.login(page,acc['id'],acc['pw']); print('login',ok)\n"
+        f" for prmo in {prmos}:\n"
+        "  print('HP', prmo, run.apply_hpoint(page,prmo))\n"
+        " page.close()\n"
+    )
+    try:
+        r = subprocess.run([BROWSER_PY, "-c", code], cwd=str(ROOT), capture_output=True, text=True, timeout=180)
+        good = ("already_done': True" in r.stdout) or ("'success': True" in r.stdout)
+        print(f"  [적립] {'✓' if good else '⚠️확인필요'} prmo={prmos} {r.stdout.strip()[-140:]}", flush=True)
+    except Exception as e:
+        print(f"  [적립] ⚠️ 적립신청 호출 실패(결제는 정상): {e}", flush=True)
 
 
 PAYER = {"hmall": pay_hmall, "lotte": pay_lotte, "galleria": pay_galleria}
@@ -101,6 +157,8 @@ def _pay_cart(cart: dict, data: dict) -> bool:
         cart["paid"] = True
         _save(data)                       # 성공 즉시 기록 (중복결제 방지)
         print(f"  ✓ {LABEL[mall]} #{cart['account']} 결제 완료 (기록 paid:true)", flush=True)
+        if mall == "hmall":               # 현대 식품: 10% prmo 있으면 적립신청 (없으면 skip)
+            apply_reward(cart)
     else:
         print(f"  ✗ {LABEL[mall]} #{cart['account']} 결제 실패\n--- log ---\n{log}\n-----------", flush=True)
     return ok

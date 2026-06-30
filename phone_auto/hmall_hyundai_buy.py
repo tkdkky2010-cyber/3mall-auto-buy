@@ -58,7 +58,7 @@ from phone_auto.adb_input import ADB
 # adb 를 PATH 에 (flow_runner/ADB 가 bare 'adb' 호출)
 os.environ["PATH"] = os.path.dirname(hw.ADB) + os.pathsep + os.environ.get("PATH", "")
 
-PLAN = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+PLAN = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
 CARD_PIN = "137601"          # 현대카드 PIN 6자리 (공용)
 CART_ICON = (1012, 151)      # hmall 메인 우측상단 장바구니 아이콘 (1080x2400)
 HOME_NAV = (106, 2218)       # 하단 네비 '홈' (앱이 마이페이지로 복원돼도 홈 강제용)

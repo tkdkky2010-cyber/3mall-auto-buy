@@ -35,7 +35,7 @@ PLAN_FILE = ROOT / "buy/cart_plan.json"
 
 # 계정별 상품(단독 순서). id2=하루견과초록 / id3=하루견과갈색 / id10=이경제녹용
 PLAN: dict[int, list[int]] = {}
-for a in (1, 2, 3, 4, 5):            PLAN[a] = [2, 10]
+for a in (1, 2, 3, 4, 5, 6):         PLAN[a] = [2, 10]
 for a in (7, 8, 9, 10, 11, 12):      PLAN[a] = [2]
 for a in (13, 14, 15, 16, 17, 18, 19): PLAN[a] = [3]
 
@@ -81,12 +81,12 @@ def phone_reset():
 
 
 def phone_pay(acct: int) -> tuple[bool, str]:
-    """폰 flow_payment 결제 (hmall_combo_checkout 단일계정)."""
-    r = subprocess.run([PHONE_PY, "-m", "phone_auto.hmall_combo_checkout", str(acct)], cwd=str(ROOT),
-                       env={**os.environ, "PYTHON_BIN": PHONE_PY}, capture_output=True, text=True, timeout=480)
+    """폰 인앱 결제 (hmall_hyundai_buy 단일계정 — 주문완료검증+뷰티+당일카드).
+    ※ 정식 진입점은 루트 buy.py. 이 모듈은 식품 cart-set+resume 레거시."""
+    r = subprocess.run([PHONE_PY, "-m", "phone_auto.hmall_hyundai_buy", str(acct)], cwd=str(ROOT),
+                       env={**os.environ, "PYTHON_BIN": PHONE_PY}, capture_output=True, text=True, timeout=900)
     tail = r.stdout[-700:]
-    summary = r.stdout.split("SUMMARY")[-1]
-    ok = ("PAID" in summary) and ("FAIL" not in summary)
+    ok = ("=> DONE" in r.stdout) or ("SKIP_EMPTY" in r.stdout)
     return ok, tail
 
 
