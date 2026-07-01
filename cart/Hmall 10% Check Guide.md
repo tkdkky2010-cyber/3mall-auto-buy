@@ -130,6 +130,7 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 | 28 | 스키니랩 시서스 다이어트 11박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2202464603&sectId=3059445 |
 | 29 | 아이클타임 키성장 에프지오 6박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2237140367 |
 | 32 | 셀게이트 엑스트라버진 올리브오일 그리스 30포 6박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244447362 |
+| 33 | GRN 붓기캔디 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2250831230&sectId=3060687 |
 
 ---
 

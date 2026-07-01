@@ -153,5 +153,12 @@
     "url_extra": "",
     "option_index": 1,
     "auto_coupon": true
+  },
+  "33": {
+    "name": "GRN 붓기캔디",
+    "slitmCd": "2250831230",
+    "url_extra": "&sectId=3060687",
+    "option_index": 1,
+    "auto_coupon": true
   }
 }
