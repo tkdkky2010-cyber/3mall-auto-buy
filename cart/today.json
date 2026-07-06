@@ -1,240 +1,36 @@
 {
-  "date": "2026-06-29",
+  "date": "2026-07-05",
   "account_used": "tkdkky2002",
   "products": [
     {
       "id": 2,
       "name": "하루견과 초록색 100봉",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2151046312&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "릴레이푸드 최대 10%적립",
-      "events": [
-        {
-          "prmo": "P202606041140",
-          "name": "릴레이푸드 최대 10%적립",
-          "event_end": "6.30 23:59",
-          "tiers": [
-            {
-              "min_won": 30000,
-              "min_unit": "원",
-              "reward_pt": 1500
-            },
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 3500
-            },
-            {
-              "min_won": 70000,
-              "min_unit": "원",
-              "reward_pt": 6000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 150000,
-              "min_unit": "원",
-              "reward_pt": 15000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 30000,
-          "min_unit": "원",
-          "reward_pt": 1500
-        },
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 3500
-        },
-        {
-          "min_won": 70000,
-          "min_unit": "원",
-          "reward_pt": 6000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 150000,
-          "min_unit": "원",
-          "reward_pt": 15000
-        }
-      ],
-      "max_reward": "15,000P",
-      "event_end": "6.30 23:59",
-      "has_coupon": false,
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
+      "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 2,
-        "list_price": 179800,
-        "member_price": 161820,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 161820,
-        "kakao_reward_pt": 15000,
-        "kakao_final_cost": 135493,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 2,
-          "tier_min": 100000,
-          "tier_reward": 10000,
-          "nominal_pct": 10.0,
-          "actual_total": 161820,
-          "actual_reward": 15000,
-          "effective_pct": 9.269558769002595
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 80910,
-        "options": [
-          {
-            "idx": 1,
-            "name": "[하루견과] 순수견과100% 썬넛트 하루견과 넛츠시그니처 23gx100봉",
-            "list_price": 89900
-          }
-        ]
-      }
+      "simple_ranges": []
     },
     {
       "id": 3,
       "name": "하루견과 갈색 100봉",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2225431602&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "릴레이푸드 최대 10%적립",
-      "events": [
-        {
-          "prmo": "P202606041140",
-          "name": "릴레이푸드 최대 10%적립",
-          "event_end": "6.30 23:59",
-          "tiers": [
-            {
-              "min_won": 30000,
-              "min_unit": "원",
-              "reward_pt": 1500
-            },
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 3500
-            },
-            {
-              "min_won": 70000,
-              "min_unit": "원",
-              "reward_pt": 6000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 150000,
-              "min_unit": "원",
-              "reward_pt": 15000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 30000,
-          "min_unit": "원",
-          "reward_pt": 1500
-        },
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 3500
-        },
-        {
-          "min_won": 70000,
-          "min_unit": "원",
-          "reward_pt": 6000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 150000,
-          "min_unit": "원",
-          "reward_pt": 15000
-        }
-      ],
-      "max_reward": "15,000P",
-      "event_end": "6.30 23:59",
-      "has_coupon": false,
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
+      "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 2,
-        "list_price": 177000,
-        "member_price": 159300,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 159300,
-        "kakao_reward_pt": 15000,
-        "kakao_final_cost": 133149,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 2,
-          "tier_min": 100000,
-          "tier_reward": 10000,
-          "nominal_pct": 10.0,
-          "actual_total": 159300,
-          "actual_reward": 15000,
-          "effective_pct": 9.416195856873824
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 79650,
-        "options": [
-          {
-            "idx": 1,
-            "name": "[하루견과] ONLY견과 썬넛트 시그니처오리지널 22gx100봉",
-            "list_price": 88500
-          },
-          {
-            "idx": 2,
-            "name": "[하루견과] 1세트당 44700원꼴 썬넛트 하루견과 시그니처60입x4세트",
-            "list_price": 44700
-          },
-          {
-            "idx": 4,
-            "name": "[하루견과]시그니처오리지널22gx30입세트",
-            "list_price": 34900
-          }
-        ]
-      }
+      "simple_ranges": []
     },
     {
       "id": 6,
@@ -266,247 +62,31 @@
       "id": 8,
       "name": "이디야 디카페인",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244409628&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "릴레이푸드 최대 10%적립",
-      "events": [
-        {
-          "prmo": "P202606041140",
-          "name": "릴레이푸드 최대 10%적립",
-          "event_end": "6.30 23:59",
-          "tiers": [
-            {
-              "min_won": 30000,
-              "min_unit": "원",
-              "reward_pt": 1500
-            },
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 3500
-            },
-            {
-              "min_won": 70000,
-              "min_unit": "원",
-              "reward_pt": 6000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 150000,
-              "min_unit": "원",
-              "reward_pt": 15000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 30000,
-          "min_unit": "원",
-          "reward_pt": 1500
-        },
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 3500
-        },
-        {
-          "min_won": 70000,
-          "min_unit": "원",
-          "reward_pt": 6000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 150000,
-          "min_unit": "원",
-          "reward_pt": 15000
-        }
-      ],
-      "max_reward": "15,000P",
-      "event_end": "6.30 23:59",
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 4,
-        "list_price": null,
-        "member_price": null,
-        "card_slides": [],
-        "kakao_price": null,
-        "kakao_reward_pt": 0,
-        "kakao_final_cost": null,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 4,
-          "tier_min": 100000,
-          "tier_reward": 10000,
-          "nominal_pct": 10.0,
-          "actual_total": 116280,
-          "actual_reward": 10000,
-          "effective_pct": 8.599931200550396
-        },
-        "effective_ten_percent": true,
-        "error": "바로구매 실패",
-        "benefit_unit_price": 29070,
-        "options": [
-          {
-            "idx": 1,
-            "name": "[이디야] 디카페인 아메리카노 130T x 2개",
-            "list_price": 34200
-          },
-          {
-            "idx": 4,
-            "name": "[이디야] 페르소나7T x2+에티오피아7T x2+콜롬비아7T x2",
-            "list_price": 28900
-          }
-        ]
-      }
+      "simple_ranges": []
     },
     {
       "id": 9,
       "name": "이디야 카페인",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2246603712&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "릴레이푸드 최대 10%적립",
-      "events": [
-        {
-          "prmo": "P202606041140",
-          "name": "릴레이푸드 최대 10%적립",
-          "event_end": "6.30 23:59",
-          "tiers": [
-            {
-              "min_won": 30000,
-              "min_unit": "원",
-              "reward_pt": 1500
-            },
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 3500
-            },
-            {
-              "min_won": 70000,
-              "min_unit": "원",
-              "reward_pt": 6000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 150000,
-              "min_unit": "원",
-              "reward_pt": 15000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 30000,
-          "min_unit": "원",
-          "reward_pt": 1500
-        },
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 3500
-        },
-        {
-          "min_won": 70000,
-          "min_unit": "원",
-          "reward_pt": 6000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 150000,
-          "min_unit": "원",
-          "reward_pt": 15000
-        }
-      ],
-      "max_reward": "15,000P",
-      "event_end": "6.30 23:59",
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 4,
-        "list_price": 155200,
-        "member_price": 131920,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 131920,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 112686,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 4,
-          "tier_min": 100000,
-          "tier_reward": 10000,
-          "nominal_pct": 10.0,
-          "actual_total": 131920,
-          "actual_reward": 10000,
-          "effective_pct": 7.580351728320194
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 32980,
-        "options": [
-          {
-            "idx": 1,
-            "name": "[이디야] 오리지널 아메리카노 150T x2개",
-            "list_price": 38800
-          },
-          {
-            "idx": 2,
-            "name": "[이디야] 스페셜에디션 아메리카노 150T x 2개",
-            "list_price": 38800
-          },
-          {
-            "idx": 3,
-            "name": "[이디야] 캡슐커피 3종 맛보기 10T x 3개 (마일드브리즈/딥에스프레소/스모키벨벳)",
-            "list_price": 21000
-          },
-          {
-            "idx": 4,
-            "name": "[이디야] 바닐라라떼 30T x 2개",
-            "list_price": 22000
-          },
-          {
-            "idx": 5,
-            "name": "[이디야] 카페라떼 30T x 2개",
-            "list_price": 21000
-          },
-          {
-            "idx": 6,
-            "name": "[이디야] 토피넛라떼 30T x 2개",
-            "list_price": 22000
-          }
-        ]
-      }
+      "simple_ranges": []
     },
     {
       "id": 10,
@@ -533,7 +113,7 @@
       "tiers": [],
       "max_reward": null,
       "event_end": null,
-      "has_coupon": false,
+      "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": []
@@ -623,7 +203,7 @@
       "tiers": [],
       "max_reward": null,
       "event_end": null,
-      "has_coupon": false,
+      "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": []
@@ -681,7 +261,7 @@
       "tiers": [],
       "max_reward": null,
       "event_end": null,
-      "has_coupon": false,
+      "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": []
@@ -696,7 +276,7 @@
       "tiers": [],
       "max_reward": null,
       "event_end": null,
-      "has_coupon": false,
+      "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": []
@@ -726,7 +306,7 @@
       "tiers": [],
       "max_reward": null,
       "event_end": null,
-      "has_coupon": false,
+      "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": []
@@ -743,12 +323,21 @@
       "event_end": null,
       "has_coupon": false,
       "error": "판매중단"
+    },
+    {
+      "id": 33,
+      "name": "GRN 붓기캔디",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2250831230&sectId=3060687",
+      "ten_percent": false,
+      "phrase": null,
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
+      "has_coupon": false,
+      "error": null,
+      "coupon_claimed": false
     }
   ],
-  "ten_percent_ids": [
-    2,
-    3,
-    8,
-    9
-  ]
+  "ten_percent_ids": []
 }

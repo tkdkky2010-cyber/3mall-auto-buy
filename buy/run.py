@@ -33,10 +33,12 @@ if PW_BACKEND is None:
 ROOT = Path(__file__).parent
 PROJECT_ROOT = ROOT.parent
 load_dotenv(ROOT / ".env")
+sys.path.insert(0, str(PROJECT_ROOT))
+from chrome_launcher import ensure_chrome  # noqa: E402  (CDP attach 스크립트는 ensure_chrome 필수)
 
 ACCOUNTS_FILE = Path(os.environ.get("HMALL_CONFIG_PATH") or (PROJECT_ROOT / "hmall_config.json"))
 PRODUCTS_FILE = ROOT / "products.json"
-PLAN_FILE = ROOT / "cart_plan.json"
+PLAN_FILE = Path(os.environ.get("CART_PLAN_FILE") or (ROOT / "cart_plan.json"))
 
 INACTIVE_ACCOUNTS: list[int] = []  # 2026-06-23: #6 구매금지 해제 (사용자 지시, 다시 사용 가능)
 
@@ -190,6 +192,25 @@ def login(page: Page, account_id: str, account_pw: str) -> bool:
         body = page.inner_text("body")
         if "로그아웃" in body:
             return True
+        # 비밀번호 변경 캠페인(pwdChangePup): 로그인 자체는 성공, 인터스티셜만 뜬 상태.
+        # '90일 후 변경하기'(연기)로 닫고 재확인. ⚠️ '지금 변경하기' 절대 금지(비번 실제 변경됨).
+        if "pwdChangePup" in page.url or "비밀번호 변경" in body:
+            clicked = page.evaluate("""() => {
+                const els = Array.from(document.querySelectorAll('a, button'));
+                const t = els.find(el => /90일\\s*후\\s*변경/.test((el.innerText||'').trim()));
+                if (t) { t.click(); return true; }
+                return false;
+            }""")
+            if clicked:
+                page.wait_for_timeout(1500)
+                try:
+                    page.goto("https://www.hmall.com/md/dpl/index", wait_until="domcontentloaded", timeout=10000)
+                    page.wait_for_timeout(800)
+                    if "로그아웃" in page.inner_text("body"):
+                        print(f"  [PWCAMP] {account_id} — 비밀번호 변경 캠페인 '90일 후 변경'으로 닫음 → 로그인 성공")
+                        return True
+                except Exception:
+                    pass
         if "다른 로그인 수단" in body or "로그인에 실패" in body:
             print(f"  [BLOCKED] {account_id} — 로그인 차단됨")
         elif "비밀번호" in body and "일치" in body:
@@ -706,6 +727,7 @@ def main() -> int:
 
     summary = []
     print(f"[INFO] PW backend: {PW_BACKEND}")
+    ensure_chrome(int(CDP_PORT))   # 9222 죽음/탭0 자동복구 (launch-hmall-chrome.sh + 탭 보장)
     with sync_playwright() as p:
         try:
             browser = p.chromium.connect_over_cdp(CDP_ENDPOINT, slow_mo=500)

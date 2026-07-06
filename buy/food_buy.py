@@ -28,16 +28,23 @@ ADB = "/opt/homebrew/bin/adb"
 PHONE_PY = "/opt/homebrew/bin/python3"   # phone_auto (brew python)
 BROWSER_PY = "python3"                    # run.py (system python, playwright)
 HMALL = "com.hmallapp"
-QTY = 2
 ACCOUNT_DELAY = 7 * 60
 STATE = ROOT / "buy/_food_done.json"
-PLAN_FILE = ROOT / "buy/cart_plan.json"
+PLAN_FILE = ROOT / "buy/cart_plan.json"            # 매일 갱신되는 계정별 플랜 (SoT)
+PLAN_TMP = ROOT / "buy/_cart_plan_food_tmp.json"   # 단독결제용 임시 단일상품 카트 (run.py 전용, PLAN_FILE 보존)
 
-# 계정별 상품(단독 순서). id2=하루견과초록 / id3=하루견과갈색 / id10=이경제녹용
+# 계정별 상품(단독 순서) — cart_plan.json 에서 로드. ★하드코딩 금지(플랜은 매일 바뀜).
+# cart_plan.json items:[{product,accounts,qty}] → 계정→[상품id], (계정,상품)→수량 으로 역매핑.
+_plan = json.loads(PLAN_FILE.read_text(encoding="utf-8"))
 PLAN: dict[int, list[int]] = {}
-for a in (1, 2, 3, 4, 5, 6):         PLAN[a] = [2, 10]
-for a in (7, 8, 9, 10, 11, 12):      PLAN[a] = [2]
-for a in (13, 14, 15, 16, 17, 18, 19): PLAN[a] = [3]
+QTY_BY: dict[tuple[int, int], int] = {}
+for _it in _plan.get("items", []):
+    _pid = int(_it["product"])
+    _qty = int(_it.get("qty", 1))
+    for _acc in _it["accounts"]:
+        _acc = int(_acc)
+        PLAN.setdefault(_acc, []).append(_pid)
+        QTY_BY[(_acc, _pid)] = _qty
 
 # 상품별 적립 prmo (today.json)
 PRMO: dict[int, list[str]] = {}
@@ -63,12 +70,16 @@ def _mark_done(acct, pid):
 
 
 def pc_cart_set(acct: int, pid: int) -> tuple[bool, str]:
-    """PC: 카트 비우고 그 상품 1종만 담기 (CART_ONLY)."""
-    PLAN_FILE.write_text(json.dumps(
-        {"date": "2026-06-05", "_comment": "단독결제 임시", "items": [{"product": pid, "accounts": [acct], "qty": QTY}]},
+    """PC: 카트 비우고 그 상품 1종만 담기 (CART_ONLY).
+    단일상품 카트는 임시파일(PLAN_TMP)에 쓰고 run.py 에 CART_PLAN_FILE 로 넘긴다 —
+    cart_plan.json(마스터 플랜)은 건드리지 않음(재개 시 PLAN 훼손 방지)."""
+    qty = QTY_BY.get((acct, pid), 1)
+    PLAN_TMP.write_text(json.dumps(
+        {"date": "food-single", "_comment": "단독결제 임시(run.py 전용)", "items": [{"product": pid, "accounts": [acct], "qty": qty}]},
         ensure_ascii=False, indent=2), encoding="utf-8")
     r = subprocess.run([BROWSER_PY, "buy/run.py", str(acct)], cwd=str(ROOT),
-                       env={**os.environ, "CART_ONLY": "true", "DRY_PAYMENT": "true"},
+                       env={**os.environ, "CART_ONLY": "true", "DRY_PAYMENT": "true",
+                            "CART_PLAN_FILE": str(PLAN_TMP)},
                        capture_output=True, text=True, timeout=300)
     ok = ("담기: 1/1" in r.stdout) or ("cart-only 담기 1/1" in r.stdout)
     return ok, r.stdout[-300:]
@@ -154,7 +165,7 @@ def do_account(acct: int) -> bool:
             import purchase_ledger as PL
             _accts = json.loads((ROOT / "hmall_config.json").read_text(encoding="utf-8"))["accounts"]
             _aid = _accts[acct - 1]["id"] if 0 <= acct - 1 < len(_accts) else None
-            PL.record_food("현대Hmall", _aid, pid, qty=QTY)
+            PL.record_food("현대Hmall", _aid, pid, qty=QTY_BY.get((acct, pid), 1))
         except Exception as e:
             print(f"  [ledger] 기록 실패(무시): {e}", flush=True)
         print(f"  ✓ product {pid} 완료(결제+적립)", flush=True)
