@@ -75,6 +75,18 @@ def _tap(serial: str, xy: tuple[int, int], wait: float = 1.2) -> None:
     time.sleep(wait)
 
 
+def _tap_text(serial: str, needle: str, wait: float = 1.5) -> bool:
+    """dump 에서 needle 포함 요소 bounds 중심을 탭 (하드코딩 좌표 드리프트 방지). 못 찾으면 False."""
+    import re
+    xml = _dump(serial)
+    m = re.search(r'text="[^"]*' + re.escape(needle) + r'[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml)
+    if not m:
+        return False
+    x1, y1, x2, y2 = map(int, m.groups())
+    _tap(serial, ((x1 + x2) // 2, (y1 + y2) // 2), wait=wait)
+    return True
+
+
 def _launch(serial: str) -> None:
     _sh(serial, "shell", "monkey", "-p", HMALL_PKG, "-c", "android.intent.category.LAUNCHER", "1")
     time.sleep(5)
@@ -286,7 +298,10 @@ def _open_login_form(serial: str) -> "CDP | None":
     for _ in range(4):
         _tap(serial, MYPAGE_TAB, wait=4)
         if _chooser_loaded():                 # chooser 확실히 떴을 때만 링크 탭
-            _tap(serial, HMALL_LOGIN_LINK, wait=3)
+            # ★소셜로그인 추가로 'Hmall/H.Point 아이디로 로그인하기' 버튼이 아래로 밀림(좌표 드리프트).
+            #   dump 로 실제 위치 찾아 탭, 실패 시에만 고정좌표 폴백. (2026-07-07 버튼 y1310→1454)
+            if not _tap_text(serial, "아이디로 로그인", wait=3):
+                _tap(serial, HMALL_LOGIN_LINK, wait=3)
             for _ in range(6):                # 폼 로드 폴링
                 f = _attach_login_form()
                 if f:

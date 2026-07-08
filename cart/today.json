@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-05",
+  "date": "2026-07-08",
   "account_used": "tkdkky2002",
   "products": [
     {
@@ -12,7 +12,7 @@
       "tiers": [],
       "max_reward": null,
       "event_end": null,
-      "has_coupon": true,
+      "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": []
@@ -27,7 +27,7 @@
       "tiers": [],
       "max_reward": null,
       "event_end": null,
-      "has_coupon": true,
+      "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": []
@@ -92,77 +92,237 @@
       "id": 10,
       "name": "이경제 더힘찬녹용 30포",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2240802022&ordpreview=true",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 112970
+      }
     },
     {
       "id": 11,
       "name": "라메종드미엘 프랑스 라벤더 천연꿀 8병",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2246845189&sectId=3059445",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
-      "has_coupon": true,
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
+      "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 262400
+      }
     },
     {
       "id": 12,
       "name": "갱년기 다이어트 리얼퀸 3병",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847&sectId=3059445",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 44060
+      }
     },
     {
       "id": 13,
       "name": "GRN 핑크 초록이",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847&sectId=3059445",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 44060
+      },
       "alias_of": 12
     },
     {
       "id": 14,
       "name": "GRN 곰돌이",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847&sectId=3059445",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 44060
+      },
       "alias_of": 12
     },
     {
@@ -182,61 +342,310 @@
       "id": 16,
       "name": "루솔",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2225275921",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
-      "tiers": [],
-      "max_reward": null,
-      "event_end": null,
+      "ten_percent": true,
+      "phrase": "유아 cool 시리즈 10%적립",
+      "events": [
+        {
+          "prmo": "P202607026903",
+          "name": "유아 cool 시리즈 10%적립",
+          "event_end": "7.08 23:59",
+          "tiers": [
+            {
+              "min_won": 30000,
+              "min_unit": "원",
+              "reward_pt": 3000
+            },
+            {
+              "min_won": 50000,
+              "min_unit": "원",
+              "reward_pt": 5000
+            },
+            {
+              "min_won": 100000,
+              "min_unit": "원",
+              "reward_pt": 10000
+            },
+            {
+              "min_won": 150000,
+              "min_unit": "원",
+              "reward_pt": 15000
+            },
+            {
+              "min_won": 200000,
+              "min_unit": "원",
+              "reward_pt": 20000
+            },
+            {
+              "min_won": 300000,
+              "min_unit": "원",
+              "reward_pt": 30000
+            },
+            {
+              "min_won": 400000,
+              "min_unit": "원",
+              "reward_pt": 40000
+            },
+            {
+              "min_won": 500000,
+              "min_unit": "원",
+              "reward_pt": 50000
+            }
+          ],
+          "simple_range": null
+        }
+      ],
+      "tiers": [
+        {
+          "min_won": 30000,
+          "min_unit": "원",
+          "reward_pt": 3000
+        },
+        {
+          "min_won": 50000,
+          "min_unit": "원",
+          "reward_pt": 5000
+        },
+        {
+          "min_won": 100000,
+          "min_unit": "원",
+          "reward_pt": 10000
+        },
+        {
+          "min_won": 150000,
+          "min_unit": "원",
+          "reward_pt": 15000
+        },
+        {
+          "min_won": 200000,
+          "min_unit": "원",
+          "reward_pt": 20000
+        },
+        {
+          "min_won": 300000,
+          "min_unit": "원",
+          "reward_pt": 30000
+        },
+        {
+          "min_won": 400000,
+          "min_unit": "원",
+          "reward_pt": 40000
+        },
+        {
+          "min_won": 500000,
+          "min_unit": "원",
+          "reward_pt": 50000
+        }
+      ],
+      "max_reward": "50,000P",
+      "event_end": "7.08 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [],
+      "payment": {
+        "qty": 1,
+        "list_price": 51500,
+        "member_price": 46350,
+        "card_slides": [
+          {
+            "alt": "토스페이 최대 15,000원 혜택",
+            "text": "토스페이 최대 15,000원 혜택 7/1~7/30, 선착순 혜택!",
+            "percent": null,
+            "price": 15000
+          },
+          {
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 7/1~7/31 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
+          },
+          {
+            "alt": "네이버페이 최대 3%적립",
+            "text": "네이버페이 최대 3%적립 기본 적립 + 추가적립 (7/1~7/31)",
+            "percent": null,
+            "price": null
+          }
+        ],
+        "kakao_price": 46350,
+        "kakao_reward_pt": 3000,
+        "kakao_final_cost": 43350,
+        "paybacks": {},
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 30000,
+          "tier_reward": 3000,
+          "nominal_pct": 10.0,
+          "actual_total": 46350,
+          "actual_reward": 3000,
+          "effective_pct": 6.472491909385113
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 46350,
+        "options": [
+          {
+            "idx": 1,
+            "name": "[루솔] 진한 배도라지즙 선물박스(60포) 배즙",
+            "list_price": 51500
+          },
+          {
+            "idx": 2,
+            "name": "[루솔] 진한 배도라지즙 선물박스(80포) 배즙",
+            "list_price": 71000
+          },
+          {
+            "idx": 3,
+            "name": "[루솔] 진한 배도라지즙 선물박스(100포) 배즙",
+            "list_price": 87000
+          },
+          {
+            "idx": 4,
+            "name": "[루솔] 진한 배도라지즙 선물박스(120포) 배즙",
+            "list_price": 103000
+          }
+        ]
+      }
     },
     {
       "id": 17,
       "name": "데이즈온 원데이 알파 18개",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2247036059&sectId=3059445",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
-      "has_coupon": true,
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
+      "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 47920
+      }
     },
     {
       "id": 20,
       "name": "바디랩 유기농 레몬즙 1박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244671296&sectId=3059445",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 20800
+      }
     },
     {
       "id": 22,
       "name": "올바른건강식품 와이 9박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244934734&sectId=3059445",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 66340
+      }
     },
     {
       "id": 23,
@@ -255,36 +664,53 @@
       "id": 25,
       "name": "유기농 석류젤리 9박(90개)",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
-      "has_coupon": true,
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
+      "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 55120
+      }
     },
     {
       "id": 26,
       "name": "오라틱스 구강유산균 10박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244032427&sectId=3059445",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
-      "tiers": [],
-      "max_reward": null,
-      "event_end": null,
-      "has_coupon": true,
-      "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": []
-    },
-    {
-      "id": 28,
-      "name": "스키니랩 시서스 다이어트 11박",
-      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202464603&sectId=3059445",
       "ten_percent": false,
       "phrase": "출석하면 매일 100% 적립",
       "events": [],
@@ -297,19 +723,98 @@
       "simple_ranges": []
     },
     {
+      "id": 28,
+      "name": "스키니랩 시서스 다이어트 11박",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2202464603&sectId=3059445",
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
+      "tiers": [],
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
+      "has_coupon": false,
+      "error": null,
+      "coupon_claimed": false,
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 143650
+      }
+    },
+    {
       "id": 29,
       "name": "아이클타임 키성장 에프지오 6박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2237140367",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
-      "has_coupon": true,
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
+      "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 792000
+      }
     },
     {
       "id": 32,
@@ -328,16 +833,63 @@
       "id": 33,
       "name": "GRN 붓기캔디",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2250831230&sectId=3060687",
-      "ten_percent": false,
-      "phrase": null,
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강식품 브랜드 특별전 10%적립",
+      "events": [
+        {
+          "prmo": "P202607067509",
+          "name": "건강식품 브랜드 특별전 10%적립",
+          "event_end": "7.09 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 10000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
+      "max_reward": "1,000,000P (단순 10%)",
+      "event_end": "7.09 23:59",
       "has_coupon": false,
       "error": null,
-      "coupon_claimed": false
+      "coupon_claimed": false,
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 10000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
+        "optimal_tier": null,
+        "effective_ten_percent": false,
+        "error": "≥10% tier unreachable (cap 500K)",
+        "benefit_unit_price": 62910
+      }
     }
   ],
-  "ten_percent_ids": []
+  "ten_percent_ids": [
+    10,
+    11,
+    12,
+    13,
+    14,
+    16,
+    17,
+    20,
+    22,
+    25,
+    28,
+    29,
+    33
+  ]
 }

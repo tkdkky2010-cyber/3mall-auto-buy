@@ -609,8 +609,12 @@ def select_card_lotte(day: str | None = None) -> dict:
         out["err"] = "'다른 결제수단' 미발견"; return out
     _adb().tap(db["cx"], db["cy"]); time.sleep(1.5)         # 라디오 선택(그리드 활성, 라디오라 멱등)
     # 2) '신용카드' 그리드 버튼 → '카드 선택'/'할부 선택' 드롭다운 노출
-    if not ocr_tap("신용카드", retries=4):
-        out["err"] = "'신용카드' 버튼 탭 실패"; return out
+    # ★신용카드 버튼이 그리드 아래로 밀릴 수 있음(2026-07-08 계정1 실패) → 스크롤하며 찾아 탭.
+    #   contains=False(정확일치) = 배너 '롯데카드(신용카드/L.PAY) N% 할인' 오매칭 방지(ocr_tap 기본과 동일).
+    sc = _scroll_to("신용카드", contains=False, max_scroll=6)
+    if not sc:
+        out["err"] = "'신용카드' 버튼 탭 실패(스크롤 후 미발견)"; return out
+    _adb().tap(sc["cx"], sc["cy"]); time.sleep(0.5)
     time.sleep(1.5)
     # 3) '카드 선택' 드롭다운(행 우측 chevron x≈987) → 카드목록 팝업.
     #    ★exact 매칭 필수 — contains 면 안내문 '...비씨카드 선택 시...'의 '카드 선택' 부분문자열을 오매칭(2026-06-02 #11 버그).

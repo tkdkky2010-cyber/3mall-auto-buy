@@ -82,19 +82,23 @@ def load_json(path: Path) -> dict:
 
 
 def dismiss_popup(page: Page) -> None:
-    """페이지에 popup 뜨면 '닫기' 텍스트 찾아 클릭. 없으면 그냥 return."""
-    for _ in range(3):  # 여러 popup 동시 뜨는 경우
+    """페이지 popup 닫기. ★'30일간 보이지 않기' 우선(재등장 억제, 롯데 비번변경/이벤트 팝업이
+    담기 클릭을 가로막던 원인 — 2026-07-08) → 없으면 '닫기'. 둘 다 없으면 return."""
+    for _ in range(4):  # 여러 popup 동시/연속
         clicked = False
-        for kind in ("button", "link"):
-            try:
-                close_el = page.get_by_role(kind, name=re.compile(r"^닫기$|닫기\s*$")).first
-                if close_el.count() > 0:
-                    close_el.click(timeout=1500)
-                    clicked = True
-                    page.wait_for_timeout(400)
-                    break
-            except Exception:
-                continue
+        for pat in (r"30일간\s*보이지\s*않기", r"오늘\s*하루\s*보지\s*않기", r"^닫기$|닫기\s*$"):
+            for kind in ("button", "link"):
+                try:
+                    el = page.get_by_role(kind, name=re.compile(pat)).first
+                    if el.count() > 0:
+                        el.click(timeout=1500)
+                        clicked = True
+                        page.wait_for_timeout(400)
+                        break
+                except Exception:
+                    continue
+            if clicked:
+                break
         if not clicked:
             break
 
