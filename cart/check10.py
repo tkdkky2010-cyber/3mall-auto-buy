@@ -848,20 +848,29 @@ def _extract_order_page(page: Page) -> dict:
     """) or {}
 
 
-def _find_optimal_qty(unit_price: int | None, tiers: list[dict], cap_won: int = 500_000, min_pct: float = 10.0) -> dict | None:
+def _find_optimal_qty(unit_price: int | None, tiers: list[dict], cap_won: int = 500_000, min_pct: float = 10.0,
+                      simple_ranges: list[dict] | None = None) -> dict | None:
     """≥min_pct nominal ratio tier 중 best 선택.
 
     nominal_pct = tier.reward_pt / tier.min_won × 100.
     candidates 중 (highest nominal_pct, tiebreak smallest qty) 선정.
     actual_total (= qty × unit_price) > cap_won 인 tier 는 제외.
 
+    simple_ranges(단순 N% 적립 — tiers 가 비는 상품)도 pseudo-tier(min_won 임계에서 pct%)로 편입해
+    동일 로직으로 qty 최적화 → 주문서(바로구매)까지 진행 가능.
+
     Returns dict {qty, tier_min, tier_reward, nominal_pct, actual_total, actual_reward, effective_pct}
     또는 None (조건 만족 tier 없음).
     """
-    if not tiers or not unit_price or unit_price <= 0:
+    pool = list(tiers or [])
+    for sr in (simple_ranges or []):
+        mw, pct = sr.get("min_won"), sr.get("pct")
+        if mw and pct:
+            pool.append({"min_won": mw, "reward_pt": int(round(mw * pct / 100)), "min_unit": "원"})
+    if not pool or not unit_price or unit_price <= 0:
         return None
     candidates = []
-    for tier in tiers:
+    for tier in pool:
         tier_min = tier.get("min_won")
         reward = tier.get("reward_pt")
         if not tier_min or not reward:
@@ -875,7 +884,7 @@ def _find_optimal_qty(unit_price: int | None, tiers: list[dict], cap_won: int = 
             continue
         # 실제 hit 되는 가장 높은 tier = actual_reward
         actual_reward = max(
-            (t["reward_pt"] for t in tiers if t.get("min_won") and t["min_won"] <= actual_total),
+            (t["reward_pt"] for t in pool if t.get("min_won") and t["min_won"] <= actual_total),
             default=reward,
         )
         effective_pct = (actual_reward / actual_total) * 100
@@ -943,7 +952,7 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
     out["benefit_unit_price"] = benefit_unit
 
     # 2) optimal qty 계산 (≥10% nominal, cap 500K)
-    optimal = _find_optimal_qty(benefit_unit, tiers, cap_won=500_000, min_pct=10.0)
+    optimal = _find_optimal_qty(benefit_unit, tiers, cap_won=500_000, min_pct=10.0, simple_ranges=simple_ranges)
     out["optimal_tier"] = optimal
     if not optimal:
         out["effective_ten_percent"] = False
@@ -1197,6 +1206,33 @@ def print_report(results: list[dict]) -> None:
               f"{kk:>9} | {kkf:>9} | {pb_str}")
 
 
+def _cdp_alive(port: str) -> bool:
+    """해당 포트의 Chrome CDP 가 응답하는지 (붙기 전에 살아있는 포트만 후보로)."""
+    import urllib.request
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=2).read()
+        return True
+    except Exception:
+        return False
+
+
+def _hmall_logged_in(context) -> bool:
+    """loginForm 진입 후 '로그아웃' 노출 여부로 Hmall 로그인 세션 판정 (raw 로그인은 하지 않음).
+    로그인 상태면 loginForm 이 메인으로 리다이렉트되어 body 에 '로그아웃' 존재."""
+    pg = context.new_page()
+    try:
+        pg.goto(LOGIN_URL, wait_until="domcontentloaded")
+        pg.wait_for_timeout(1200)
+        return "로그아웃" in pg.inner_text("body")
+    except Exception:
+        return False
+    finally:
+        try:
+            pg.close()
+        except Exception:
+            pass
+
+
 def main() -> int:
     if not ACCOUNTS_FILE.exists():
         print(f"[FATAL] {ACCOUNTS_FILE} 미존재")
@@ -1217,10 +1253,34 @@ def main() -> int:
     print(f"[INFO] 사용 계정 #{acc_idx} {acc['id']}")
     print(f"[INFO] PW backend: {PW_BACKEND}")
 
-    # CDP 9223 자동 launch — chrome_launcher.ensure_chrome() (LAUNCHERS dict 기반)
-    ensure_chrome(int(CDP_PORT))
+    # ── CDP 포트 자동 선택 (하드코딩 X) ──
+    #   fresh 프로필 생짜 로그인은 Hmall reCAPTCHA v3 로 차단됨 → "이미 로그인된 CfT 세션 재사용"이 정답.
+    #   9223(check10 전용)·9222(HmallChrome) 중 Hmall 로그인된 포트를 찾아 그대로 사용.
+    #   CHECK10_CDP_PORT 로 강제 지정 가능. 아무데도 로그인 안 됐으면 9223 새로 띄우고 로그인 시도(fallback).
+    #   connect 는 plain playwright — patchright 는 Chrome 148 connect 시 크래시(setCacheDisabled). CDP attach 라 스텔스 무관.
+    from playwright.sync_api import sync_playwright as sync_pw_plain
+    forced = os.environ.get("CHECK10_CDP_PORT")
+    candidates = list(dict.fromkeys([forced] * bool(forced) + [CDP_PORT, "9222"]))
+    alive = [pt for pt in candidates if _cdp_alive(pt)]
+    print(f"[INFO] CDP 후보 포트 {candidates} / 살아있음 {alive}")
 
-    with sync_playwright() as p:
+    with sync_pw_plain() as p:
+        # 1) 로그인된 CfT 우선 재사용
+        for port in alive:
+            try:
+                browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}", slow_mo=300)
+            except Exception as e:
+                print(f"[WARN] 포트 {port} 연결 실패: {str(e)[:90]}")
+                continue
+            context = browser.contexts[0] if browser.contexts else browser.new_context()
+            if _hmall_logged_in(context):
+                print(f"[OK] 로그인된 CfT 재사용 → 포트 {port}")
+                return _run(context, acc, acc_idx)
+            print(f"[INFO] 포트 {port} — Hmall 로그인 안 됨, 다음 후보")
+
+        # 2) 로그인된 포트 없음 → 9223 새로 띄우고 raw 로그인 (기존 동작, reCAPTCHA 차단 가능)
+        print(f"[INFO] 로그인된 CfT 없음 — {CDP_PORT} launch + 로그인 시도")
+        ensure_chrome(int(CDP_PORT))
         try:
             browser = p.chromium.connect_over_cdp(CDP_ENDPOINT, slow_mo=300)
         except Exception as e:
