@@ -124,9 +124,20 @@ def apply_reward(cart: dict) -> None:
         print("  [적립] 10% prmo 없음 (쿠폰만/적립없음) — 적립단계 skip", flush=True)
         return
     acct = cart["account"]
+    # ★9222 Chrome 창이 전부 닫혀 페이지 타깃 0개면 connect_over_cdp 가
+    #   'Browser context management is not supported'로 실패(2026-07-13 실측) → 탭 1개 보장 후 연결.
+    cdp_port = os.environ.get("CDP_PORT", "9222")
+    try:
+        import urllib.request
+        if not json.loads(urllib.request.urlopen(f"http://127.0.0.1:{cdp_port}/json/list", timeout=5).read()):
+            urllib.request.urlopen(urllib.request.Request(
+                f"http://127.0.0.1:{cdp_port}/json/new?https://www.hmall.com", method="PUT"), timeout=5)
+            print("  [적립] 9222 페이지 0개 → 탭 생성", flush=True)
+    except Exception as e:
+        print(f"  [적립] ⚠️ CDP preflight 실패(계속 시도): {e}", flush=True)
     code = (
         "import sys; sys.path.insert(0,'buy'); import run\n"
-        "from playwright.sync_api import sync_playwright\n"
+        "sync_playwright=run.sync_playwright\n"   # patchright 우선 — 오늘 담기와 동일 백엔드(plain은 9222 연결 실패 이력)
         f"acc=run.load_json(run.ACCOUNTS_FILE)['accounts'][{acct}-1]\n"
         "with sync_playwright() as p:\n"
         # ★기존 탭 재사용 — 새 탭=macOS Chrome 창 포커스 강탈(2026-07-10). close 안 함.
@@ -136,12 +147,28 @@ def apply_reward(cart: dict) -> None:
         f" for prmo in {prmos}:\n"
         "  print('HP', prmo, run.apply_hpoint(page,prmo))\n"
     )
-    try:
-        r = subprocess.run([BROWSER_PY, "-c", code], cwd=str(ROOT), capture_output=True, text=True, timeout=180)
-        good = ("already_done': True" in r.stdout) or ("'success': True" in r.stdout)
-        print(f"  [적립] {'✓' if good else '⚠️확인필요'} prmo={prmos} {r.stdout.strip()[-140:]}", flush=True)
-    except Exception as e:
-        print(f"  [적립] ⚠️ 적립신청 호출 실패(결제는 정상): {e}", flush=True)
+    # ★로그인 실패(login False)일 땐 apply_hpoint의 '이미 신청 완료'가 신뢰 불가 —
+    #   2026-07-13 실측: login False + already_done=True가 전부 오판이었고, 재로그인 성공 시
+    #   실제로는 미신청(fresh apply)이었음. 그래서 login True 확인될 때까지 재시도(최대 3회).
+    #   good = login True AND (신규신청 or 이미신청). login False는 미검증으로 취급 → 재시도.
+    import time as _t
+    last_out = last_err = ""
+    for attempt in range(1, 4):
+        try:
+            r = subprocess.run([BROWSER_PY, "-c", code], cwd=str(ROOT), capture_output=True, text=True, timeout=180)
+            last_out, last_err = r.stdout, r.stderr
+        except Exception as e:
+            print(f"  [적립] ⚠️ 적립신청 호출 실패(결제는 정상): {e}", flush=True)
+            return
+        login_ok = "login True" in last_out
+        reward_ok = ("already_done': True" in last_out) or ("'success': True" in last_out)
+        if login_ok and reward_ok:
+            print(f"  [적립] ✓ prmo={prmos} {last_out.strip()[-140:]}", flush=True)
+            return
+        print(f"  [적립] 시도{attempt} 미확정(login_ok={login_ok}) — 재시도", flush=True)
+        _t.sleep(4)
+    err_tail = " | stderr: " + last_err.strip().splitlines()[-1] if last_err.strip() else ""
+    print(f"  [적립] ⚠️확인필요(3회 실패) prmo={prmos} {last_out.strip()[-140:]}{err_tail}", flush=True)
 
 
 PAYER = {"hmall": pay_hmall, "lotte": pay_lotte, "galleria": pay_galleria}

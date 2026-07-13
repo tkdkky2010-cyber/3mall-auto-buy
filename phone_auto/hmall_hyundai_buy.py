@@ -1605,10 +1605,15 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None) -> 
         res["status"] = "ORDER_PAGE_FAIL(주문서 미도달)"; return res
     # ★H.Point 전액사용 (700px 방식, <100p skip — flow_runner 정본 재사용, 식품 flow step5와 동일.
     #   카드선택보다 먼저. 2026-06-05 결정사항인데 설화수 경로에 누락돼 있던 것 2026-06-06 연결)
-    try:
-        FlowRunner(use_camera=False).run_action({"action": "hmall_use_all_points"})
-    except Exception as e:
-        print(f"[#{idx}] ⚠️ 포인트 전액사용 실패(계속 진행): {e}", flush=True)
+    # HMALL_NO_POINTS=1 이면 skip — 포인트 차감으로 결제금액이 적립 tier(예: 15만원 구간) 아래로
+    #   내려가 이벤트 적립을 놓치는 것 방지 (사용자 지시 2026-07-13).
+    if os.environ.get("HMALL_NO_POINTS") == "1":
+        print(f"[#{idx}] H.Point 사용 skip (HMALL_NO_POINTS=1 — 적립구간 금액 유지)", flush=True)
+    else:
+        try:
+            FlowRunner(use_camera=False).run_action({"action": "hmall_use_all_points"})
+        except Exception as e:
+            print(f"[#{idx}] ⚠️ 포인트 전액사용 실패(계속 진행): {e}", flush=True)
     lap("H.Point 전액사용 (700px)")
     # 카드 결정 + 선택 (공통) — card 미지정 시 카드할인 캐러셀 당일카드 자동감지(스크롤 포함)
     day_card = detect_card()
@@ -1693,11 +1698,21 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None) -> 
     lap(f"뷰티포인트 재인증 → ★계정 #{idx} 총소요")
     res["status"] = "DONE" + ("" if bp.get("ok") else f"(beauty_fail:{bp.get('err')})")
     # 구매대장 기록 (JSON + 시트). 실패해도 결제엔 영향 없음. (resume 경로 _do_beauty 는 미기록)
-    # ★설화수 전용 (식품은 buy/food_buy.py 가 기록 — 식품은 이 스크립트를 안 탐)
+    # combo=NN 지정(설화수) → 조합가 기록 / 미지정(식품) → cart/today_carts.json 상품·수량으로 기록
     try:
         import purchase_ledger as PL
-        PL.record_combo("현대Hmall", res.get("id"), combo_idx,
-                        order_no=(res.get("pay") or {}).get("order"), card=res.get("card"))
+        order_no = (res.get("pay") or {}).get("order")
+        if combo_idx is not None:
+            PL.record_combo("현대Hmall", res.get("id"), combo_idx,
+                            order_no=order_no, card=res.get("card"))
+        else:
+            mf_path = Path(__file__).resolve().parent.parent / "cart" / "today_carts.json"
+            mf = json.loads(mf_path.read_text(encoding="utf-8"))
+            cart = next((c for c in mf.get("carts", [])
+                         if c.get("mall") in ("현대", "hmall") and c.get("account") == idx), None)
+            for it in (cart or {}).get("items", []):
+                PL.record_food("현대Hmall", res.get("id"), it.get("product"), qty=it.get("qty"),
+                               order_no=order_no, card=res.get("card"))
     except Exception as e:
         print(f"   [ledger] 기록 실패(무시): {e}", flush=True)
     return res
@@ -1787,7 +1802,8 @@ def resume(idx=None, max_steps: int = 50) -> dict:
             # ★주문서 재개도 정본 가드 통과 후 결제 (포인트→카드 금액일치, 2026-06-06).
             #   둘 다 멱등: 포인트 이미 사용/없음=skip, 카드 금액일치=skip — 재개 시 이중적용 없음.
             try:
-                FlowRunner(use_camera=False).run_action({"action": "hmall_use_all_points"})
+                if os.environ.get("HMALL_NO_POINTS") != "1":   # 적립구간 금액 유지 (buy_one과 동일)
+                    FlowRunner(use_camera=False).run_action({"action": "hmall_use_all_points"})
                 FlowRunner(use_camera=False).run_action({"action": "hmall_select_card_discount"})
             except Exception as e:
                 res["status"] = f"SELECT_CARD_FAIL(resume):{e}"; return res

@@ -83,7 +83,13 @@ def food_info(product_id) -> tuple:
         d = json.loads(TODAY_JSON.read_text(encoding="utf-8"))
         p = next((x for x in d.get("products", []) if str(x.get("id")) == str(product_id)), None)
         if not p:
-            return (None, None, None)
+            # today.json 미측정 상품(옵션 변형 등) — buy/products.json 이름만 폴백 (금액은 미상)
+            try:
+                prods = json.loads((ROOT / "buy" / "products.json").read_text(encoding="utf-8"))
+                name = (prods.get(str(product_id)) or {}).get("name")
+            except Exception:
+                name = None
+            return (name, None, None)
         pay = p.get("payment") or {}
         return (p.get("name"), pay.get("kakao_price"), pay.get("qty"))
     except Exception:
