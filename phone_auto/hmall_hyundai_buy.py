@@ -87,6 +87,13 @@ BC_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "bc_paybook_isp.json"  # BC(
 CARD_GRID_NAME = {"현대": "현대카드", "롯데": "롯데카드", "하나": "하나카드", "KB": "KB국민카드",
                   "삼성": "삼성카드", "NH": "NH농협카드", "BC": "비씨카드"}
 CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC", "삼성", "NH")   # 7개 전부 라이브검증 완료 (NH=PAYCO 경유, 2026-06-01)
+
+# ★현대카드 '일반 결제' 강제 계정 (2026-07-10 사용자 지시, 계정 ID 기준 — 인덱스는 바뀔 수 있음).
+#   skykow = 현대카드 앱카드 등록 계정: 캐러셀에서 현대카드 선택 시 결제수단이 '앱카드 결제'로
+#   자동선택됨 → 앱카드는 누적금액 임계 초과 시 현대카드 인증(자동화 불가)이 떠 PAY_FAIL 반복.
+#   → 주문서 결제수단 영역 [일반 결제|앱카드 결제] 탭에서 '일반 결제' 선택 후 진행이 정본.
+#   다른 계정은 이 탭 자체가 없음(비등록) — 기존 pay_hyundai(PIN) 경로 그대로. 식품·설화수 공통(단일 진입점).
+GENERAL_PAY_IDS = {"skykow"}
 # ⏳ 토스페이(간편결제 채널) 미구현 — 레포 루트 TOSS_PAY_NOTES.md 참고. PIN=dump 셔플(source=dump, 137601, FLAG_SECURE). 토스 할인날 라이브 작성+검증 권장. 카카오페이=타 폰 사용중이라 제외.
 
 # 카드할인 캐러셀 OCR 토큰 → 카드키 별칭.
@@ -163,6 +170,29 @@ def cap(path: str = "/tmp/_hd_buy.png") -> str:
     _CAP_N += 1
     subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=open(path, "wb"))
     return path
+
+
+def wake_screen() -> dict:
+    """★화면 preflight (2026-07-10 근본수정, 양 몰 공용): 절전으로 화면 OFF 면 screencap=완전검정
+    → OCR 전맹 → 모든 버튼 '미발견'으로 롯데 #11~14 가 4계정 연속 LOGOUT_FAIL 한 사고의 재발 방지.
+    WAKEUP → 키가드 있으면 dismiss-keyguard+스와이프(비보안만 풀림) → 여전히 잠김=보안잠금(adb 해제 불가)
+    → ok:False. 호출측(buy_one)은 즉시 중단하고 사용자 잠금해제 요청 (검은화면 헛돌기 금지).
+    판정 문자열은 SM-G9960 실측: 'mWakefulness=Awake' / KeyguardServiceDelegate 'showing=true'."""
+    def _sh(*args) -> str:
+        return subprocess.run(["adb", "shell", *args], capture_output=True, text=True).stdout
+    _sh("input", "keyevent", "224"); time.sleep(1.0)            # KEYCODE_WAKEUP
+    kg = "showing=true" in _sh("dumpsys", "window", "policy")
+    if kg:
+        _sh("wm", "dismiss-keyguard"); time.sleep(0.8)          # 비보안 키가드만 해제됨
+        _sh("input", "touchscreen", "swipe", "540", "2000", "540", "700", "250"); time.sleep(1.2)
+        _sh("input", "keyevent", "224"); time.sleep(0.5)        # 스와이프 중 재doze 대비
+        kg = "showing=true" in _sh("dumpsys", "window", "policy")
+    awake = "mWakefulness=Awake" in _sh("dumpsys", "power")
+    ok = awake and not kg
+    if not ok:
+        print(f"   ✗ [screen] 화면 사용불가 — awake={awake} 잠금={kg}. "
+              "보안잠금은 adb 로 못 풂 → 폰 직접 잠금해제 후 재실행", flush=True)
+    return {"ok": ok, "awake": awake, "keyguard": kg}
 
 
 def close_home_popup(max_iter: int = 4) -> int:
@@ -1411,6 +1441,73 @@ def pay_hyundai(pin: str = CARD_PIN) -> dict:
     return out
 
 
+def pay_hyundai_general() -> dict:
+    """★GENERAL_PAY_IDS(skykow) 전용 — 현대카드 **일반 결제** 경로 (2026-07-10).
+    실측(probe): 카드선택 직후 주문서에 결제수단 영역 노출 — '일반 결제'(303,593) / '앱카드 결제'(776,594),
+    앱카드 기본선택(the Red 4***...8387 카드 UI). 탭은 좌표 아닌 OCR로(레이아웃 드리프트 대비).
+    ⚠️ '결제하기' 이후 후속 화면은 라이브 미검증 — 아는 마커(PIN번호 결제/본인인증/주문완료)만 진행,
+    모르는 화면이면 OCR 텍스트 덤프 출력 후 안전 정지(err). 카드 인증 전 정지는 미결제라 재시도 안전."""
+    out = {"step": "general_tab"}
+    # 1) 결제수단 영역 '일반 결제' 탭 — 카드할인(700px) 아래에 있음 → 아래로 스크롤하며 탐색
+    #    (2026-07-10 1차 시도: 위로만 폴백해 미발견. 주문서 순서 = 카드할인 → 결제수단 → 총결제)
+    found = ocr_tap("일반 결제", contains=True, retries=2)
+    if not found:
+        adb = _adb()
+        for _ in range(5):
+            adb.swipe(540, 1800, 540, 900, 400); time.sleep(1.2)   # 아래로 스크롤
+            if ocr_tap("일반 결제", contains=True, retries=1):
+                found = True; break
+    if not found:
+        out["err"] = "'일반 결제' 탭 미발견 (아래 5스크롤 탐색 실패)"; return out
+    time.sleep(1.5)
+    out["step"] = "order_page"
+    # 2) 결제하기 (금액 버튼)
+    if not ocr_tap("결제하기", contains=True):
+        out["err"] = "결제하기(금액) 실패"; return out
+    # 3) 후속 화면 판별 — 아는 마커만 진행, 모르면 덤프+정지.
+    #    일반결제 선택 직후 재렌더로 첫 결제하기 탭이 미반영될 수 있음(2026-07-10 실측) → 주문서 그대로면 1회 재탭.
+    end = time.time() + 30
+    txt = ""
+    retapped = False
+    while time.time() < end:
+        txt = " ".join(x["text"] for x in _ocr_texts(cap()))
+        if any(k in txt for k in ("PIN번호 결제", "카드번호", "비밀번호", "안심", "생년월일", "본인 인증")) \
+           or ("주문" in txt and "완료" in txt):
+            break
+        if not retapped and "결제수단" in txt and "결제하기" in txt:
+            print("   [general] 주문서 그대로 — 결제하기 1회 재탭", flush=True)
+            ocr_tap("결제하기", contains=True)
+            retapped = True
+        time.sleep(0.5)
+    if "주문" in txt and "완료" in txt:
+        out["step"] = "paid_clicked"; return out            # 추가인증 없이 바로 완료된 경우
+    if "PIN번호 결제" in txt:
+        # 일반결제인데 SDK PIN 화면이 뜨는 변종 — 기존 pay_hyundai 후속(PIN 6자리)과 동일 처리
+        out["step"] = "pay_method"
+        if not ocr_tap("PIN번호 결제", contains=True):
+            out["err"] = "PIN번호 결제 선택 실패"; return out
+        if not wait_text("PIN번호를 입력", timeout=15):
+            out["err"] = "PIN 화면 미도달"; return out
+        _adb().tap(*PIN_DOT); time.sleep(1.3)
+        FlowRunner(use_camera=False).run_action(
+            {"action": "input_pin", "preset": "hyundai_hmall_pin6", "value": CARD_PIN,
+             "tap_delay_sec": 0.4, "use_camera": False})
+        time.sleep(0.8)
+        out["step"] = "pin_entered"
+        if not ocr_tap("확인"):
+            out["err"] = "PIN 확인 실패"; return out
+        if not wait_text("결제합니다", timeout=15) and not wait_text("결제하기", timeout=3):
+            out["err"] = "결제확인 화면 미도달"; return out
+        if not ocr_tap("결제하기", contains=True):
+            out["err"] = "최종 결제하기 실패"; return out
+        out["step"] = "paid_clicked"; return out
+    # 모르는 화면 — 덤프 출력 후 안전 정지 (여기서 flow 확장할 것)
+    print(f"   [general] 미지원 후속 화면 — OCR 덤프:\n{txt[:600]}", flush=True)
+    out["step"] = "post_pay_click"
+    out["err"] = "일반결제 후속 화면 미지원(덤프 확인 후 flow 확장 필요)"
+    return out
+
+
 def handle_after_pay(timeout: float = 30) -> str:
     """결제하기 후: 안전결제 팝업 확인 → 본인인증 자동입력 → 주문완료 판정.
     반환: 'ORDER_COMPLETE' | 'IDENTITY_FAIL' | 'AFTER_AUTH_UNKNOWN' | 'UNKNOWN'."""
@@ -1469,6 +1566,10 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None) -> 
     serial = hw._serial()
     res = {"idx": idx, "status": None, "combo_idx": combo_idx}
     print(f"\n{'='*54}\n[#{idx}] 앱 콜드런치 → 로그인...", flush=True)
+    ws = wake_screen()                      # ★절전/잠금 preflight (2026-07-10 검은화면 사고 재발방지)
+    if not ws["ok"]:
+        res["status"] = f"SCREEN_LOCKED(awake={ws['awake']},keyguard={ws['keyguard']}) — 폰 잠금해제 필요"
+        return res
 
     def _launch_and_login():
         hw.reset_to_main(serial)   # force-stop+콜드런치+8s 안정화 (CDP 준비, 꼬인 상태 원천제거)
@@ -1527,7 +1628,12 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None) -> 
     # 카드별 SDK ⚠️실돈
     print(f"[#{idx}] ⚠️ {use_card}카드 결제 실행", flush=True)
     if use_card == "현대":
-        pay = pay_hyundai()
+        # ★GENERAL_PAY_IDS(skykow): 앱카드 등록 계정 — '일반 결제' 탭 필수 (앱카드=인증벽. 식품·설화수 공통)
+        if (res.get("id") or "") in GENERAL_PAY_IDS:
+            print(f"[#{idx}] ★{res['id']} = 일반결제 강제 계정 → pay_hyundai_general", flush=True)
+            pay = pay_hyundai_general()
+        else:
+            pay = pay_hyundai()
         res["pay"] = pay
         if pay.get("err"):
             res["status"] = f"PAY_FAIL@{pay.get('step')}:{pay['err']}"; return res

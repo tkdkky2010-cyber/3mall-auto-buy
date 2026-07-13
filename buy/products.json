@@ -160,5 +160,12 @@
     "url_extra": "&sectId=3060687",
     "option_index": 1,
     "auto_coupon": true
+  },
+  "34": {
+    "name": "이디야 스페셜에디션 아메리카노 (9번 옵션2)",
+    "slitmCd": "2246603712",
+    "url_extra": "&sectId=3059445",
+    "option_index": 2,
+    "auto_coupon": true
   }
 }

@@ -26,7 +26,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 MANIFEST = ROOT / "cart" / "today_carts.json"
-PHONE_PY = os.environ.get("PHONE_PY", "/opt/homebrew/bin/python3")  # phone_auto (brew python, pyobjc/Vision)
+# phone_auto 인터프리터: pyobjc/Vision 필요. brew python3 심볼릭이 사라져(2026-07-10) 존재하는 것 폴백.
+PHONE_PY = os.environ.get("PHONE_PY") or next(
+    (p for p in ("/opt/homebrew/bin/python3", "/usr/bin/python3") if Path(p).exists()), sys.executable)
 BROWSER_PY = os.environ.get("BROWSER_PY", "python3")                # sulwhasoo PC (playwright)
 DELAY = int(os.environ.get("BUY_DELAY_SEC", "0"))                   # 결제 성공 사이 대기(추적회피 필요 시)
 
@@ -127,12 +129,12 @@ def apply_reward(cart: dict) -> None:
         "from playwright.sync_api import sync_playwright\n"
         f"acc=run.load_json(run.ACCOUNTS_FILE)['accounts'][{acct}-1]\n"
         "with sync_playwright() as p:\n"
-        " br=p.chromium.connect_over_cdp(run.CDP_ENDPOINT); ctx=br.contexts[0] if br.contexts else br.new_context(); page=ctx.new_page()\n"
+        # ★기존 탭 재사용 — 새 탭=macOS Chrome 창 포커스 강탈(2026-07-10). close 안 함.
+        " br=p.chromium.connect_over_cdp(run.CDP_ENDPOINT); ctx=br.contexts[0] if br.contexts else br.new_context(); page=ctx.pages[-1] if ctx.pages else ctx.new_page()\n"
         " run._hmall_clean(ctx,page,deep=True)\n"
         " ok=run.login(page,acc['id'],acc['pw']); print('login',ok)\n"
         f" for prmo in {prmos}:\n"
         "  print('HP', prmo, run.apply_hpoint(page,prmo))\n"
-        " page.close()\n"
     )
     try:
         r = subprocess.run([BROWSER_PY, "-c", code], cwd=str(ROOT), capture_output=True, text=True, timeout=180)

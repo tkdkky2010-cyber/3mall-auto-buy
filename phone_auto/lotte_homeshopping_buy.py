@@ -43,7 +43,7 @@ sys.path.insert(0, str(ROOT))
 from phone_auto import hmall_webview as hw
 # 공통 헬퍼 재사용 (OCR/tap/대기 — 앱 비종속). cap/_adb 는 ANDROID_SERIAL 고정 bare adb.
 from phone_auto.hmall_hyundai_buy import (
-    cap, _adb, ocr_find, ocr_tap, wait_text, screen_has, _resolve_serial, _wait_app,
+    cap, _adb, ocr_find, ocr_tap, wait_text, screen_has, _resolve_serial, _wait_app, wake_screen,
     CARD_ALIASES, CARD_GRID_NAME,
     _card_secrets, _tap_shuffle,        # 삼성 일반결제 공용 헬퍼 (hmall=정본, 양 몰 공용)
     pay_nh_general,                     # NH 일반결제 SDK(다른결제→일반결제→카드4칸→CVC→확인→6자리) — 몰 무관 공용
@@ -1317,6 +1317,10 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
     combo_idx=구매대장 기록용 조합번호(rate 시트에서 금액/조합명 조회). 미지정이면 금액 미상으로 기록."""
     res = {"idx": idx, "status": None}
     print(f"\n{'='*54}\n[#{idx}] 롯데홈쇼핑 구매 시작", flush=True)
+    ws = wake_screen()                      # ★절전/잠금 preflight (2026-07-10 #11~14 검은화면 LOGOUT_FAIL 재발방지)
+    if not ws["ok"]:
+        res["status"] = f"SCREEN_LOCKED(awake={ws['awake']},keyguard={ws['keyguard']}) — 폰 잠금해제 필요"
+        return res
     reset_lotte_app()
     dismiss_popups()
     if not logout():
@@ -1409,6 +1413,9 @@ def main() -> int:
         r = buy_one(i, card=card, combo_idx=combo_idx)
         results.append(r)
         print(f"[#{i}] → {r['status']}", flush=True)
+        if str(r["status"]).startswith("SCREEN_LOCKED"):   # 잠긴 폰에 나머지 계정 헛돌기 금지
+            print("[STOP] 폰 잠김 — 잠금해제 후 재실행 (나머지 계정 중단)", flush=True)
+            break
     print("\n===== 요약 =====")
     for r in results:
         b = r.get("beauty", {})

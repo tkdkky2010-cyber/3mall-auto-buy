@@ -1219,18 +1219,13 @@ def _cdp_alive(port: str) -> bool:
 def _hmall_logged_in(context) -> bool:
     """loginForm 진입 후 '로그아웃' 노출 여부로 Hmall 로그인 세션 판정 (raw 로그인은 하지 않음).
     로그인 상태면 loginForm 이 메인으로 리다이렉트되어 body 에 '로그아웃' 존재."""
-    pg = context.new_page()
+    pg = context.pages[-1] if context.pages else context.new_page()   # 기존 탭 재사용(포커스 강탈 방지) — close 안 함
     try:
         pg.goto(LOGIN_URL, wait_until="domcontentloaded")
         pg.wait_for_timeout(1200)
         return "로그아웃" in pg.inner_text("body")
     except Exception:
         return False
-    finally:
-        try:
-            pg.close()
-        except Exception:
-            pass
 
 
 def main() -> int:
@@ -1302,19 +1297,20 @@ def _is_crash_error(err: str | None) -> bool:
 
 
 def _fresh_page(context, old):
-    """죽은 page 닫고 같은 context에서 새 page 생성 (쿠키 유지 → 재로그인 불필요)."""
+    """죽은 page 닫고 같은 context의 다른 탭 재사용(없으면 새 탭). 쿠키 유지 → 재로그인 불필요.
+    새 탭 생성은 macOS 창 포커스 강탈이라 가급적 기존 탭 재사용(2026-07-10)."""
     try:
         old.close()
     except Exception:
         pass
-    return context.new_page()
+    return context.pages[-1] if context.pages else context.new_page()
 
 
 def _run(context, acc, acc_idx: int = 1) -> int:
-    page = context.new_page()
+    # ★기존 탭 재사용 — 새 탭=macOS Chrome 창 포커스 강탈(2026-07-10). close 안 함.
+    page = context.pages[-1] if context.pages else context.new_page()
     if not login(page, acc["id"], acc["pw"]):
         print(f"[FATAL] 로그인 실패")
-        page.close()
         return 1
     print(f"[OK] 로그인")
 

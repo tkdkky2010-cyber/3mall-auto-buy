@@ -587,7 +587,7 @@ def _read_mypage_paid_count(page: Page) -> int | None:
             except Exception:
                 continue
         if target is None:
-            target = ctx.new_page()
+            target = ctx.pages[-1] if ctx.pages else ctx.new_page()   # 기존 탭 재사용(포커스 강탈 방지)
         target.goto("https://www.hmall.com/mo/mpf/selectMyPageMain",
                   wait_until="domcontentloaded", timeout=15000)
         target.wait_for_timeout(2000)
@@ -654,7 +654,9 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
     같은 계정의 여러 product 를 clear 1회 후 누적으로 담는다.
     """
     print(f"\n=== #{idx} {account['id']} — 담을 상품 {len(items)}개 (PC 카트 담기) ===")
-    page = context.new_page()
+    # ★새 탭(new_page)=macOS Chrome 창 포커스 강탈 → 기존 탭 재사용 (2026-07-10, sulwhasoo 롯데 패턴).
+    #   계정마다 login()이 logout+재로그인, _hmall_clean이 상태 정리 → 탭 유지해도 안전(close 안 함).
+    page = context.pages[-1] if context.pages else context.new_page()
 
     if cdp_mode:
         _hmall_clean(context, page)
@@ -668,8 +670,7 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
 
     if not logged_in:
         print(f"  [SKIP] #{idx} {account['id']} — 로그인 실패")
-        page.close()
-        return (0, len(items), False, None)
+        return (0, len(items), False, None)   # 탭 재사용 — close 안 함(포커스 강탈 방지)
 
     # run.py = 현대몰 PC 장바구니 채우기 전용. 결제는 buy.py → 폰 앱 인앱(현대=hmall_hyundai_buy).
     # clear 1회 → plan 전 상품 누적 담기 (checkout/결제 없음).
@@ -684,8 +685,7 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
         if ci < len(items):
             page.wait_for_timeout(3000)
     print(f"  ✓ #{idx} {account['id']} 담기 {success}/{len(items)}")
-    page.close()
-    return (success, len(items), True, None)
+    return (success, len(items), True, None)   # 탭 재사용 — close 안 함(포커스 강탈 방지)
 
 
 def main() -> int:

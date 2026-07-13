@@ -304,7 +304,7 @@ def main(argv=None):
     with sync_playwright() as pw:
         browser = pw.chromium.connect_over_cdp(CDP_ENDPOINT, timeout=20000)
         context = browser.contexts[0] if browser.contexts else browser.new_context()
-        page = context.new_page()
+        page = context.pages[-1] if context.pages else context.new_page()   # 기존 탭 재사용(포커스 강탈 방지)
         page.set_default_timeout(25000)
 
         # 로그인 검증
