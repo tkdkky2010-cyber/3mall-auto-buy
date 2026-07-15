@@ -1,11 +1,25 @@
-# 토스페이(Toss Pay) 결제 경로 노트 — 2026-06-01 탐색 (실결제 X, 비할인날 단독경로만 관찰)
+# 토스페이(Toss Pay) 결제 경로 노트 — 2026-06-01 탐색 + **2026-07-15 pay_toss 코드화·라이브검증 완료(#7)**
 
-> ## ⏩ 다음 세션 빠른 시작 (토스페이 할인 떴을 때)
-> 1. **pay_toss는 아직 코드 없음** → NH처럼 **그날 라이브로 작성+검증**. 아래 경로 그대로 따르면 됨.
-> 2. **PIN은 반드시 `input_pin source=dump`** (토스 PIN화면=FLAG_SECURE라 screencap 검정, dump만 됨). **숫자좌표 하드코딩 절대 금지(셔플)**. PIN=137601.
-> 3. 토스앱 결제화면은 screencap OK(OCR 가능), PIN화면만 dump. 토스앱 패키지 `viva.republica.toss`.
-> 4. 할인날엔 캐러셀이 토스페이+카드 자동선택 → 토스앱 진입 후 바로 `결제하기`→PIN. (오늘 본 비할인 단독경로는 토스앱서 카드 직접선택 단계가 더 있음 — 아래 참고)
-> 5. 막히면 탐색도구 재사용: `python3 -m phone_auto._toss now|tap x y|swipe|back` (캡처+OCR).
+> ## ✅ 구현 완료 (2026-07-15) — 다음 토스 할인날엔 그냥 `python3 buy.py 현대 N` (자동)
+> `phone_auto/hmall_hyundai_buy.py`의 **`detect_card`(토스 우선인식) + `_select_toss_card` + `pay_toss`** 로
+> end-to-end 자동. buy_one 이 당일카드=토스 감지하면 자동 라우팅. #7 라이브 완주(결제+완료탭+적립).
+>
+> **★대전제: 토스앱(`viva.republica.toss`)이 로그인돼 있어야 함.** 미로그인이면 게스트 본인확인
+> (휴대폰번호+SMS/PASS)이 떠 **자동화 불가** → pay_toss가 `CertifyGuest`/'휴대폰 번호' 감지해 안전정지(미결제).
+> 세션 전 토스앱 열어 로그인 확인(잠금 PIN=137601로 열림 = 로그인 상태). 카드=토스 기본카드(현재 Amex) 그대로 결제.
+>
+> **검증된 전체 경로 (결합 할인날, 2026-07-15)**:
+> ```
+> 주문서 카드할인 '토스페이 삼성 N% 즉시할인' 카드박스 직접 탭(_select_toss_card; 700px 캐러셀 정본은
+>   토스 레이아웃 미지원 '캐러셀 None' → 카드박스 탭 + 결제버튼금액==토스카드금액/‘적용되었어요’ 토스트 검증)
+> → 원 결제하기(OCR) → 토스 '결제진행' 화면 '다음'(OCR) → 토스앱 OnlinePayActivity(screencap O=OCR)
+> → '결제하기'(OCR) → PIN PasswordActivity(FLAG_SECURE, 셔플, **text="N" 노드** → `input_pin source=text_dump` 137601)
+> → ★OnlinePayApproveCompleteActivity '현대Hmall에서 결제를 완료해주세요' → **'완료' 탭**(안 누르면 카드 승인됐는데
+>   hmall 주문 미생성!) → hmall 복귀 = 주문완료. 이후 buy_one 공통(wait_order_complete + 적립).
+> ```
+> - **PIN은 `source=text_dump`** (❌`dump`=content-desc 아님). 토스 셔플 키패드 숫자는 `text` 노드. PIN=137601.
+> - '토스페이 삼성 N%'의 '삼성'은 hmall-side 프로모명일 뿐 — 실제 청구는 토스 기본카드(Amex)이고 7%는 그대로 적용됨(#11 실측).
+> - 취소: 토스 화면 back → '결제 취소할까요?' → '결제 취소' → hmall 복귀(미결제, 카트 보존).
 
 토스페이 = **간편결제 채널**이 신용카드를 감싸는 방식 (직접 카드 아님). 카카오페이는 다른 폰에서 사용 중이라 제외, 토스만 사용.
 
@@ -41,7 +55,10 @@
 ## 취소 방법 (탐색/중단 시)
 토스 결제화면에서 back → `결제 취소할까요?` 다이얼로그 → **`결제 취소`** 탭 → hmall 복귀(결제 안 됨, 카트 보존).
 
-## pay_toss 구현 시 (TODO — 실제 토스 할인날 라이브 검증 권장, NH처럼)
-- 결합 할인날 캐러셀 자동선택 경로는 **미검증**(오늘 비할인이라 단독만 봄). 할인날 첫 런에서 검증.
-- 뼈대: 원결제하기(OCR) → '다음'(OCR/dump) → `_wait_app('viva.republica.toss')` → (할인날=카드 사전선택됨) `결제하기`(OCR) → PIN `input_pin source=dump` 137601 → hmall 복귀 `wait_order_complete` → 뷰티.
-- 비할인날 단독 테스트 시엔 `결제수단 변경·설정`에서 카드 선택 스텝 추가 필요.
+## pay_toss 구현 완료 (2026-07-15, 라이브검증 #7) — 위 '✅ 구현 완료' 박스가 정본
+실제 코드(`phone_auto/hmall_hyundai_buy.py` `pay_toss`/`_select_toss_card`/`detect_card` 토스분기,
+`flow_runner.py` `input_pin source=text_dump`, `hmall_webview.py` `_webview_socket` hmall PID 우선)로 구현·검증.
+- 2026-06-01 탐색 때 예상했던 것과 다른 실측 3건: ① 할인날 캐러셀은 **자동선택 안 됨**(카드박스 직접 탭 필요),
+  ② PIN이 content-desc 아닌 **text 노드**(text_dump), ③ PIN 뒤 **'완료' 탭**(승인완료 화면)이 있어야 hmall 주문 생성.
+- ⚠️ 실패사례: `_webview_socket`이 카드앱(KB 등) 백그라운드 웹뷰 소켓을 먼저 잡아 login 타임아웃 → hmall PID 우선으로 fix.
+  `_select_toss_card` btn/toss 금액 OCR 실패 시 SELECT_CARD_FAIL(transient) → **재시도로 해결**(#10 실측).
