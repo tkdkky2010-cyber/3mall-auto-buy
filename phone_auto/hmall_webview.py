@@ -114,10 +114,19 @@ def _dump(serial: str) -> str:
 
 def _webview_socket(serial: str) -> str:
     out = _sh(serial, "shell", "cat", "/proc/net/unix")
-    for ln in out.splitlines():
-        if "webview_devtools_remote_" in ln:
-            return ln.strip().split()[-1].lstrip("@")
-    raise RuntimeError("webview_devtools 소켓 없음 — hmall 앱 foreground 확인")
+    socks = [ln.strip().split()[-1].lstrip("@") for ln in out.splitlines()
+             if "webview_devtools_remote_" in ln]
+    if not socks:
+        raise RuntimeError("webview_devtools 소켓 없음 — hmall 앱 foreground 확인")
+    # ★카드앱(KB/삼성 등)이 백그라운드 웹뷰로 devtools 소켓을 동시에 열면(이전 결제 잔여)
+    #   첫 매칭이 카드앱 빈 웹뷰라 CDP 타겟 0개 → login 타임아웃(2026-07-15 실측: KB카드 21688).
+    #   소켓명 뒤 숫자 = 프로세스 PID → hmall(com.hmallapp) PID 소켓을 우선 선택.
+    pids = _sh(serial, "shell", "pidof", HMALL_PKG).strip().split()
+    for pid in pids:
+        want = f"webview_devtools_remote_{pid}"
+        if want in socks:
+            return want
+    return socks[0]
 
 
 def _forward(serial: str) -> None:

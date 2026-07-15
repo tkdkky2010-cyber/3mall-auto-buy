@@ -26,6 +26,9 @@ from _common import (
 
 import os as _os
 _LOTTE_PORT = _os.environ.get("RATE_CHECK_CDP_PORT", "9222")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from chrome_launcher import ensure_chrome
+ensure_chrome(int(_LOTTE_PORT))  # 9222 안 떠있으면 구글로그인 CFT 자동 launch
 opts = Options()
 opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{_LOTTE_PORT}")
 _svc = matched_chromedriver_service(_LOTTE_PORT)  # 버전 mismatch 회피
@@ -43,6 +46,12 @@ def block_dialogs():
 # 7개 상품: 쿠폰 + 첫 상품에서 카드할인
 coupons = {}
 card_info = None
+
+# 세션 워밍 — goods 딥링크로 직행하면 WAF가 403(콜드 세션) 반환.
+# 홈을 먼저 찍어 쿠키/세션을 확보해야 goods 페이지가 200으로 열림.
+driver.get("https://www.lotteimall.com/main/viewMain.lotte")
+time.sleep(2)
+block_dialogs()
 
 for code in 'bcdefgh':
     goods = IDS[code]['lotte']

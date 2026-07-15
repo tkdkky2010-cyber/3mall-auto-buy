@@ -1110,12 +1110,11 @@ def write_to_sheet(results: list[dict], date_str: str, acc_idx: int = 1) -> bool
     max_tiers = max(((len(r.get("tiers") or []) + len(r.get("simple_ranges") or [])) for r in results), default=0)
 
     section_title = [f"현대Hmall 10% 적립 체크 ({tab_candidates[0]}) — {len(results)}개 상품"]
-    headers = ["#", "제품명", "10%적립", "적립 문구", "쿠폰",
+    headers = ["#", "제품명", "URL", "10%적립", "적립 문구", "쿠폰",
                "수량", "혜택가",
                "즉시할인가", "실비(= 즉시할인가 × 카드페이백계수 − 적립금)"]
     headers += ["행사종료"]
     headers += [f"구간{i+1}" for i in range(max_tiers)]
-    headers += ["URL"]
 
     def _fmt(v):
         return f"{v:,}" if isinstance(v, (int, float)) and v else ""
@@ -1148,8 +1147,8 @@ def write_to_sheet(results: list[dict], date_str: str, acc_idx: int = 1) -> bool
             sr_cells = [f"{sr['min_won']:,}원 ~ {sr['max_won']:,}원 {sr['pct']}%적립" for sr in sr_list]
             tier_cells = sr_cells + tier_cells
             tier_cells += [""] * (max_tiers - len(tier_cells))
-        rows.append([str(r["id"]), r["name"], ten, phrase, coupon,
-                     qty_s, lp_s, imm_s, real_s, event_end_s] + tier_cells + [r.get("url", "")])
+        rows.append([str(r["id"]), r["name"], r.get("url", ""), ten, phrase, coupon,
+                     qty_s, lp_s, imm_s, real_s, event_end_s] + tier_cells)
 
     payload = [section_title] + [headers] + rows
     n_cols = len(headers)

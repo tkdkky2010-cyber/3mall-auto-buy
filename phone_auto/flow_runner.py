@@ -937,6 +937,29 @@ class FlowRunner:
                     self._log(f"  [{_i}/{len(value)}] tap '{_d}' @ ({_x},{_y})"); time.sleep(delay)
                 self.use_camera = _saved_use_camera
                 return
+            # source=="text_dump": text 기반 셔플 키패드 (토스 PasswordActivity — 숫자칸이 content-desc
+            #   아닌 text="N" 노드, 2026-07-15 실측). dump 와 동일하되 text 속성으로 매핑. FLAG_SECURE 무관(dump O).
+            if action.get("source") == "text_dump":
+                import subprocess as _sp, xml.etree.ElementTree as _ET, re as _re3
+                _sp.run(["adb","exec-out","uiautomator","dump","--compressed","/sdcard/_kp.xml"], capture_output=True)
+                _sp.run(["adb","pull","/sdcard/_kp.xml","/tmp/_kp.xml"], capture_output=True)
+                _BD = _re3.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
+                ks = {}
+                for n in _ET.parse("/tmp/_kp.xml").getroot().iter():
+                    tt = (n.attrib.get("text","") or "").strip()
+                    if tt.isdigit() and len(tt) == 1:
+                        mm = _BD.match(n.attrib.get("bounds",""))
+                        if mm:
+                            x1,y1,x2,y2 = map(int, mm.groups()); ks[tt] = ((x1+x2)//2, (y1+y2)//2)
+                need = set(value)
+                if not need.issubset(ks.keys()):
+                    raise FlowError(f"input_pin(text_dump): text 키패드 부족 (got {sorted(ks)}, need {sorted(need)})")
+                self._log(f"input_pin(text_dump) text {len(ks)}/10 매핑 → {len(value)}자리 연속탭 (셔플 무관)")
+                for _i, _d in enumerate(value, 1):
+                    _x, _y = ks[_d]; self.adb.tap(_x, _y)
+                    self._log(f"  [{_i}/{len(value)}] tap '{_d}' @ ({_x},{_y})"); time.sleep(delay)
+                self.use_camera = _saved_use_camera
+                return
             # source=="sequential_logo": 숫자 1~0 순서 고정 + 로고 decoy 키패드 (하나 nFilter).
             # 로고칸만 밝기로 검출, 나머지 칸에 순서대로 매핑 — OCR 숫자값 안 읽음(8↔0 혼동 회피).
             if action.get("source") == "sequential_logo":

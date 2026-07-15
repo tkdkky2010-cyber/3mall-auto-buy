@@ -86,7 +86,7 @@ BC_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "bc_paybook_isp.json"  # BC(
 # 카드사 → '카드 선택' 그리드 표기명 (카드할인 행 토큰은 키, 그리드명은 값). 결제 SDK 있는 카드만 활성.
 CARD_GRID_NAME = {"현대": "현대카드", "롯데": "롯데카드", "하나": "하나카드", "KB": "KB국민카드",
                   "삼성": "삼성카드", "NH": "NH농협카드", "BC": "비씨카드"}
-CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC", "삼성", "NH")   # 7개 전부 라이브검증 완료 (NH=PAYCO 경유, 2026-06-01)
+CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC", "삼성", "NH", "토스")   # +토스페이(2026-07-15, 토스앱 로그인 전제 PIN)
 
 # ★현대카드 '일반 결제' 강제 계정 (2026-07-10 사용자 지시, 계정 ID 기준 — 인덱스는 바뀔 수 있음).
 #   skykow = 현대카드 앱카드 등록 계정: 캐러셀에서 현대카드 선택 시 결제수단이 '앱카드 결제'로
@@ -94,7 +94,9 @@ CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC", "삼성", "NH")   #
 #   → 주문서 결제수단 영역 [일반 결제|앱카드 결제] 탭에서 '일반 결제' 선택 후 진행이 정본.
 #   다른 계정은 이 탭 자체가 없음(비등록) — 기존 pay_hyundai(PIN) 경로 그대로. 식품·설화수 공통(단일 진입점).
 GENERAL_PAY_IDS = {"skykow"}
-# ⏳ 토스페이(간편결제 채널) 미구현 — 레포 루트 TOSS_PAY_NOTES.md 참고. PIN=dump 셔플(source=dump, 137601, FLAG_SECURE). 토스 할인날 라이브 작성+검증 권장. 카카오페이=타 폰 사용중이라 제외.
+# 토스페이(간편결제 채널) = pay_toss (2026-07-15 라이브 작성). ★토스앱(viva.republica.toss) 로그인 전제 —
+#   미로그인이면 게스트 본인확인(휴대폰번호+SMS/PASS)이 떠 자동화 불가(pay_toss가 감지해 안전정지).
+#   PIN=dump 셔플(source=dump, 137601, FLAG_SECURE). 카카오페이=타 폰 사용중이라 제외. 상세=TOSS_PAY_NOTES.md.
 
 # 카드할인 캐러셀 OCR 토큰 → 카드키 별칭.
 # 근거(실측): 현대 할인날 캐러셀 = "현대 5% 즉시할인" + "<금액>원"(별 item). 금액은 카트 합계에 따라 매번
@@ -112,6 +114,7 @@ CARD_ALIASES = {
     "삼성": "삼성",
     "NH농협": "NH", "NH": "NH", "농협": "NH",                        # NH/농협 변형
     "BC": "BC", "비씨": "BC", "페이북": "BC",                         # BC/비씨/페이북 변형
+    "토스페이": "토스", "토스": "토스",                                # 토스페이(간편결제, 카드감쌈) — detect_card 특수처리도 있음
     # 아래는 SDK 미구현(CARDS_SUPPORTED 아님) — detect는 되되 UNSUPPORTED_CARD로 안전 정지(현대 오폴백 방지)
     "신한": "신한", "우리": "우리",
 }
@@ -807,6 +810,76 @@ def pay_hana() -> dict:
     return out
 
 
+def _toss_dump() -> str:
+    """토스앱(viva.republica.toss) 화면 텍스트 — FLAG_SECURE라 screencap 검정, uiautomator dump는 됨."""
+    try:
+        return hw._dump(hw._serial())
+    except Exception:
+        return ""
+
+
+def pay_toss(pin: str = CARD_PIN) -> dict:
+    """토스페이(삼성 등 신용카드를 감싸는 간편결제) — 토스페이 선택된 주문서에서 호출.
+    ★토스앱(viva.republica.toss) 로그인 전제. 미로그인이면 게스트 본인확인(휴대폰번호+SMS/PASS)이 떠
+      자동화 불가 → 감지 즉시 안전정지(err, 카드인증 전이라 미결제 = 재시도 안전).
+    경로(2026-07-15 라이브): (원)결제하기(OCR) → 토스 '결제진행' 화면 '다음'(OCR) → 토스앱 진입 →
+      (로그인) 결제하기(OCR) → PIN 6자리(dump 셔플, FLAG_SECURE, 137601) → hmall 복귀.
+    주문완료 검증/뷰티는 buy_one(wait_order_complete) 공통. TOSS_OBSERVE=1 이면 토스앱 진입 후 dump만 찍고 정지."""
+    out = {"step": "order_page"}
+    if not ocr_tap("결제하기", contains=True):                   # 1) 원 결제하기 (hmall WebView OCR)
+        out["err"] = "원결제하기 실패"; return out
+    if not wait_text("다음", timeout=15):                        # 2) 토스 '결제진행' 화면('다음' 버튼)
+        out["err"] = "토스 결제진행(다음) 화면 미도달"; return out
+    if not ocr_tap("다음", contains=True):
+        out["err"] = "다음 탭 실패"; return out
+    out["step"] = "toss_next"
+    if not _wait_app("viva.republica.toss", timeout=20):        # 3) 토스앱 진입
+        out["err"] = "토스앱 미진입"; return out
+    time.sleep(3.5)                                              # 토스앱 로딩(결제확인/PIN 렌더)
+    scr = _toss_dump()
+    # 4) 게스트 본인확인 = 토스앱 미로그인 → SMS/PASS 필요(자동화 불가). 안전정지.
+    if any(k in scr for k in ("본인\xa0확인", "본인 확인", "휴대폰\xa0번호", "휴대폰 번호", "CertifyGuest")):
+        out["step"] = "toss_guest"
+        out["err"] = "토스 게스트 본인확인 화면 — 토스앱 로그인 필요(자동화 불가)"; return out
+    out["step"] = "toss_app"
+    # ★관찰 모드: 로그인 후 첫 검증 시 토스 결제/PIN 화면 구조 확인용 — dump 출력 후 정지(미결제).
+    if os.environ.get("TOSS_OBSERVE") == "1":
+        print(f"[TOSS_OBSERVE] toss screen dump head:\n{scr[:1800]}", flush=True)
+        out["err"] = "TOSS_OBSERVE stop (관찰 전용, 미결제)"; return out
+    # 5) 토스 결제확인(OnlinePayActivity, screencap O=OCR) '결제하기'(기본선택 카드 그대로 = Amex) → PIN 화면
+    if not ocr_tap("결제하기", contains=True, retries=4):
+        out["err"] = "토스앱 결제하기 미발견"; return out
+    out["step"] = "toss_pay_clicked"
+    # 6) PIN 화면(PasswordActivity, FLAG_SECURE=screencap 검정) 대기 → text_dump 셔플 137601
+    #    (토스 키패드 숫자는 text="N" 노드라 content-desc dump 아닌 text_dump)
+    end = time.time() + 14
+    while time.time() < end and "비밀번호" not in _toss_dump():
+        time.sleep(0.8)
+    try:
+        FlowRunner(use_camera=False).run_action(
+            {"action": "input_pin", "value": pin, "source": "text_dump"})
+    except Exception as e:
+        out["err"] = f"토스 PIN 입력 실패: {e}"; return out
+    out["step"] = "pin_entered"
+    # 6b) ★토스 승인완료(OnlinePayApproveCompleteActivity) '현대Hmall에서 결제를 완료해주세요' → '완료' 탭.
+    #     이 완료를 안 누르면 카드는 승인됐는데 hmall 주문이 최종 생성 안 됨(2026-07-15 #2 실측: 카드
+    #     94,005원 승인됐으나 주문 미생성 → 수동 완료 필요했음). 필수 단계.
+    for _ in range(22):
+        if _wait_app("com.hmallapp", timeout=1):                # 이미 hmall 자동복귀했으면 완료 불요
+            break
+        if "완료해주세요" in _toss_dump():                        # 승인완료 화면(OCR 가능=screencap O)
+            if not ocr_tap("완료", pick="bottom", retries=2):    # 하단 '완료' 버튼(제목 '완료해주세요' 아님)
+                _adb().tap(540, 2130)                           # OCR 실패 폴백(고정좌표 [476,2084][604,2177])
+            time.sleep(2.5)
+            break
+        time.sleep(1.0)
+    out["step"] = "toss_complete"
+    if not _wait_app("com.hmallapp", timeout=20):               # 7) hmall 복귀 = 주문 최종생성
+        out["err"] = "hmall 복귀 실패(PIN/완료 확인 필요)"; return out
+    out["ok"] = True
+    return out
+
+
 def pay_bc() -> dict:
     """BC카드(페이북/KCP) SDK (라이브검증 2026-06-01 #3 주문 20260601059538, 490,000원 비씨카드 일시불 + 뷰티 적립완료)
     — **비씨카드 선택된 주문서에서 호출**. 주문완료까지. (롯데/하나와 동일 패턴)
@@ -1350,6 +1423,12 @@ def detect_card() -> str | None:
                           for it in region)
             if not has_amt:
                 return None
+            # ★토스페이(삼성 등 카드 감싸는 간편결제): 카드명 행("토스페이 삼성")과 금액 행("267,189원")이
+            #   cy 40px 넘게 떨어져 아래 same-row 매칭에서 누락됨(2026-07-15 실측 DETECT_CARD_FAIL).
+            #   영역에 '토스' 있으면 우선 반환 — '삼성' substring보다 먼저(토스페이는 삼성카드 직접결제
+            #   pay_samsung 와 경로가 완전히 다름 → 반드시 '토스'로 분기해야 함).
+            if any("토스" in it["text"] for it in region):
+                return "토스"
             # ⚠️ OCR이 '현대 5% 즉시할인'과 '255,968원'을 별도 item으로 쪼갤 수 있음 → 영역 전체에서
             #    카드사 토큰 검색(위=첫번째 당일카드). 금액 item엔 카드명 없음(#4 실측).
             # ⚠️ 단, 금액 없는 행은 제외 — '현대홈쇼핑 현대카드 Ed2 7% 청구할인 >' 이벤트 안내 행에서
@@ -1369,11 +1448,47 @@ def detect_card() -> str | None:
     return None
 
 
+def _select_toss_card() -> dict:
+    """주문서 '카드할인'에서 '토스페이' 카드 선택. 700px 캐러셀 정본은 토스 레이아웃 미지원
+    (2026-07-15 실측: '캐러셀 None' → 검증 실패) → 토스 카드 박스 직접 탭 + 결제버튼 금액==토스카드 금액
+    검증(#6/#11 실측). 이미 선택돼 있으면 탭 안 함(토글 보호). 최대 4회(스크롤 포함)."""
+    def _won(t):                                    # 천단위 콤마 숫자 (OCR이 '94,005'와 '원'을 분리하므로 원 불요)
+        m = re.search(r"(\d{1,3}(?:,\d{3})+)", t)
+        return int(m.group(1).replace(",", "")) if m else None
+
+    def _read(its):
+        toss = next((it for it in its if "토스페이" in it["text"] and it["cy"] < 2050), None)
+        btn = next((it for it in its if "결제하기" in it["text"]), None)
+        btn_amt = _won(btn["text"]) if btn else None
+        toss_amt = None
+        if toss:                                    # 토스 카드 박스 안(아래 240px, 같은 열)의 금액
+            near = [_won(it["text"]) for it in its
+                    if _won(it["text"]) and toss["cx"] - 280 < it["cx"] < toss["cx"] + 320
+                    and toss["cy"] < it["cy"] < toss["cy"] + 240]
+            toss_amt = next((a for a in near if a), None)
+        toast = any("적용되" in it["text"] for it in its)   # '…즉시할인이 적용되었어요' 토스트
+        return toss, btn_amt, toss_amt, toast
+
+    toss = btn_amt = toss_amt = None
+    for attempt in range(1, 5):
+        toss, btn_amt, toss_amt, toast = _read(_ocr_texts(cap()))
+        if not toss:                                # 카드할인 안 보이면 스크롤 다운
+            _adb().swipe(540, 1700, 540, 900, 400); time.sleep(0.8); continue
+        if btn_amt and toss_amt and btn_amt == toss_amt:   # 결제금액=토스카드금액 = 선택됨
+            return {"ok": True, "amt": btn_amt, "via": "already" if attempt == 1 else "tap"}
+        if toast and attempt > 1:                    # 탭 후 '적용되었어요' 토스트 = 선택 성공(금액 OCR 실패 대비)
+            return {"ok": True, "amt": btn_amt, "via": "toast"}
+        _adb().tap(toss["cx"], toss["cy"] + 90); time.sleep(1.8)   # 카드 박스 탭(텍스트 아래 = 카드 중앙)
+    return {"ok": False, "err": f"토스 카드 선택/검증 실패 (btn={btn_amt} toss={toss_amt})"}
+
+
 def select_card(card: str, day: str | None = None) -> dict:
     """결제수단을 card로 설정. 당일 할인카드면 캐러셀(할인 적용), 아니면 그리드(할인 없음).
     당일카드는 캐러셀로(메모리: 굳이 그리드 우회 X — 오류↑). day=호출측이 감지한 당일카드(중복 감지 회피)."""
     if day is None:
         day = detect_card()
+    if card == "토스":                    # 토스페이 = 전용 셀렉터(700px 캐러셀 미지원, 카드박스 직접 탭)
+        return _select_toss_card()
     grid_name = CARD_GRID_NAME.get(card, card + "카드")
     if day == card:
         # ★당일카드 = 700px 정본(flow_runner hmall_select_card_discount, 식품 flow와 동일):
@@ -1676,6 +1791,11 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None) -> 
         res["pay"] = np_
         if not np_.get("ok"):
             res["status"] = f"NH_FAIL@{np_.get('step')}:{np_.get('err')}"; return res
+    elif use_card == "토스":
+        tp = pay_toss()                 # 토스페이(간편결제) — 토스앱 로그인 전제 PIN. 게스트 본인확인 뜨면 안전정지.
+        res["pay"] = tp
+        if not tp.get("ok"):
+            res["status"] = f"TOSS_FAIL@{tp.get('step')}:{tp.get('err')}"; return res
     lap(f"{use_card} 결제 → 주문완료")
     # 주문완료 확인 (공통, 전 카드): orderComplete 렌더 대기 = ① beauty 타이밍 확보(KB) ② 거절 감지(BC 한도초과)
     oc = wait_order_complete(timeout=20)

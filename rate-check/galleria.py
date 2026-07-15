@@ -29,7 +29,9 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 import _common as C
+from chrome_launcher import ensure_chrome
 
 PENDING_EXIT = 2
 
@@ -40,6 +42,7 @@ GALLERIA_URL = "https://www.galleria.co.kr/goods/initDetailGoods.action?goods_no
 # Selenium attach
 # ============================================================
 def attach_chrome() -> webdriver.Chrome:
+    ensure_chrome(C.CDP_PORT)  # 9222 안 떠있으면 구글로그인 CFT 자동 launch
     opts = Options()
     opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{C.CDP_PORT}")
     svc = C.matched_chromedriver_service(C.CDP_PORT)  # 버전 mismatch 회피 (_common 참조)

@@ -31,7 +31,7 @@ def _ensure_tab(endpoint: str) -> None:
         pass
 
 
-def ensure_chrome(port: int = 9222, timeout: int = 15) -> None:
+def ensure_chrome(port: int = 9222, timeout: int = 30) -> None:
     """CDP {port} 안 떠있으면 launch 스크립트 자동 호출. 떠있으면 탭 ≥1 보장."""
     endpoint = f"http://127.0.0.1:{port}"
     try:
