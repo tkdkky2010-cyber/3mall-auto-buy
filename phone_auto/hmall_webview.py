@@ -19,6 +19,9 @@ CLI:
     python3 -m phone_auto.hmall_webview login <idx>   # N번 계정 로그인 (logout→nav→CDP)
     python3 -m phone_auto.hmall_webview logout
     python3 -m phone_auto.hmall_webview cart           # 현재 계정 장바구니 empty 여부
+    python3 -m phone_auto.hmall_webview points         # 아이디별 H.Point 보유 잔액 파악(전 계정)
+    python3 -m phone_auto.hmall_webview points 1 3 5   # 지정 계정만
+    python3 -m phone_auto.hmall_webview points here    # 재로그인 없이 현재 로그인 계정만
 """
 from __future__ import annotations
 import json
@@ -381,6 +384,87 @@ def cart_state(serial: str | None = None) -> dict:
         cdp.close()
 
 
+# ──────────────────────────── H.Point 잔액 조회 ────────────────────────────
+# 현대몰 포인트는 결제 시 flow_runner 가 '전액사용'으로 무조건 소진(READ_FIRST §체크아웃).
+# 이 함수는 **소진 전 아이디별 보유 잔액**을 마이홈에서 읽어 파악하는 용도(읽기전용, 결제 안 함).
+HPOINT_URLS = [
+    "https://www.hmall.com/mo/mma/myhome",          # 마이홈 요약(H.Point 노출)
+    "https://www.hmall.com/mo/mpf/selectMyPageMain",  # 폴백: 마이페이지 메인
+]
+
+import re as _re
+
+# 'H.Point'/'H포인트' 라벨 뒤 15자 이내 첫 숫자([\d,]) — 라벨과 값 사이 개행/공백/원·P 허용.
+_HP_LABEL = _re.compile(r"H\.?\s*[Pp]oint|H\s*포인트|에이치\s*포인트")
+_HP_NUM = _re.compile(r"([\d]{1,3}(?:,[\d]{3})*|[\d]+)\s*(?:P|p|점|원)?")
+
+
+def _parse_hpoint(body: str):
+    """마이홈 body innerText 에서 H.Point 보유액 파싱. (point:int|None, raw:str) 반환.
+    라벨('H.Point'/'H포인트') 직후 첫 숫자를 잔액으로 본다. 못 찾으면 point=None + 라벨주변 raw."""
+    m = _HP_LABEL.search(body)
+    if not m:
+        return None, ""
+    tail = body[m.end():m.end() + 40]                 # 라벨 뒤 40자 안에서 숫자 탐색
+    raw = body[max(0, m.start() - 10):m.end() + 40].replace("\n", " ⏎ ").strip()
+    nm = _HP_NUM.search(tail)
+    if not nm:
+        return None, raw
+    try:
+        return int(nm.group(1).replace(",", "")), raw
+    except ValueError:
+        return None, raw
+
+
+def hpoint_balance(serial: str | None = None) -> dict:
+    """현재 로그인 계정의 H.Point 보유 잔액 (CDP, 읽기전용). 결제/사용 안 함.
+    HPOINT_URLS 를 순회하며 라벨 뒤 숫자 파싱. 못 읽으면 point=None + raw(라벨주변) 로 튜닝 근거 제공."""
+    serial = serial or _serial()
+    _forward(serial)
+    cdp = _attach_any()
+    try:
+        last_raw = ""
+        for url in HPOINT_URLS:
+            cdp.navigate(url)
+            if "loginForm" in (cdp.ev("location.href") or "") or "/login" in (cdp.ev("location.href") or ""):
+                return {"point": None, "error": "로그아웃 상태(세션 없음)", "url": url}
+            body = cdp.ev("document.body?document.body.innerText:''") or ""
+            pt, raw = _parse_hpoint(body)
+            last_raw = raw or last_raw
+            if pt is not None:
+                return {"point": pt, "url": url, "raw": raw}
+        return {"point": None, "error": "H.Point 라벨/숫자 미발견", "raw": last_raw}
+    finally:
+        cdp.close()
+
+
+def all_points(serial: str | None = None, idxs: list[int] | None = None) -> list[dict]:
+    """아이디별 H.Point 잔액 파악. 각 계정 login_account → hpoint_balance → 표 출력.
+    idxs=None 이면 hmall_config.json 전 계정. 로그인 실패 계정은 point=None + login_error."""
+    serial = serial or _serial()
+    accounts = load_accounts()
+    targets = idxs or list(range(1, len(accounts) + 1))
+    rows: list[dict] = []
+    for idx in targets:
+        acc = accounts[idx - 1]
+        lr = login_account(idx, serial)
+        if not lr.get("success"):
+            rows.append({"idx": idx, "id": acc["id"], "point": None,
+                         "login_error": lr.get("error", "로그인 실패")})
+            print(f"  #{idx:>2} {acc['id']:<16} 로그인 실패: {lr.get('error')}", flush=True)
+            continue
+        bal = hpoint_balance(serial)
+        rows.append({"idx": idx, "id": acc["id"], **bal})
+        if bal.get("point") is not None:
+            print(f"  #{idx:>2} {acc['id']:<16} {bal['point']:>9,} P", flush=True)
+        else:
+            print(f"  #{idx:>2} {acc['id']:<16} 잔액 파싱 실패 ({bal.get('error')}) raw='{bal.get('raw','')}'", flush=True)
+    total = sum(r["point"] for r in rows if r.get("point"))
+    read = [r for r in rows if r.get("point") is not None]
+    print(f"\n  합계(읽힌 {len(read)}/{len(targets)}계정): {total:,} P", flush=True)
+    return rows
+
+
 def _main():
     import sys
     args = sys.argv[1:]
@@ -397,6 +481,17 @@ def _main():
         if len(args) > 1:
             print("login:", login_account(int(args[1]), serial).get("success"))
         print(json.dumps(cart_state(serial), ensure_ascii=False))
+    elif cmd == "points":
+        # points            → 전 계정 아이디별 H.Point 잔액 파악
+        # points <idx..>    → 지정 계정만 (예: points 1 3 5)
+        # points here       → 재로그인 없이 현재 로그인 계정만 조회
+        if len(args) > 1 and args[1] == "here":
+            print(json.dumps(hpoint_balance(serial), ensure_ascii=False))
+        else:
+            idxs = [int(a) for a in args[1:]] or None
+            print("아이디별 H.Point 잔액:")
+            rows = all_points(serial, idxs)
+            print(json.dumps(rows, ensure_ascii=False))
     else:
         print(f"unknown cmd: {cmd}")
 
