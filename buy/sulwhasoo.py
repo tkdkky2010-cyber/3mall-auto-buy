@@ -27,7 +27,7 @@ PW_BACKEND = "playwright"
 ROOT = Path(__file__).parent
 PROJECT_ROOT = ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-from chrome_launcher import ensure_chrome  # noqa: E402
+from chrome_launcher import resolve_cdp_port  # noqa: E402
 load_dotenv(ROOT / ".env")
 
 CREDENTIALS_FILE = PROJECT_ROOT / "credentials.json"
@@ -547,6 +547,37 @@ def _solve_lotte_captcha(login_page: Page, max_refresh: int = 3) -> str:
     return fallback  # 합의 실패 시 GCV 최선값(이후 로그인 실패하면 재시도 루프가 처리)
 
 
+def _lotte_pw_campaign_present(page: Page) -> bool:
+    """비밀번호 변경 캠페인(팝업/인터스티셜) 감지 — '지금 변경하기'/'30일 후' 버튼 존재로 판정.
+    떠 있으면 아직 실제 로그인 미확정(카트 컨텍스트 무효)."""
+    try:
+        return page.evaluate(r"""() => {
+            const els = Array.from(document.querySelectorAll('a,button,input[type=button]'));
+            return els.some(el => /지금\s*변경하기|30일\s*후/.test((el.innerText||el.value||'').trim()));
+        }""")
+    except Exception:
+        return False
+
+
+def _lotte_dismiss_pw_campaign(page: Page) -> None:
+    """비밀번호 변경 캠페인을 '30일 후'(연기)로 닫음. ⚠️ '지금 변경하기' 절대 클릭 금지(비번 실변경).
+    2026-07-21 사고: dismiss_popup 패턴('30일간 보이지 않기')이 '30일 후' 버튼을 못 잡아 캠페인 위에서
+    카트담기가 미로그인 컨텍스트로 헛돎 → 전용 처리 추가(사용자 지시: 롯데는 '30일 후')."""
+    for _ in range(3):
+        clicked = page.evaluate(r"""() => {
+            const els = Array.from(document.querySelectorAll('a,button,input[type=button],span'));
+            const safe = els.find(el => {
+                const t = (el.innerText||el.value||'').trim();
+                return /30일\s*후|나중에|다음에\s*변경|30일간\s*보이지/.test(t) && !/지금\s*변경/.test(t);
+            });
+            if (safe) { safe.click(); return true; }
+            return false;
+        }""")
+        if not clicked:
+            break
+        page.wait_for_timeout(1200)
+
+
 def lotte_login(page: Page, account_id: str, account_pw: str) -> bool:
     """롯데 로그인 — ★팝업/새창 없이 기존 탭을 로그인 URL 로 직접 이동(2026-06-08).
     popup 이 macOS 창 focus 강탈 주범 → 직접 nav 로 Chrome 백그라운드 유지(focus 안 뺏음).
@@ -601,10 +632,16 @@ def lotte_login(page: Page, account_id: str, account_pw: str) -> bool:
                     return False
                 print(f"  [LOGIN] 실패(캡차오판 또는 비번오류) — 재시도 ({attempt + 1}/3)")
                 continue
+            # ★비밀번호 변경 캠페인(2026-07-21 사고): 로그인 자체는 성공이나 인터스티셜/팝업이 뜬 상태.
+            #   '30일 후'(연기)로 닫아야 실제 로그인 확정. ⚠️ '지금 변경하기' 절대 금지(비번 실제 변경됨).
+            #   미처리 시 '로그아웃' 텍스트만 보고 오탐 → 카트담기가 미로그인 컨텍스트에서 헛됨.
+            _lotte_dismiss_pw_campaign(page)
             # 성공 추정 → ★홈으로 이동(이후 clear_cart/add_combo 가 홈 기준) + 최종 검증
             page.goto(LOTTE_HOME, wait_until="domcontentloaded", timeout=20000)
             page.wait_for_timeout(2000)
-            if "로그아웃" in page.inner_text("body") and "loginfailure" not in page.url:
+            _lotte_dismiss_pw_campaign(page)   # 홈에서 재등장 가능 → 다시 닫기
+            if "로그아웃" in page.inner_text("body") and "loginfailure" not in page.url \
+               and not _lotte_pw_campaign_present(page):
                 return True
         return False
     except Exception as e:
@@ -1018,19 +1055,17 @@ def main() -> int:
     print(f"[INFO] mall={mall}, account #{idx} {acc['id']}, DRY={DRY_PAYMENT}")
     print(f"[INFO] PW backend: {PW_BACKEND}")
 
-    ensure_chrome(int(CDP_PORT))
+    _port = resolve_cdp_port(int(CDP_PORT))   # 9222 막히면 9223→9224 (같은 CFT)
+    _endpoint = f"http://127.0.0.1:{_port}"
     with sync_playwright() as p:
         try:
-            browser = p.chromium.connect_over_cdp(CDP_ENDPOINT)
+            browser = p.chromium.connect_over_cdp(_endpoint)
         except Exception as e:
             print(f"[FATAL] CDP 연결 실패: {e}")
             return 1
         context = browser.contexts[0] if browser.contexts else browser.new_context()
-        # 롯데는 기존 탭 재사용(새 탭/팝업이 창 focus 강탈 → 직접 nav 만으로 진행). 갤러리아는 기존 흐름 유지.
-        if mall == "lotte":
-            mall_page = context.pages[-1] if context.pages else context.new_page()
-        else:
-            mall_page = context.new_page()
+        # 기존 탭 재사용 — 새 탭 생성(new_page)이 macOS 창 focus 강탈 (2026-07-16 갤러리아 잔재 제거)
+        mall_page = context.pages[-1] if context.pages else context.new_page()
 
         home = LOTTE_HOME if mall == "lotte" else GALLERIA_HOME
         try:

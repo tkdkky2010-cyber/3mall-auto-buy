@@ -93,7 +93,8 @@ CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC", "삼성", "NH", "�
 #   자동선택됨 → 앱카드는 누적금액 임계 초과 시 현대카드 인증(자동화 불가)이 떠 PAY_FAIL 반복.
 #   → 주문서 결제수단 영역 [일반 결제|앱카드 결제] 탭에서 '일반 결제' 선택 후 진행이 정본.
 #   다른 계정은 이 탭 자체가 없음(비등록) — 기존 pay_hyundai(PIN) 경로 그대로. 식품·설화수 공통(단일 진입점).
-GENERAL_PAY_IDS = {"skykow"}
+#   Jinhwa4553(계정#12) = 2026-07-16 동일증상 확인(앱카드 자동선택 → 현대카드 인증벽 PAY_FAIL 반복) → 일반결제 추가.
+GENERAL_PAY_IDS = {"skykow", "Jinhwa4553"}
 # 토스페이(간편결제 채널) = pay_toss (2026-07-15 라이브 작성). ★토스앱(viva.republica.toss) 로그인 전제 —
 #   미로그인이면 게스트 본인확인(휴대폰번호+SMS/PASS)이 떠 자동화 불가(pay_toss가 감지해 안전정지).
 #   PIN=dump 셔플(source=dump, 137601, FLAG_SECURE). 카카오페이=타 폰 사용중이라 제외. 상세=TOSS_PAY_NOTES.md.

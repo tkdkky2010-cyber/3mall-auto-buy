@@ -16,7 +16,7 @@ tools: Bash, Read, Write, Edit, mcp__playwright__browser_navigate, mcp__playwrig
 - Step 4 → Step 5 자동 진행 절대 금지. 사용자가 명시적으로 Step 5 호출해야만 결제 진행.
 
 ## 작업 디렉토리
-`/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/`
+`/Users/jasonkim/work/Vibe Coding/3mall auto buy/`
 
 ---
 

@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT / "rate-check"))
 import run as buy_run  # type: ignore
 from run import CART_URL, CDP_ENDPOINT, login, clear_cart, add_to_cart  # type: ignore
 import _common as C
-from chrome_launcher import ensure_chrome
+from chrome_launcher import resolve_cdp_port
 
 
 def _pick_cdp_backend(endpoint: str):
@@ -299,10 +299,11 @@ def main(argv=None):
     print(f"[INFO] 처리 조합 {len(combos)}개")
 
     results: list[dict] = []
-    ensure_chrome(C.CDP_PORT)
-    sync_playwright = _pick_cdp_backend(CDP_ENDPOINT)   # patchright 우선, Chrome 147+ 행/에러 시 plain playwright (12s 프로브)
+    _port = resolve_cdp_port(C.CDP_PORT)   # 9222 막히면 9223→9224 (같은 CFT)
+    _endpoint = f"http://127.0.0.1:{_port}"
+    sync_playwright = _pick_cdp_backend(_endpoint)   # patchright 우선, Chrome 147+ 행/에러 시 plain playwright (12s 프로브)
     with sync_playwright() as pw:
-        browser = pw.chromium.connect_over_cdp(CDP_ENDPOINT, timeout=20000)
+        browser = pw.chromium.connect_over_cdp(_endpoint, timeout=20000)
         context = browser.contexts[0] if browser.contexts else browser.new_context()
         page = context.pages[-1] if context.pages else context.new_page()   # 기존 탭 재사용(포커스 강탈 방지)
         page.set_default_timeout(25000)

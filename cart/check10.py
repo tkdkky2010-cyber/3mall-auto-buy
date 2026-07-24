@@ -5,11 +5,10 @@
 
 사용법:
     pip install -r ../buy/requirements.txt
-    bash launch-check10-chrome.sh                    # CDP 9223 Chrome 미리 띄우기 (idempotent)
     python3 cart/check10.py                          # 기본 (account #1)
     python3 cart/check10.py 3                        # 특정 계정 idx
 
-CDP attach 모드 — Chrome은 launch-check10-chrome.sh 가 책임.
+CDP attach 모드 — 로그인된 CFT 9222 단일 사용 (launch = ~/bin/launch-hmall-chrome.sh, 자동).
 """
 from __future__ import annotations
 import json
@@ -33,13 +32,13 @@ except ImportError:
 ROOT = Path(__file__).parent
 PROJECT_ROOT = ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-from chrome_launcher import ensure_chrome  # noqa: E402
+from chrome_launcher import resolve_cdp_port, PORT_CHAIN  # noqa: E402
 load_dotenv(PROJECT_ROOT / "buy" / ".env")
 
 ACCOUNTS_FILE = Path(os.environ.get("HMALL_CONFIG_PATH") or (PROJECT_ROOT / "hmall_config.json"))
 TODAY_OUT = ROOT / "today.json"
 
-CDP_PORT = "9223"  # check10 전용 (launch-check10-chrome.sh와 일치). buy/.env 의 CDP_PORT는 buy/run.py 용(9222)이라 별도.
+CDP_PORT = "9222"  # ★단일 CFT 원칙(2026-07-16): 로그인된 CFT 9222 만 사용. 9223 실제 Chrome 폐기 (창 강탈 원인).
 CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
 LOGIN_URL = "https://www.hmall.com/mo/cob/loginForm"
 ITEM_URL_FMT = "https://www.hmall.com/md/pda/itemPtc?slitmCd={slitmCd}{extra}"
@@ -1109,10 +1108,22 @@ def write_to_sheet(results: list[dict], date_str: str, acc_idx: int = 1) -> bool
     # 구간 수 최대값 → 컬럼 수 결정 (tier + simple_range 합)
     max_tiers = max(((len(r.get("tiers") or []) + len(r.get("simple_ranges") or [])) for r in results), default=0)
 
+    # 당일 카드할인 라벨(예 '삼성 5%') — 전 상품 공통이라 J1(카드할인가 열 머리) 에 1회 표기.
+    _pairs = []
+    for r in results:
+        for c in ((r.get("payment") or {}).get("card_slides") or []):
+            if c.get("percent"):
+                _pairs.append(((c.get("text") or "").split()[0], c["percent"]))
+    card_label = ""
+    if _pairs:
+        from collections import Counter
+        (nm, pct), _ = Counter(_pairs).most_common(1)[0]
+        card_label = f"{nm} {pct}%"
     section_title = [f"현대Hmall 10% 적립 체크 ({tab_candidates[0]}) — {len(results)}개 상품"]
+    section_title += [""] * (9 - len(section_title)) + [card_label]   # J1 = 당일 카드할인
     headers = ["#", "제품명", "URL", "10%적립", "적립 문구", "쿠폰",
                "수량", "혜택가",
-               "즉시할인가", "실비(= 즉시할인가 × 카드페이백계수 − 적립금)"]
+               "즉시할인가", "카드할인가", "5만↑최소수량", "실비(= 즉시할인가 × 카드페이백계수 − 적립금)"]
     headers += ["행사종료"]
     headers += [f"구간{i+1}" for i in range(max_tiers)]
 
@@ -1125,7 +1136,7 @@ def write_to_sheet(results: list[dict], date_str: str, acc_idx: int = 1) -> bool
             ten = "ERR"
             phrase = r.get("error", "")
             coupon = ""
-            qty_s = lp_s = imm_s = real_s = ""
+            qty_s = lp_s = imm_s = card_s = min_qty_s = real_s = ""
             event_end_s = ""
             tier_cells = [""] * max_tiers
         else:
@@ -1137,6 +1148,18 @@ def write_to_sheet(results: list[dict], date_str: str, acc_idx: int = 1) -> bool
             # G열 = 우수고객 혜택가 (있으면) → 없으면 소비자가(list_price)
             lp_s = _fmt(p.get("benefit_unit_price") or p.get("list_price"))
             imm_s = _fmt(p.get("kakao_price"))         # 즉시할인가
+            # 당일 카드할인(5%/7%) 적용가 = 혜택가에 카드할인 한 번 더. 금액만 기입(카드명/%는 J1).
+            # 최소수량 = 카드할인 '단가' 기준 5만원 이상이 되는 최소 수량 (적립 판정이 최종결제가 기준).
+            card_s = min_qty_s = ""
+            _cs = [c for c in (p.get("card_slides") or []) if c.get("percent") and c.get("price")]
+            if _cs:
+                best = max(_cs, key=lambda c: c.get("percent") or 0)
+                card_s = _fmt(best["price"])
+                _bu = p.get("benefit_unit_price")
+                if _bu:
+                    unit_card = int(round(_bu * (1 - (best["percent"] or 0) / 100)))
+                    if unit_card and unit_card < 50000:
+                        min_qty_s = str(math.ceil(50000 / unit_card))
             real_s = _fmt(p.get("kakao_final_cost"))   # 실비
             event_end_s = r.get("event_end") or ""
             tiers_p = r.get("tiers") or []
@@ -1148,7 +1171,7 @@ def write_to_sheet(results: list[dict], date_str: str, acc_idx: int = 1) -> bool
             tier_cells = sr_cells + tier_cells
             tier_cells += [""] * (max_tiers - len(tier_cells))
         rows.append([str(r["id"]), r["name"], r.get("url", ""), ten, phrase, coupon,
-                     qty_s, lp_s, imm_s, real_s, event_end_s] + tier_cells)
+                     qty_s, lp_s, imm_s, card_s, min_qty_s, real_s, event_end_s] + tier_cells)
 
     payload = [section_title] + [headers] + rows
     n_cols = len(headers)
@@ -1247,14 +1270,13 @@ def main() -> int:
     print(f"[INFO] 사용 계정 #{acc_idx} {acc['id']}")
     print(f"[INFO] PW backend: {PW_BACKEND}")
 
-    # ── CDP 포트 자동 선택 (하드코딩 X) ──
+    # ── CDP 포트: 로그인된 CFT 9222 단일 (2026-07-16 사용자 지시 — 다른 창 절대 띄우지 말 것) ──
     #   fresh 프로필 생짜 로그인은 Hmall reCAPTCHA v3 로 차단됨 → "이미 로그인된 CfT 세션 재사용"이 정답.
-    #   9223(check10 전용)·9222(HmallChrome) 중 Hmall 로그인된 포트를 찾아 그대로 사용.
-    #   CHECK10_CDP_PORT 로 강제 지정 가능. 아무데도 로그인 안 됐으면 9223 새로 띄우고 로그인 시도(fallback).
+    #   CHECK10_CDP_PORT 로 강제 지정 가능. 로그인 안 돼 있으면 같은 9222 CFT 에서 로그인 시도(fallback).
     #   connect 는 plain playwright — patchright 는 Chrome 148 connect 시 크래시(setCacheDisabled). CDP attach 라 스텔스 무관.
     from playwright.sync_api import sync_playwright as sync_pw_plain
     forced = os.environ.get("CHECK10_CDP_PORT")
-    candidates = list(dict.fromkeys([forced] * bool(forced) + [CDP_PORT, "9222"]))
+    candidates = list(dict.fromkeys([forced] * bool(forced) + [CDP_PORT] + [str(p) for p in PORT_CHAIN]))
     alive = [pt for pt in candidates if _cdp_alive(pt)]
     print(f"[INFO] CDP 후보 포트 {candidates} / 살아있음 {alive}")
 
@@ -1272,14 +1294,15 @@ def main() -> int:
                 return _run(context, acc, acc_idx)
             print(f"[INFO] 포트 {port} — Hmall 로그인 안 됨, 다음 후보")
 
-        # 2) 로그인된 포트 없음 → 9223 새로 띄우고 raw 로그인 (기존 동작, reCAPTCHA 차단 가능)
-        print(f"[INFO] 로그인된 CfT 없음 — {CDP_PORT} launch + 로그인 시도")
-        ensure_chrome(int(CDP_PORT))
+        # 2) 로그인 안 됨 → CFT 에서 raw 로그인 (reCAPTCHA 차단 가능성 있음). 포트는 체인 폴백.
+        _port = resolve_cdp_port(int(CDP_PORT))
+        _endpoint = f"http://127.0.0.1:{_port}"
+        print(f"[INFO] 로그인된 세션 없음 — {_port} CFT 에서 로그인 시도")
         try:
-            browser = p.chromium.connect_over_cdp(CDP_ENDPOINT, slow_mo=300)
+            browser = p.chromium.connect_over_cdp(_endpoint, slow_mo=300)
         except Exception as e:
             print(f"[FATAL] CDP {CDP_PORT} 연결 실패: {e}")
-            print(f"  수동 실행: bash {PROJECT_ROOT}/launch-check10-chrome.sh")
+            print(f"  수동 실행: bash ~/bin/launch-hmall-chrome.sh")
             return 1
         context = browser.contexts[0] if browser.contexts else browser.new_context()
         return _run(context, acc, acc_idx)
@@ -1316,7 +1339,17 @@ def _run(context, acc, acc_idx: int = 1) -> int:
     # 중복 URL은 base 한 번만 페이지 방문, alias는 base의 benefit_ratio + 자기 옵션 unit_list_price로 derive
     cache: dict[str, dict] = {}
     results: list[dict] = []
-    products_to_run = PRODUCTS[:1] if os.environ.get("DEBUG_ORDER") else PRODUCTS
+    # CHECK10_ONLY="34,35" → 해당 id 만 검사(부분 실행). 나머지는 기존 today.json 결과를 병합해
+    #   전체를 다시 기록한다(write_to_sheet 가 ws.clear() 하므로 부분만 쓰면 기존 행이 날아감 — 2026-07-23).
+    only_ids = {int(x) for x in os.environ.get("CHECK10_ONLY", "").replace(" ", "").split(",") if x.isdigit()}
+    if os.environ.get("DEBUG_ORDER"):
+        products_to_run = PRODUCTS[:1]
+    elif only_ids:
+        products_to_run = [p for p in PRODUCTS if p["id"] in only_ids]
+        print(f"[INFO] 부분 실행 CHECK10_ONLY={sorted(only_ids)} → {len(products_to_run)}개 상품만 검사 "
+              f"(나머지는 기존 {TODAY_OUT.name} 결과 병합)", flush=True)
+    else:
+        products_to_run = PRODUCTS
     for prod in products_to_run:
         if prod.get("alias_of"):
             base = next((r for r in results if r["id"] == prod["alias_of"]), None)
@@ -1358,6 +1391,20 @@ def _run(context, acc, acc_idx: int = 1) -> int:
                    f"페이백[{pb_str}]")
             print(f"     → 결제: {ppr}{' [' + payment['error'] + ']' if payment.get('error') else ''}")
         results.append(result)
+
+    # 부분 실행이면 기존 today.json 결과와 병합 (id 기준 신규가 승) → 전체를 다시 기록.
+    if only_ids and TODAY_OUT.exists():
+        try:
+            prev = json.loads(TODAY_OUT.read_text(encoding="utf-8"))
+            if prev.get("date") == datetime.now().strftime("%Y-%m-%d"):
+                merged = {r["id"]: r for r in (prev.get("products") or [])}
+                merged.update({r["id"]: r for r in results})
+                results = [merged[k] for k in sorted(merged)]
+                print(f"[OK] 기존 결과 병합 → 총 {len(results)}개 (신규/갱신 {len(only_ids)}개)", flush=True)
+            else:
+                print(f"[WARN] {TODAY_OUT.name} 날짜가 오늘이 아님({prev.get('date')}) — 병합 skip", flush=True)
+        except Exception as e:
+            print(f"[WARN] 기존 결과 병합 실패({e}) — 이번 결과만 기록", flush=True)
 
     print_report(results)
 

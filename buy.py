@@ -126,7 +126,9 @@ def apply_reward(cart: dict) -> None:
     acct = cart["account"]
     # ★9222 Chrome 창이 전부 닫혀 페이지 타깃 0개면 connect_over_cdp 가
     #   'Browser context management is not supported'로 실패(2026-07-13 실측) → 탭 1개 보장 후 연결.
-    cdp_port = os.environ.get("CDP_PORT", "9222")
+    # 포트 체인: 9222 막히면 9223→9224 (같은 로그인된 CFT) — 2026-07-16
+    from chrome_launcher import resolve_cdp_port
+    cdp_port = str(resolve_cdp_port(int(os.environ.get("CDP_PORT", "9222"))))
     try:
         import urllib.request
         if not json.loads(urllib.request.urlopen(f"http://127.0.0.1:{cdp_port}/json/list", timeout=5).read()):
@@ -141,7 +143,7 @@ def apply_reward(cart: dict) -> None:
         f"acc=run.load_json(run.ACCOUNTS_FILE)['accounts'][{acct}-1]\n"
         "with sync_playwright() as p:\n"
         # ★기존 탭 재사용 — 새 탭=macOS Chrome 창 포커스 강탈(2026-07-10). close 안 함.
-        " br=p.chromium.connect_over_cdp(run.CDP_ENDPOINT); ctx=br.contexts[0] if br.contexts else br.new_context(); page=ctx.pages[-1] if ctx.pages else ctx.new_page()\n"
+        f" br=p.chromium.connect_over_cdp('http://127.0.0.1:{cdp_port}'); ctx=br.contexts[0] if br.contexts else br.new_context(); page=ctx.pages[-1] if ctx.pages else ctx.new_page()\n"
         " run._hmall_clean(ctx,page,deep=True)\n"
         " ok=run.login(page,acc['id'],acc['pw']); print('login',ok)\n"
         f" for prmo in {prmos}:\n"

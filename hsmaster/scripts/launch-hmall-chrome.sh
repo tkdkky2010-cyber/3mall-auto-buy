@@ -13,7 +13,9 @@
 # Idempotent: 이미 9222 살아있으면 그대로 종료. 세션(쿠키)은 프로필에 유지됨.
 set -e
 
-PORT=9222
+# 포트 체인(2026-07-16): 9222 막히면 chrome_launcher.resolve_cdp_port 가
+# HMALL_CDP_PORT=9223/9224 로 재호출 — 같은 CFT 프로필, 포트만 변경.
+PORT="${HMALL_CDP_PORT:-9222}"
 
 # 1) 이미 포트 살아있으면 그대로 재사용
 if curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$PORT/json/version" | grep -q 200; then
@@ -51,11 +53,23 @@ fi
 mkdir -p "$USER_DATA_DIR"
 rm -f "$USER_DATA_DIR"/Singleton* 2>/dev/null || true
 
-"$CHROME_BIN" --remote-debugging-port=$PORT "--remote-allow-origins=*" \
-  --user-data-dir="$USER_DATA_DIR" --profile-directory="$PROFILE_DIR" \
-  --no-first-run --no-default-browser-check --disable-popup-blocking \
-  "$START_URL" > /dev/null 2>&1 &
-disown
+# ★백그라운드 launch (2026-07-16): 바이너리 직접 exec 는 macOS 가 새 앱을 전면으로
+#   가져와 사용자 창 포커스를 강탈. CFT 는 `open -g`(포그라운드 금지)+`-j`(숨김) 로 launch.
+#   (open --args 는 앱 미실행 상태에서만 전달됨 — CFT 는 위에서 포트체크/quit 했으므로 안전.
+#    실제 Chrome 폴백은 개인 Chrome 이 이미 떠있으면 open 이 args 를 무시 → 직접 exec 유지.)
+if [ "${HMALL_USE_REAL_CHROME:-0}" = "1" ]; then
+  "$CHROME_BIN" --remote-debugging-port=$PORT "--remote-allow-origins=*" \
+    --user-data-dir="$USER_DATA_DIR" --profile-directory="$PROFILE_DIR" \
+    --no-first-run --no-default-browser-check --disable-popup-blocking \
+    "$START_URL" > /dev/null 2>&1 &
+  disown
+else
+  APP_PATH="${CHROME_BIN%/Contents/MacOS/*}"
+  open -g "$APP_PATH" --args --remote-debugging-port=$PORT "--remote-allow-origins=*" \
+    --user-data-dir="$USER_DATA_DIR" --profile-directory="$PROFILE_DIR" \
+    --no-first-run --no-default-browser-check --disable-popup-blocking \
+    "$START_URL"
+fi
 
 for i in $(seq 1 12); do
   sleep 1

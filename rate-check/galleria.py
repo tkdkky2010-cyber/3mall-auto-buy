@@ -31,7 +31,7 @@ from selenium.webdriver.chrome.options import Options
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import _common as C
-from chrome_launcher import ensure_chrome
+from chrome_launcher import resolve_cdp_port
 
 PENDING_EXIT = 2
 
@@ -42,11 +42,18 @@ GALLERIA_URL = "https://www.galleria.co.kr/goods/initDetailGoods.action?goods_no
 # Selenium attach
 # ============================================================
 def attach_chrome() -> webdriver.Chrome:
-    ensure_chrome(C.CDP_PORT)  # 9222 안 떠있으면 구글로그인 CFT 자동 launch
+    port = resolve_cdp_port(C.CDP_PORT)  # 9222 막히면 9223→9224 (같은 CFT), 필요시 자동 launch
     opts = Options()
-    opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{C.CDP_PORT}")
-    svc = C.matched_chromedriver_service(C.CDP_PORT)  # 버전 mismatch 회피 (_common 참조)
-    return webdriver.Chrome(options=opts, service=svc) if svc else webdriver.Chrome(options=opts)
+    opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{port}")
+    svc = C.matched_chromedriver_service(port)  # 버전 mismatch 회피 (_common 참조)
+    d = webdriver.Chrome(options=opts, service=svc) if svc else webdriver.Chrome(options=opts)
+    # ★캐시 비활성화 — CFT 가 며칠씩 떠있으면 어제 페이지가 캐시로 반환돼 쿠폰% 등
+    #   daily 값이 stale (2026-07-16 갤러리아 쿠폰 20%↔실제 14% 사고). 매 실행 fresh 강제.
+    try:
+        d.execute_cdp_cmd("Network.setCacheDisabled", {"cacheDisabled": True})
+    except Exception as e:
+        print(f"  [WARN] 캐시 비활성화 실패 ({e}) — stale 값 주의")
+    return d
 
 
 # ============================================================
@@ -270,6 +277,47 @@ def download_gwp_image(src: str, dest: Path) -> Path:
     return dest
 
 
+# ── GWP 변경 감지: 이미지 내용 지문(etag/last-modified/md5) 기반 ──────────────
+# ★날짜(7.6-7.31 등)·구성은 매일 새로 확인해야 하는 값 — "어제 것 복사" 절대 금지.
+#   이미지가 바뀌면(=행사 변경) 지문이 달라지므로 강제 재판독(PENDING).
+#   지문이 이전과 동일하면(=이미지 바이트 동일) 그때만 검증된 구성 재사용 = 안전.
+_GWP_REGISTRY = C.TMP_DIR / "gwp_by_fingerprint.json"
+
+
+def gwp_image_fingerprint(src: str) -> str | None:
+    """GWP 이미지의 내용 지문. etag/last-modified 우선, 없으면 본문 md5."""
+    import hashlib
+    try:
+        r = requests.get(src, timeout=10, headers={"Cache-Control": "no-cache"})
+        r.raise_for_status()
+        etag = (r.headers.get("ETag") or "").strip('"')
+        lm = r.headers.get("Last-Modified") or ""
+        if etag:
+            return f"etag:{etag}"
+        if lm:
+            return f"lm:{lm}"
+        return "md5:" + hashlib.md5(r.content).hexdigest()
+    except Exception as e:
+        print(f"  [WARN] GWP 지문 조회 실패 ({e}) — 변경 감지 불가, 재판독 강제")
+        return None
+
+
+def _load_registry() -> dict:
+    try:
+        return json.loads(_GWP_REGISTRY.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_registry(fp: str, period: str, gwp_set: list, date: str) -> None:
+    reg = _load_registry()
+    reg[fp] = {"period": period, "set": gwp_set, "verified_date": date}
+    try:
+        _GWP_REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"  [WARN] GWP 레지스트리 저장 실패 ({e})")
+
+
 def load_gwp_config(path: Path) -> C.GwpDay:
     """GWP JSON → GwpDay. JSON 형식:
     {
@@ -293,16 +341,19 @@ def load_gwp_config(path: Path) -> C.GwpDay:
     return C.GwpDay(set_items=items, period=data.get("period", ""))
 
 
-def emit_gwp_pending(date: str, image_path: Path) -> int:
+def emit_gwp_pending(date: str, image_path: Path, image_fp: str | None = None) -> int:
     json_path = C.TMP_DIR / f"gwp_{date}.json"
+    fp_line = f'\n       "image_fp": {image_fp!r},' if image_fp else ""
     print()
     print("=" * 60)
     print(f"▶ GWP_PENDING — 40/70만 GWP 이미지 판독 필요")
     print(f"   이미지: {image_path}")
     print(f"   판독 후 작성: {json_path}")
-    print(f"   JSON 형식 예시:")
+    print(f"   ★ 이미지의 '행사 기간(예: 7.18 - 7.31)'과 구성을 **직접 보고** 그대로 적을 것.")
+    print(f"     절대 이전 날짜/구성 복사 금지 — 이미지가 바뀌어서 재판독 요청된 것임.")
+    print(f"   JSON 형식 (아래 image_fp 는 그대로 유지 = 변경감지 지문):")
     print(f"     {{")
-    print(f'       "period": "5.8 - 5.31",')
+    print(f'       "period": "M.D - M.D",{fp_line}')
     print(f'       "set": [')
     print(f'         {{"text": "순행클렌징오일 50ml", "qty": 1}},')
     print(f'         {{"text": "여윤팩 35ml", "qty": 2}}')
@@ -468,28 +519,51 @@ def main(argv=None):
         except Exception:
             pass
 
-    # GWP 처리
+    # GWP 처리 — ★날짜/구성은 이미지 지문으로 변경 감지. 하드코딩/어제복사 금지.
+    live_fp = gwp_image_fingerprint(gwp_image_src) if gwp_image_src else None
+
     if gwp_json_path.exists():
-        print(f"  GWP 구성 로드: {gwp_json_path}")
+        # 오늘자 JSON 존재 → 로드하되, 그 JSON이 '지금 라이브 이미지'와 맞는지 지문으로 검증.
         gwp = load_gwp_config(gwp_json_path)
+        recorded_fp = json.loads(gwp_json_path.read_text(encoding="utf-8")).get("image_fp")
+        if live_fp and recorded_fp and recorded_fp != live_fp:
+            # JSON 이 현재 이미지와 다른 이미지 기준으로 작성됨(= stale/복사) → 거부, 강제 재판독.
+            print(f"  ❌ GWP JSON 이 라이브 이미지와 불일치 — 이미지 변경됨(재판독 필요)")
+            print(f"       JSON 기준 지문={recorded_fp}  /  현재 라이브={live_fp}")
+            gwp_json_path.unlink()
+            if gwp_image_src:
+                download_gwp_image(gwp_image_src, gwp_image_path)
+            return emit_gwp_pending(today, gwp_image_path)
+        print(f"  GWP 구성 로드: {gwp_json_path} (period={gwp.period!r})")
         print(f"      1세트 = {gwp.set_value:,}원, 6세트 = {gwp.set_value * 6:,}원")
-        # ★ JSON 로드 성공 시 다운로드된 jpg 더 이상 불필요 → 정리 (결과파일 X)
+        if live_fp:
+            _save_registry(live_fp, gwp.period,
+                           json.loads(gwp_json_path.read_text(encoding="utf-8")).get("set", []), today)
         if gwp_image_path.exists():
             try:
                 gwp_image_path.unlink()
-                print(f"      gwp 이미지 정리: {gwp_image_path.name}")
             except Exception:
                 pass
+    elif live_fp and live_fp in _load_registry():
+        # 오늘자 JSON 없지만 이미지 지문이 이전에 검증된 것과 동일(=이미지 바이트 동일) → 안전 재사용.
+        reg = _load_registry()[live_fp]
+        gwp_json_path.write_text(json.dumps(
+            {"period": reg["period"], "set": reg["set"], "image_fp": live_fp},
+            ensure_ascii=False, indent=2), encoding="utf-8")
+        gwp = load_gwp_config(gwp_json_path)
+        print(f"  ✓ GWP 이미지 미변경(지문 일치, {reg['verified_date']} 검증) — 재판독 불필요")
+        print(f"      period={gwp.period!r}, 1세트={gwp.set_value:,}원")
     else:
+        # 새 이미지(지문 미등록) 또는 지문 조회 실패 → 반드시 사람이 재판독.
         if gwp_image_src:
-            print(f"  GWP 이미지 다운로드 → {gwp_image_path}")
+            print(f"  GWP 이미지 다운로드(신규/변경) → {gwp_image_path}")
             try:
                 download_gwp_image(gwp_image_src, gwp_image_path)
             except Exception as e:
                 print(f"  ⚠️ 이미지 다운로드 실패: {e}")
         else:
             print(f"  ⚠️ GWP 이미지 fast-path 못 찾음 — 페이지 스크린샷 필요할 수 있음")
-        return emit_gwp_pending(today, gwp_image_path)
+        return emit_gwp_pending(today, gwp_image_path, live_fp)
 
     # --only 디버그 모드면 20조합 계산 스킵
     if args.only:

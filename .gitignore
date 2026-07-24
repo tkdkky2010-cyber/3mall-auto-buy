@@ -51,3 +51,13 @@ mall-ocr-*.json
 __pycache__/
 _tmp/
 .playwright-mcp/
+
+# 세션 임시/민감 산출물 (결제 스크린샷·진단 스크립트·실행 로그) — 절대 커밋 금지
+scratchpad/
+logs/
+*.bak
+*.bak_*
+_backup_*.json
+buy/cart_plan*.json
+buy/_cart_plan*.json
+buy/_food_done.json*

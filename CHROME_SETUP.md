@@ -1,9 +1,11 @@
 # Chrome 자동화 setup — Chrome for Testing + Profile 6
 
-> ⚠️ **2026-07-15 변경**: 9222 rate-check/Hmall 런처(`launch-hmall-chrome.sh`) **기본이 구글 로그인된 CFT**
-> (`~/Library/Application Support/Google/Chrome for Testing` / `Profile 1` = tkdkky2021)로 바뀜.
-> 이유: 구글 로그인 상태라 롯데 등에서 안 튕김(콜드 세션 403 회피). 폴백=`HMALL_USE_REAL_CHROME=1`(실제 Chrome Profile 6).
-> **아래 "Profile 6/실제 Chrome" 서술은 이제 폴백 경로** — 최신은 런처 헤더 주석 참조. check10(9223)은 아직 실제 Chrome.
+> ⚠️ **2026-07-16 확정 — 단일 CFT 원칙**: 모든 자동화(rate-check·check10·buy 전부) = **로그인된 CFT 9222 하나만**.
+> (`~/Library/Application Support/Google/Chrome for Testing` / `Profile 1` = tkdkky2021 구글 로그인)
+> - launch = `open -g` **백그라운드** (사용자 창 포커스 절대 강탈 금지, new_page 대신 기존 탭 재사용)
+> - **9223 실제 Chrome(Check10RealChrome) 폐기** — launch-check10-chrome.sh 는 9222 위임 스텁
+> - 폴백=`HMALL_USE_REAL_CHROME=1`(실제 Chrome Profile 6) — env 명시할 때만, 자동 실행 절대 없음
+> **아래 "Profile 6/실제 Chrome" 서술은 폐기된 폴백 경로** — 최신은 런처 헤더 주석 참조.
 
 매일 자동화 시 메인 Chrome 안 닫히고 + Hmall 봇 차단 회피되는 격리된 Chrome 환경.
 

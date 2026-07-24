@@ -133,7 +133,7 @@ def _run_accounts(browser, accounts, idxs, go: bool, mode: str) -> int:
     for idx in idxs:
         acc = accounts[idx - 1]
         print(f"\n=== #{idx} {acc['id']} 카카오페이 체크아웃 ({mode}) ===")
-        page = ctx.new_page()
+        page = ctx.pages[-1] if ctx.pages else ctx.new_page()   # 기존 탭 재사용(포커스 강탈 방지)
         try:
             run._hmall_clean(ctx, page, deep=True)
             if not run.login(page, acc["id"], acc["pw"]):
@@ -143,8 +143,7 @@ def _run_accounts(browser, accounts, idxs, go: bool, mode: str) -> int:
             print(f"    결과: {r}")
         except Exception as e:
             print(f"    [FATAL] #{idx}: {e}")
-        finally:
-            page.close()
+        # page.close() 제거 — 탭 재사용 패턴과 페어 (닫으면 다음 계정이 새 탭 생성 = 포커스 강탈)
     return 0
 
 
@@ -157,7 +156,8 @@ def main() -> int:
         return 1
 
     accounts = run.load_json(run.ACCOUNTS_FILE)["accounts"]
-    run.ensure_chrome(int(run.CDP_PORT))
+    _port = run.resolve_cdp_port(int(run.CDP_PORT))   # 9222 막히면 9223→9224 (같은 CFT)
+    _endpoint = f"http://127.0.0.1:{_port}"
     mode = "GO 결제하기클릭" if go else "INSPECT(안누름)"
     print(f"[checkout_kakao] {mode} — 계정 {idxs}")
 
@@ -166,7 +166,7 @@ def main() -> int:
     # 인스턴스에 붙는 것이라 스텔스 무관 (run.py 카트담기 19/19도 실제로 plain playwright 로 성공).
     from playwright.sync_api import sync_playwright as pw_plain
     with pw_plain() as p:
-        browser = p.chromium.connect_over_cdp(run.CDP_ENDPOINT, slow_mo=500)
+        browser = p.chromium.connect_over_cdp(_endpoint, slow_mo=500)
         return _run_accounts(browser, accounts, idxs, go, mode)
 
 

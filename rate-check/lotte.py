@@ -27,15 +27,20 @@ from _common import (
 import os as _os
 _LOTTE_PORT = _os.environ.get("RATE_CHECK_CDP_PORT", "9222")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from chrome_launcher import ensure_chrome
-ensure_chrome(int(_LOTTE_PORT))  # 9222 안 떠있으면 구글로그인 CFT 자동 launch
+from chrome_launcher import resolve_cdp_port
+_LOTTE_PORT = str(resolve_cdp_port(int(_LOTTE_PORT)))  # 9222 막히면 9223→9224 (같은 CFT)
 opts = Options()
 opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{_LOTTE_PORT}")
 _svc = matched_chromedriver_service(_LOTTE_PORT)  # 버전 mismatch 회피
 driver = webdriver.Chrome(options=opts, service=_svc) if _svc else webdriver.Chrome(options=opts)
 print(f"CDP attach: 127.0.0.1:{_LOTTE_PORT}")
+# ★캐시 비활성화 — 장기 실행 CFT 의 stale 페이지 방지 (갤러리아 쿠폰 사고 2026-07-16, 동일 리스크)
+try:
+    driver.execute_cdp_cmd("Network.setCacheDisabled", {"cacheDisabled": True})
+except Exception as _e:
+    print(f"  [WARN] 캐시 비활성화 실패 ({_e}) — stale 값 주의")
 
-IDS = json.load(open('/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/hsmaster/config/sulwhasoo-ids.json'))['ids']
+IDS = json.load(open(Path(__file__).resolve().parent.parent / "hsmaster" / "config" / "sulwhasoo-ids.json"))['ids']
 PRICES = {'b':229000,'c':150000,'d':125000,'e':215000,'f':140000,'g':225000,'h':270000}
 
 def block_dialogs():
@@ -160,7 +165,7 @@ print(f"카드: {card_info}")
 # GLOBAL_TIERS = [{'threshold': int, 'reward': int}, ...] 오름차순. compute() 가 결제금액 vs threshold 로 max 1회 적립 (RULES §7-3).
 # ★ 결과파일 절대 사용 X — sheet가 SoT.
 IGNORE_KW = [l.strip() for l in open(
-    '/Users/jasonkim/Desktop/Vibe Coding/3mall auto buy/lotte_ignore_keywords.txt',
+    Path(__file__).resolve().parent.parent / "lotte_ignore_keywords.txt",
     encoding='utf-8') if l.strip()]
 
 _COLLECT_JS = r"""

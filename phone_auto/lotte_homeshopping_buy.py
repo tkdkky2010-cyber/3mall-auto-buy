@@ -865,6 +865,21 @@ def pay_lotte_payco(card: str = "삼성") -> dict:
 # (셔플키패드 2엔진→4엔진 roi 로직·card_secrets 로더는 hmall pay_samsung 과 공유 — 한 곳만 고치면 됨.)
 
 
+def _tap_shuffle_retry(value: str, delay: float = 1.0, tries: int = 3) -> dict:
+    """_tap_shuffle + 매핑 실패 시 '재배열'로 재셔플 후 재시도. 2/4엔진 OCR 오독·매핑실패 대응
+    (2026-07-21 #13 cert 매핑실패/#14 CVC 오독 사고). 재시도마다 force_vote(4엔진)로 정확도↑."""
+    r: dict = {}
+    for i in range(tries):
+        r = _tap_shuffle(value, delay=delay, force_vote=(i > 0))
+        if r.get("ok"):
+            return r
+        if screen_has("재배열"):
+            ocr_tap("재배열", contains=True); time.sleep(1.2)   # 재셔플 → 새 레이아웃 재OCR
+        else:
+            time.sleep(0.8)
+    return r
+
+
 def pay_lotte_samsung_general() -> dict:
     """삼성카드 **일반결제(카드번호 직접 입력)** — PAYCO/ARS 완전 회피.
     ✅ 2026-06-02 #12 leenamsu0318 **라이브 풀완주 검증**(주문 2026-06-02-G05038, 뷰티+적립금까지). 1~8단계 전부 동작.
@@ -925,21 +940,36 @@ def pay_lotte_samsung_general() -> dict:
     if not r.get("ok"):
         out["err"] = f"카드번호 입력 실패: {r.get('err')}"; return out
     time.sleep(1.5)
-    # 4b) CVC 필드('CVC번호 뒤 3자리') 탭 → 셔플키패드 → 3자리
-    cf = next((it for it in _ocr_texts(cap()) if "CVC" in it["text"].upper()), None)
-    if cf:
-        _adb().tap(cf["cx"], cf["cy"])
-    else:
-        out["err"] = "CVC 필드 미발견"; return out
-    time.sleep(1.5)
-    r = _tap_shuffle(cvc, delay=1.0)
-    if not r.get("ok"):
-        out["err"] = f"CVC 입력 실패: {r.get('err')}"; return out
-    time.sleep(1.0)
-    # 4c) '다음' (카드+CVC 입력되면 파랑 활성)
-    if not ocr_tap("다음", contains=True, retries=4):
-        out["err"] = "카드/CVC '다음' 실패"; return out
-    time.sleep(2.5)
+    # 카드번호 셔플키패드 '입력완료' — 15자리 자동닫힘 안 되는 화면 대응
+    #   (2026-07-21 #8 사고: 미탭 → CVC 필드 미출현 → PAY_FAIL@card_cvc). 있을 때만 탭.
+    if screen_has("입력완료"):
+        ocr_tap("입력완료", contains=True); time.sleep(1.5)
+    # 4b) CVC 입력 + '다음' — OCR 오독으로 'CVC 잘못 입력' 뜨면 확인 후 재입력(재셔플). (2026-07-21 #14 사고)
+    cvc_ok = False
+    for cvc_try in range(3):
+        cf = next((it for it in _ocr_texts(cap()) if "CVC" in it["text"].upper()), None)
+        if not cf:
+            out["err"] = "CVC 필드 미발견"; return out
+        _adb().tap(cf["cx"], cf["cy"]); time.sleep(1.5)
+        r = _tap_shuffle_retry(cvc, delay=1.0)
+        if not r.get("ok"):
+            out["err"] = f"CVC 입력 실패: {r.get('err')}"; return out
+        time.sleep(1.0)
+        if screen_has("입력완료"):
+            ocr_tap("입력완료", contains=True); time.sleep(1.2)
+        # 4c) '다음' (카드+CVC 입력되면 파랑 활성)
+        if not ocr_tap("다음", contains=True, retries=4):
+            out["err"] = "카드/CVC '다음' 실패"; return out
+        time.sleep(2.5)
+        # 'CVC 잘못 입력' 에러 감지 → 확인 후 CVC 재입력
+        if screen_has("잘못") or screen_has("다시 확인"):
+            print(f"   [lotte] CVC 오입력 감지 → 확인 후 재입력 (시도 {cvc_try + 1}/3)", flush=True)
+            ocr_tap("확인", contains=True, retries=2); time.sleep(1.5)
+            continue
+        cvc_ok = True
+        break
+    if not cvc_ok:
+        out["err"] = "CVC 재입력 3회 실패(OCR 오독 지속)"; return out
     # 5) 일반결제 비밀번호 화면 → '숫자 6자리 입력' → 셔플키패드 pin6 → '다음'
     out["step"] = "pin6"
     if not wait_text("6자리", timeout=12) and not screen_has("비밀번호"):
@@ -947,7 +977,7 @@ def pay_lotte_samsung_general() -> dict:
     pf = next((it for it in _ocr_texts(cap()) if "6자리" in it["text"] or "숫자" in it["text"]), None)
     if pf:
         _adb().tap(pf["cx"], pf["cy"]); time.sleep(1.5)
-    r = _tap_shuffle(pin6, delay=0.8)
+    r = _tap_shuffle_retry(pin6, delay=0.8)
     if not r.get("ok"):
         out["err"] = f"결제비번 입력 실패: {r.get('err')}"; return out
     time.sleep(1.0)
@@ -979,7 +1009,7 @@ def pay_lotte_samsung_general() -> dict:
     if not wait_text("비밀번호", timeout=10):
         out["err"] = "인증서 비번 화면 미도달"; return out
     time.sleep(1.0)
-    r = _tap_shuffle(cert_pw6, delay=0.8)   # 2엔진→4엔진(roi). 인증서 키패드도 2엔진 roi 로 0~9 정매핑(#13 검증)
+    r = _tap_shuffle_retry(cert_pw6, delay=0.8)   # 2엔진→4엔진(roi). 인증서 키패드도 2엔진 roi 로 0~9 정매핑(#13 검증)
     if not r.get("ok"):
         out["err"] = f"인증서 비번 입력 실패: {r.get('err')}"; return out
     time.sleep(2.0)

@@ -243,16 +243,22 @@ def _normalize(s: str) -> str:
 # 샘플 단가 = 재고현황 시트(SoT)에서 동적 로드 (s코드→단가). SAMPLE_TABLE 은 이름→s코드
 # 매칭(별칭 포함)에만 사용하고, *단가는 시트가 우선*. (하드코딩 drift 방지 — 2026-06-02)
 INVENTORY_STATUS_TAB = "재고현황"
-INVENTORY_PRICE_RANGE = "A55:E91"   # A=s코드, E=단가
+INVENTORY_PRICE_RANGE = "A55:E91"   # A=s코드, C=제품명, E=단가
 _SHEET_SAMPLE_PRICES: dict[str, int] | None = None
+_SHEET_SAMPLE_ROWS: list[tuple[str, int, str]] | None = None   # (C열 이름, 단가, s코드)
 
 
 def sample_prices_from_sheet(force: bool = False) -> dict[str, int]:
-    """재고현황 시트에서 {s코드: 단가} 로드 (1회 캐시). 실패 시 빈 dict → SAMPLE_TABLE 폴백."""
-    global _SHEET_SAMPLE_PRICES
+    """재고현황 시트에서 {s코드: 단가} 로드 (1회 캐시). 실패 시 빈 dict → SAMPLE_TABLE 폴백.
+
+    ★C열 제품명도 함께 로드 (_SHEET_SAMPLE_ROWS) — 시트가 이름 매칭의 SoT.
+      시트에 새 샘플(예: s39 시그니쳐 진생 페이셜 솝)을 추가하면 코드 수정 없이 바로 매칭됨
+      (2026-07-16: SAMPLE_TABLE 하드코딩만 보다가 s39를 '신규'로 오판한 사고 재발 방지)."""
+    global _SHEET_SAMPLE_PRICES, _SHEET_SAMPLE_ROWS
     if _SHEET_SAMPLE_PRICES is not None and not force:
         return _SHEET_SAMPLE_PRICES
     prices: dict[str, int] = {}
+    rows: list[tuple[str, int, str]] = []
     try:
         ws = gs_client().open_by_key(INVENTORY_SHEET_ID).worksheet(INVENTORY_STATUS_TAB)
         for r in ws.get(INVENTORY_PRICE_RANGE, value_render_option="UNFORMATTED_VALUE"):
@@ -264,10 +270,20 @@ def sample_prices_from_sheet(force: bool = False) -> dict[str, int]:
             val = r[4] if len(r) > 4 else None
             if isinstance(val, (int, float)) and val:
                 prices[code] = int(val)
+                name = str(r[2]).strip() if len(r) > 2 and r[2] else ""
+                if name:
+                    rows.append((name, int(val), code))
     except Exception as e:
         print(f"[WARN] 재고현황 단가 로드 실패 ({e}) → SAMPLE_TABLE 하드코딩 단가 사용")
     _SHEET_SAMPLE_PRICES = prices
+    _SHEET_SAMPLE_ROWS = rows
     return prices
+
+
+def sample_rows_from_sheet() -> list[tuple[str, int, str]]:
+    """재고현황 C열 기반 (이름, 단가, s코드) — lookup_sample 의 시트 SoT 매칭용."""
+    sample_prices_from_sheet()
+    return _SHEET_SAMPLE_ROWS or []
 
 
 def check_sample_price_drift() -> list[tuple[str, str, int, int]]:
@@ -294,11 +310,12 @@ def lookup_sample(page_text: str) -> tuple[str, int, str | None] | None:
     norm = _normalize(page_text)
     if not norm:
         return None
-    # 1) substring 매칭 — 단가표 정식이름이 페이지 텍스트에 포함되는 경우
+    # 1) substring 매칭 — SAMPLE_TABLE(하드코딩 별칭) + 재고현황 C열(시트 SoT) 둘 다 후보.
+    #    시트 C열이 있어야 새로 추가된 샘플(s39 등)이 코드 수정 없이 매칭됨 (2026-07-16).
     candidates = []
-    for name, price, code in SAMPLE_TABLE:
+    for name, price, code in list(SAMPLE_TABLE) + sample_rows_from_sheet():
         n = _normalize(name)
-        if n in norm or norm in n:
+        if n and (n in norm or norm in n):
             candidates.append((len(n), name, price, code))
     if candidates:
         # 가장 긴 매치 우선 (구체적인 게 정확)

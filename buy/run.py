@@ -34,7 +34,7 @@ ROOT = Path(__file__).parent
 PROJECT_ROOT = ROOT.parent
 load_dotenv(ROOT / ".env")
 sys.path.insert(0, str(PROJECT_ROOT))
-from chrome_launcher import ensure_chrome  # noqa: E402  (CDP attach 스크립트는 ensure_chrome 필수)
+from chrome_launcher import ensure_chrome, resolve_cdp_port  # noqa: E402  (CDP attach 스크립트는 필수)
 
 ACCOUNTS_FILE = Path(os.environ.get("HMALL_CONFIG_PATH") or (PROJECT_ROOT / "hmall_config.json"))
 PRODUCTS_FILE = ROOT / "products.json"
@@ -723,11 +723,15 @@ def main() -> int:
         target_indices = [idx for idx in all_indices if idx not in INACTIVE_ACCOUNTS]
 
     print(f"[INFO] 처리할 계정: {target_indices}")
+
+    # 포트 체인: 9222 막히면 9223→9224 (같은 CFT). 죽음/탭0 자동복구 포함.
+    global CDP_PORT, CDP_ENDPOINT
+    CDP_PORT = str(resolve_cdp_port(int(CDP_PORT)))
+    CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
     print(f"[INFO] CDP endpoint={CDP_ENDPOINT}")
 
     summary = []
     print(f"[INFO] PW backend: {PW_BACKEND}")
-    ensure_chrome(int(CDP_PORT))   # 9222 죽음/탭0 자동복구 (launch-hmall-chrome.sh + 탭 보장)
     with sync_playwright() as p:
         try:
             browser = p.chromium.connect_over_cdp(CDP_ENDPOINT, slow_mo=500)
