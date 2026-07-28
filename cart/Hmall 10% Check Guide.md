@@ -134,6 +134,8 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 | 33 | GRN 붓기캔디 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2250831230&sectId=3060687 |
 | 34 | 데이즈온 파라다이스 버닝 9박스 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2250397383&sectId=3060687 |
 | 35 | 데이즈온 프리바이오틱스 에프오에스 트리플 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2247305088 |
+| 36 | 센텔리안24 더 마데카 크림 50ml 20개 (옵션3) | https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546 |
+| 39 | 서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244447210&sectId=173266 |
 
 ---
 

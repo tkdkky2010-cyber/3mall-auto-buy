@@ -178,6 +178,7 @@ def _compute_reward(price: int | None, tiers: list[dict], simple_ranges: list[di
 # - option_keyword: base 페이지에서 클릭할 옵션 키워드 (실제 DOM 텍스트에 포함되어야 매칭)
 # - unit_list_price: 옵션의 1개당 정가 (None 이면 base.options 에서 자동 lookup)
 ALIAS_META: dict[int, dict] = {
+    36: {"option_index": 3},   # 센텔리안24 더 마데카 크림 50ml 20개 [선택3] (사용자 지정 2026-07-28)
     5:  {"alias_of": 4,  "option_keyword": "말차",   "unit_list_price": 99_900},  # codegen 5/15 확정 [선택 2]
     13: {"alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": 26900},
     14: {"alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": None},   # auto-lookup → 26,900
@@ -542,7 +543,8 @@ def _click_coupon(page: Page) -> None:
         pass
 
 
-def _execute_buy_now(page: Page, qty: int, option_keyword: str | None = None) -> tuple[bool, list[dict]]:
+def _execute_buy_now(page: Page, qty: int, option_keyword: str | None = None,
+                     option_index: int | None = None) -> tuple[bool, list[dict]]:
     """구매하기 → (옵션 모두 스크랩) → 옵션 선택 → qty + → 바로구매 → /order 페이지 도달 확인.
 
     Returns (success, options).
@@ -597,14 +599,16 @@ def _execute_buy_now(page: Page, qty: int, option_keyword: str | None = None) ->
 
     # 옵션 클릭 — span.choice-num.title 우선 + 폴백 <a>. invisible 매칭 방지 위해 timeout 5초.
     try:
+        # 선택 우선순위: option_keyword > option_index(N번) > 기본 [선택1]
+        sel_pat = re.compile(rf"\[선택\s*{option_index}\]") if option_index else re.compile(r"\[선택\s*1\]")
         if option_keyword:
             opt = page.locator("span.choice-num.title").filter(has_text=option_keyword).first
             if opt.count() == 0:
                 opt = page.locator("a").filter(has_text=option_keyword).first
         else:
-            opt = page.locator("span.choice-num.title").filter(has_text=re.compile(r"\[선택\s*1\]")).first
+            opt = page.locator("span.choice-num.title").filter(has_text=sel_pat).first
             if opt.count() == 0:
-                opt = page.locator("a").filter(has_text=re.compile(r"\[선택\s*1\]")).first
+                opt = page.locator("a").filter(has_text=sel_pat).first
         if opt.count() > 0:
             opt.click(timeout=5000)
             page.wait_for_timeout(1500)
@@ -963,7 +967,8 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
 
     # 3) 쿠폰 + 바로구매 (optimal qty)
     _click_coupon(page)
-    ok, options = _execute_buy_now(page, qty, option_keyword=prod.get("option_keyword"))
+    ok, options = _execute_buy_now(page, qty, option_keyword=prod.get("option_keyword"),
+                                   option_index=prod.get("option_index"))
     out["options"] = options
     if not ok:
         out["error"] = "바로구매 실패"

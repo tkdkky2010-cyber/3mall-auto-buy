@@ -2297,6 +2297,325 @@
         "benefit_unit_price": 73600,
         "options": []
       }
+    },
+    {
+      "id": 36,
+      "name": "센텔리안24 더 마데카 크림 50ml 20개 (옵션3)",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546",
+      "ten_percent": true,
+      "phrase": "올인데이 10%적립",
+      "events": [
+        {
+          "prmo": "P202607221074",
+          "name": "올인데이 10%적립",
+          "event_end": "7.28 23:59",
+          "tiers": [
+            {
+              "min_won": 50000,
+              "min_unit": "원",
+              "reward_pt": 5000
+            },
+            {
+              "min_won": 100000,
+              "min_unit": "원",
+              "reward_pt": 10000
+            },
+            {
+              "min_won": 200000,
+              "min_unit": "원",
+              "reward_pt": 20000
+            },
+            {
+              "min_won": 300000,
+              "min_unit": "원",
+              "reward_pt": 30000
+            },
+            {
+              "min_won": 400000,
+              "min_unit": "원",
+              "reward_pt": 40000
+            },
+            {
+              "min_won": 500000,
+              "min_unit": "원",
+              "reward_pt": 50000
+            }
+          ],
+          "simple_range": null
+        }
+      ],
+      "tiers": [
+        {
+          "min_won": 50000,
+          "min_unit": "원",
+          "reward_pt": 5000
+        },
+        {
+          "min_won": 100000,
+          "min_unit": "원",
+          "reward_pt": 10000
+        },
+        {
+          "min_won": 200000,
+          "min_unit": "원",
+          "reward_pt": 20000
+        },
+        {
+          "min_won": 300000,
+          "min_unit": "원",
+          "reward_pt": 30000
+        },
+        {
+          "min_won": 400000,
+          "min_unit": "원",
+          "reward_pt": 40000
+        },
+        {
+          "min_won": 500000,
+          "min_unit": "원",
+          "reward_pt": 50000
+        }
+      ],
+      "max_reward": "50,000P",
+      "event_end": "7.28 23:59",
+      "has_coupon": false,
+      "error": null,
+      "coupon_claimed": false,
+      "simple_ranges": [],
+      "payment": {
+        "qty": 2,
+        "list_price": 250000,
+        "member_price": 53820,
+        "card_slides": [
+          {
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 209,250원",
+            "percent": 7,
+            "price": 209250
+          },
+          {
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 213,750원",
+            "percent": 5,
+            "price": 213750
+          }
+        ],
+        "kakao_price": 50053,
+        "kakao_reward_pt": 5000,
+        "kakao_final_cost": 45053,
+        "paybacks": {},
+        "optimal_tier": {
+          "qty": 2,
+          "tier_min": 50000,
+          "tier_reward": 5000,
+          "nominal_pct": 10.0,
+          "actual_total": 53820,
+          "actual_reward": 5000,
+          "effective_pct": 9.29022668153103
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 26910,
+        "options": [
+          {
+            "idx": 1,
+            "name": "[센텔리안24] 동국제약 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
+            "list_price": 29900
+          },
+          {
+            "idx": 2,
+            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 20개",
+            "list_price": 160000
+          },
+          {
+            "idx": 3,
+            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 20개",
+            "list_price": 125000
+          },
+          {
+            "idx": 4,
+            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 3개",
+            "list_price": 24900
+          },
+          {
+            "idx": 5,
+            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 8개+15ml 1개",
+            "list_price": 62900
+          },
+          {
+            "idx": 6,
+            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 10개",
+            "list_price": 72900
+          },
+          {
+            "idx": 7,
+            "name": "[센텔리안24] 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
+            "list_price": 29900
+          },
+          {
+            "idx": 8,
+            "name": "[센텔리안24] 더마데카크림 50ml 3개+타이트 리프팅 50ml 3개",
+            "list_price": 44900
+          },
+          {
+            "idx": 10,
+            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 10개+15ml 1개",
+            "list_price": 87900
+          },
+          {
+            "idx": 11,
+            "name": "[센텔리안24] 마데카 멜라 캡처 앰플 캡슐 크림 55ml 2개",
+            "list_price": 35900
+          },
+          {
+            "idx": 12,
+            "name": "[센텔리안24] NEW 마데카크림 에이징 포커스 50ml 5개",
+            "list_price": 50900
+          },
+          {
+            "idx": 13,
+            "name": "[센텔리안24] 마데카 크림 파워 부스팅 포뮬러 어드밴스드 50ml 3개 비타민C",
+            "list_price": 25900
+          },
+          {
+            "idx": 14,
+            "name": "[센텔리안24] 동국제약 마데카크림 타이트 리프팅 50ml 6개+15ml 2개",
+            "list_price": 59900
+          },
+          {
+            "idx": 16,
+            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 10개",
+            "list_price": 63900
+          }
+        ]
+      }
+    },
+    {
+      "id": 39,
+      "name": "서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244447210&sectId=173266",
+      "ten_percent": true,
+      "phrase": "올인데이 10%적립",
+      "events": [
+        {
+          "prmo": "P202607221074",
+          "name": "올인데이 10%적립",
+          "event_end": "7.28 23:59",
+          "tiers": [
+            {
+              "min_won": 50000,
+              "min_unit": "원",
+              "reward_pt": 5000
+            },
+            {
+              "min_won": 100000,
+              "min_unit": "원",
+              "reward_pt": 10000
+            },
+            {
+              "min_won": 200000,
+              "min_unit": "원",
+              "reward_pt": 20000
+            },
+            {
+              "min_won": 300000,
+              "min_unit": "원",
+              "reward_pt": 30000
+            },
+            {
+              "min_won": 400000,
+              "min_unit": "원",
+              "reward_pt": 40000
+            },
+            {
+              "min_won": 500000,
+              "min_unit": "원",
+              "reward_pt": 50000
+            }
+          ],
+          "simple_range": null
+        }
+      ],
+      "tiers": [
+        {
+          "min_won": 50000,
+          "min_unit": "원",
+          "reward_pt": 5000
+        },
+        {
+          "min_won": 100000,
+          "min_unit": "원",
+          "reward_pt": 10000
+        },
+        {
+          "min_won": 200000,
+          "min_unit": "원",
+          "reward_pt": 20000
+        },
+        {
+          "min_won": 300000,
+          "min_unit": "원",
+          "reward_pt": 30000
+        },
+        {
+          "min_won": 400000,
+          "min_unit": "원",
+          "reward_pt": 40000
+        },
+        {
+          "min_won": 500000,
+          "min_unit": "원",
+          "reward_pt": 50000
+        }
+      ],
+      "max_reward": "50,000P",
+      "event_end": "7.28 23:59",
+      "has_coupon": false,
+      "error": null,
+      "coupon_claimed": false,
+      "simple_ranges": [],
+      "payment": {
+        "qty": 1,
+        "list_price": 99000,
+        "member_price": 84150,
+        "card_slides": [
+          {
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 78,260원",
+            "percent": 7,
+            "price": 78260
+          },
+          {
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 79,943원",
+            "percent": 5,
+            "price": 79943
+          }
+        ],
+        "kakao_price": 78260,
+        "kakao_reward_pt": 5000,
+        "kakao_final_cost": 73260,
+        "paybacks": {},
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 50000,
+          "tier_reward": 5000,
+          "nominal_pct": 10.0,
+          "actual_total": 84150,
+          "actual_reward": 5000,
+          "effective_pct": 5.941770647653001
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 84150,
+        "options": [
+          {
+            "idx": 1,
+            "name": "서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스",
+            "list_price": 99000
+          }
+        ]
+      }
     }
   ],
   "ten_percent_ids": [
@@ -2317,6 +2636,8 @@
     31,
     33,
     34,
-    35
+    35,
+    36,
+    39
   ]
 }
