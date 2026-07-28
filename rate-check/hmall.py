@@ -124,11 +124,11 @@ def lookup_payback(brand: str) -> float:
 
 
 def process_combo(page, idx: int, combo: list[tuple[str, int]],
-                  add_gift_value: dict[str, int], gwp_6set: int) -> dict:
+                  add_gift_value: dict[str, int], gwp_70tier: int) -> dict:
     """조합 1개 처리 — cart 비우기 → 담기 → 체크아웃 → 캐러셀 → 가격 추출."""
     소비자가 = sum(C.PRODUCTS[c]["price"] * q for c, q in combo)
     추증 = sum(add_gift_value.get(c, 0) * q for c, q in combo)
-    총샘플 = 추증 + gwp_6set
+    총샘플 = 추증 + gwp_70tier
 
     print(f"\n=== 조합 {idx}: {combo} 소비자가 {소비자가:,}원 ===")
 
@@ -193,7 +193,7 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
 
     return {
         "idx": idx, "combo": combo,
-        "소비자가": 소비자가, "추증": 추증, "GWP": gwp_6set, "총샘플": 총샘플,
+        "소비자가": 소비자가, "추증": 추증, "GWP": gwp_70tier, "총샘플": 총샘플,
         "card_brand": best["brand"], "card_pct": best["percent"], "payback_pct": payback,
         "preview_price": best["preview_price"], "구매가격": 구매가격,
         "순구매가": 순, "공급률": round(공급률, 4),
@@ -289,8 +289,8 @@ def main(argv=None):
         sys.exit(f"❌ '{C.today_tab_name()}' 탭 없음 — 먼저 galleria.py 실행 필요")
     comp = C.load_galleria_composition_from_sheet(ws_read)
     add_gift_value = comp["add_gift_value"]
-    gwp_6set = comp["gwp_6set"]
-    print(f"[INFO] composition (sheet): GWP 6세트={gwp_6set:,}원")
+    gwp_70tier = comp["gwp_70tier"]
+    print(f"[INFO] composition (sheet): GWP(70만↑ 4세트)={gwp_70tier:,}원")
     print(f"[INFO] 추가증정가치: {add_gift_value}")
 
     combos = list(enumerate(C.COMBOS, start=1))
@@ -314,13 +314,13 @@ def main(argv=None):
 
         for idx, combo in combos:
             try:
-                r = process_combo(page, idx, combo, add_gift_value, gwp_6set)
+                r = process_combo(page, idx, combo, add_gift_value, gwp_70tier)
                 # 측정 중 세션이 끊기면 구매하기가 장바구니/비회원폼으로 바운스됨
                 # → 재로그인 후 그 조합만 1회 재시도 (이후 조합 줄줄이 실패 방지).
                 if str(r.get("error", "")).startswith("체크아웃 페이지 미도달"):
                     if ensure_logged_in(page):
                         print(f"  [RETRY] 조합 {idx} 재로그인 후 재시도")
-                        r = process_combo(page, idx, combo, add_gift_value, gwp_6set)
+                        r = process_combo(page, idx, combo, add_gift_value, gwp_70tier)
             except Exception as e:
                 r = {"idx": idx, "error": f"예외: {e}"}
             results.append(r)

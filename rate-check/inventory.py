@@ -56,14 +56,14 @@ def load_composition_from_sheet() -> dict:
 # ============================================================
 # 당일 구성 → 조합별 코드 dict 변환
 # ============================================================
-def composition_to_combo_codes(comp: dict, gwp_sets_per_combo: int = 6) -> dict[int, dict[str, int]]:
+def composition_to_combo_codes(comp: dict, gwp_sets_per_combo: int = 4) -> dict[int, dict[str, int]]:
     """1조합 → {코드: 수량} dict.
 
     구성 = 본품 + (상품별 추가증정 × 본품수량) + (GWP 1세트 × gwp_sets_per_combo)
     같은 코드끼리 합산.
 
-    gwp_sets_per_combo: 가이드는 조합별 본품가>700K → 6세트, 400K~700K → 3세트.
-    실제로 전 조합 700K+ 가정 (Layer 1 조합 정의 기준) — 디폴트 6.
+    gwp_sets_per_combo: 2026-07-28 프로모션 변경 — 본품가>700K → 4세트, 400K~700K → 2세트.
+    실제로 전 조합 700K+ 가정 (Layer 1 조합 정의 기준) — 디폴트 4.
     """
     products = comp["products"]
     gwp_set = comp["gwp"]["set"]
@@ -252,8 +252,8 @@ def main(argv=None):
     p = argparse.ArgumentParser()
     p.add_argument("--apply", action="store_true",
                    help="차이 발견 시 새 버전 자동 추가 (디폴트: dry-run)")
-    p.add_argument("--gwp-sets", type=int, default=6,
-                   help="조합당 GWP 세트 수 (기본 6, 400K~700K 조합 있으면 3)")
+    p.add_argument("--gwp-sets", type=int, default=4,
+                   help="조합당 GWP 세트 수 (2026-07-28~ 기본 4, 400K~700K 조합이면 2)")
     args = p.parse_args(argv)
 
     date = datetime.now().strftime("%Y-%m-%d")

@@ -140,7 +140,7 @@ COMBOS: list[list[tuple[str, int]]] = [
 # N=20: Hmall 53~78 / Lotte 81~107 / J1:M21 (이전 값과 동일)
 # N=23: Hmall 53~81 / Lotte 84~113 / J1:M24
 # ============================================================
-GALLERIA_DATA_END_ROW = 50
+GALLERIA_DATA_END_ROW = 55   # 2026-07-28: GWP 7품목(여윤팩·상백선크림 추가)로 51행 → 예약 상향(버퍼 포함)
 HMALL_HEADER_ROW = GALLERIA_DATA_END_ROW + 3
 HMALL_COMBO_START_ROW = HMALL_HEADER_ROW + 6
 HMALL_COMBO_END_ROW = HMALL_COMBO_START_ROW + len(COMBOS) - 1
@@ -378,11 +378,11 @@ def galleria_combo(idx: int, combo: list[tuple[str, int]],
     소비자가 = sum(PRODUCTS[c]["price"] * q for c, q in combo)
     추가증정 = sum(products[c].add_gift_value * q for c, q in combo)
     if 소비자가 >= GWP_TIER_70:
-        gwp_value = gwp.set_value * 6
-        gwp_tier = "6세트"
+        gwp_value = gwp.set_value * 4          # 2026-07-28 프로모션 변경: 70만 6→4세트
+        gwp_tier = "4세트"
     elif 소비자가 >= GWP_TIER_40:
-        gwp_value = gwp.set_value * 3
-        gwp_tier = "3세트"
+        gwp_value = gwp.set_value * 2          # 2026-07-28 프로모션 변경: 40만 3→2세트
+        gwp_tier = "2세트"
     else:
         gwp_value = 0
         gwp_tier = "미적용"
@@ -422,7 +422,7 @@ def load_galleria_composition_from_sheet(ws) -> dict:
     SoT 원칙: 모든 결과는 Google Sheets에만 보존. 로컬 파일/캐시는 stale 위험으로 금지.
     매 실행마다 sheet에서 fresh 읽기 — 재실행 시 옛 캐시 따라 쓰는 버그 방지.
 
-    Returns: {"add_gift_value": {b: int, ...}, "gwp_1set": int, "gwp_6set": int}
+    Returns: {"add_gift_value": {b: int, ...}, "gwp_1set": int, "gwp_70tier": int}  # gwp_70tier=70만↑구간 GWP값(현재 4세트)
     galleria가 미실행이면 ValueError.
     """
     # 1) 추가증정가치 행 — "추가증정가치" 라벨 검색 (갤러리아 섹션 전체, 위치 가변 안전)
@@ -438,8 +438,8 @@ def load_galleria_composition_from_sheet(ws) -> dict:
         raise ValueError("'추가증정가치' 행 sheet에서 못찾음 — galleria 먼저 실행 필요")
 
     # 2) GWP 1세트/6세트 — "1세트 합계" / "6세트 합계" 라벨 검색 (품목 수 무관, 위치 가변 안전)
-    gwp_block = ws.get("A6:C50")
-    gwp_1set = gwp_6set = 0
+    gwp_block = ws.get(f"A6:C{GALLERIA_DATA_END_ROW}")
+    gwp_1set = gwp_70tier = 0
     for row in gwp_block:
         if not row:
             continue
@@ -447,12 +447,12 @@ def load_galleria_composition_from_sheet(ws) -> dict:
         val = _parse_won(row[2] if len(row) > 2 else "")
         if label.startswith("1세트 합계"):
             gwp_1set = val
-        elif label.startswith("6세트 합계"):
-            gwp_6set = val
-    if not gwp_6set:
-        raise ValueError("'6세트 합계' sheet에서 못찾음 — galleria 먼저 실행 필요")
+        elif "세트 합계" in label:            # 4세트(70만↑) 합계 — 세트수 무관 매칭
+            gwp_70tier = val
+    if not gwp_70tier:
+        raise ValueError("70만↑ 세트 합계 sheet에서 못찾음 — galleria 먼저 실행 필요")
 
-    return {"add_gift_value": add_gift_value, "gwp_1set": gwp_1set, "gwp_6set": gwp_6set}
+    return {"add_gift_value": add_gift_value, "gwp_1set": gwp_1set, "gwp_70tier": gwp_70tier}
 
 
 def load_galleria_samples_from_sheet(ws) -> dict:
@@ -501,7 +501,7 @@ def load_galleria_gwp_from_sheet(ws) -> list[dict]:
         if not row or not row[0].strip():
             continue
         label = row[0].strip()
-        if label.startswith("1세트 합계") or label.startswith("6세트 합계"):
+        if "세트 합계" in label:                # 1세트/4세트 합계 요약행 skip
             break
         qty_match = re.match(r"x(\d+)", row[1].strip() if len(row) > 1 else "")
         if not qty_match:

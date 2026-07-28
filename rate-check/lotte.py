@@ -274,14 +274,14 @@ _sh_lotte = _gc_lotte.open_by_key(RATE_SHEET_ID)
 _ws_lotte = _sh_lotte.worksheet(today_tab_name())
 _comp = load_galleria_composition_from_sheet(_ws_lotte)
 ADD_GIFT = _comp["add_gift_value"]
-GWP_6 = _comp["gwp_6set"]
+GWP_70 = _comp["gwp_70tier"]
 print(f"당일 추증가치 (sheet): {ADD_GIFT}")
-print(f"당일 GWP 6세트 (sheet): {GWP_6:,}원")
+print(f"당일 GWP(70만↑ 4세트) (sheet): {GWP_70:,}원")
 
 def compute(combo):
     소비자 = sum(PRICES[c]*q for c,q in combo)
     추증 = sum(ADD_GIFT[c]*q for c,q in combo)
-    총샘플 = 추증 + GWP_6
+    총샘플 = 추증 + GWP_70
     # 1) 결제금액 (적립 적용 전) 먼저 계산
     final = 0
     for c,q in combo:
@@ -326,7 +326,7 @@ data.append(['조합번호','조합','소비자가','추증','GWP','총샘플','
              '', '상품', '쿠폰%'])
 for i, r in enumerate(rows):
     cn = combo_label_ko(r['combo'])
-    row = [r['idx'], cn, r['소비자가'], r['추증'], GWP_6, r['총샘플'], r['적립'], r['최종'], r['순'], round(r['공급률'],4)]
+    row = [r['idx'], cn, r['소비자가'], r['추증'], GWP_70, r['총샘플'], r['적립'], r['최종'], r['순'], round(r['공급률'],4)]
     if i < 7:
         code = 'bcdefgh'[i]
         cp = coupons.get(code) or 0

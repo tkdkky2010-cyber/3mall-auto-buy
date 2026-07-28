@@ -393,7 +393,7 @@ def write_galleria_section(ws, products: dict[str, C.ProductDay], gwp: C.GwpDay,
     for s in gwp.set_items:
         emit(s.name, f"x{s.qty}", f"{s.price:,}원" if s.price else "단가미정")
     emit("1세트 합계", "", f"{gwp.set_value:,}원")
-    emit("6세트 합계 (70만+)", "", f"{gwp.set_value * 6:,}원")
+    emit("4세트 합계 (70만+)", "", f"{gwp.set_value * 4:,}원")   # 2026-07-28 프로모션 변경 6→4세트
     emit()
 
     # 상품별 추가증정 구성 — 샘플 수 무관
@@ -535,7 +535,7 @@ def main(argv=None):
                 download_gwp_image(gwp_image_src, gwp_image_path)
             return emit_gwp_pending(today, gwp_image_path)
         print(f"  GWP 구성 로드: {gwp_json_path} (period={gwp.period!r})")
-        print(f"      1세트 = {gwp.set_value:,}원, 6세트 = {gwp.set_value * 6:,}원")
+        print(f"      1세트 = {gwp.set_value:,}원, 4세트 = {gwp.set_value * 4:,}원")
         if live_fp:
             _save_registry(live_fp, gwp.period,
                            json.loads(gwp_json_path.read_text(encoding="utf-8")).get("set", []), today)
