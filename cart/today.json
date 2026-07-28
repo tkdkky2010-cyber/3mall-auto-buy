@@ -2383,39 +2383,435 @@
       "coupon_claimed": false,
       "simple_ranges": [],
       "payment": {
-        "qty": 2,
-        "list_price": 250000,
-        "member_price": 53820,
+        "qty": 1,
+        "list_price": 125000,
+        "member_price": 112500,
         "card_slides": [
           {
             "alt": "cardCd04",
-            "text": "카카오페이 현대 7% 즉시할인 209,250원",
+            "text": "카카오페이 현대 7% 즉시할인 104,625원",
             "percent": 7,
-            "price": 209250
+            "price": 104625
           },
           {
             "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 213,750원",
+            "text": "NH 5% 즉시할인 106,875원",
             "percent": 5,
-            "price": 213750
+            "price": 106875
           }
         ],
-        "kakao_price": 50053,
-        "kakao_reward_pt": 5000,
-        "kakao_final_cost": 45053,
+        "kakao_price": 104625,
+        "kakao_reward_pt": 10000,
+        "kakao_final_cost": 94625,
         "paybacks": {},
         "optimal_tier": {
-          "qty": 2,
+          "qty": 1,
           "tier_min": 50000,
           "tier_reward": 5000,
           "nominal_pct": 10.0,
-          "actual_total": 53820,
-          "actual_reward": 5000,
-          "effective_pct": 9.29022668153103
+          "actual_total": 112500,
+          "actual_reward": 10000,
+          "effective_pct": 8.88888888888889
         },
         "effective_ten_percent": true,
         "error": null,
-        "benefit_unit_price": 26910,
+        "benefit_unit_price": 112500,
+        "option_picked": {
+          "idx": 3,
+          "list_price": 125000
+        },
+        "options": [
+          {
+            "idx": 1,
+            "name": "[센텔리안24] 동국제약 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
+            "list_price": 29900
+          },
+          {
+            "idx": 2,
+            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 20개",
+            "list_price": 160000
+          },
+          {
+            "idx": 3,
+            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 20개",
+            "list_price": 125000
+          },
+          {
+            "idx": 4,
+            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 3개",
+            "list_price": 24900
+          },
+          {
+            "idx": 5,
+            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 8개+15ml 1개",
+            "list_price": 62900
+          },
+          {
+            "idx": 6,
+            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 10개",
+            "list_price": 72900
+          },
+          {
+            "idx": 7,
+            "name": "[센텔리안24] 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
+            "list_price": 29900
+          },
+          {
+            "idx": 8,
+            "name": "[센텔리안24] 더마데카크림 50ml 3개+타이트 리프팅 50ml 3개",
+            "list_price": 44900
+          },
+          {
+            "idx": 10,
+            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 10개+15ml 1개",
+            "list_price": 87900
+          },
+          {
+            "idx": 11,
+            "name": "[센텔리안24] 마데카 멜라 캡처 앰플 캡슐 크림 55ml 2개",
+            "list_price": 35900
+          },
+          {
+            "idx": 12,
+            "name": "[센텔리안24] NEW 마데카크림 에이징 포커스 50ml 5개",
+            "list_price": 50900
+          },
+          {
+            "idx": 13,
+            "name": "[센텔리안24] 마데카 크림 파워 부스팅 포뮬러 어드밴스드 50ml 3개 비타민C",
+            "list_price": 25900
+          },
+          {
+            "idx": 14,
+            "name": "[센텔리안24] 동국제약 마데카크림 타이트 리프팅 50ml 6개+15ml 2개",
+            "list_price": 59900
+          },
+          {
+            "idx": 16,
+            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 10개",
+            "list_price": 63900
+          }
+        ]
+      }
+    },
+    {
+      "id": 37,
+      "name": "센텔리안24 마데카크림 타임리버스 50ml 10개 (옵션6)",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546",
+      "ten_percent": true,
+      "phrase": "올인데이 10%적립",
+      "events": [
+        {
+          "prmo": "P202607221074",
+          "name": "올인데이 10%적립",
+          "event_end": "7.28 23:59",
+          "tiers": [
+            {
+              "min_won": 50000,
+              "min_unit": "원",
+              "reward_pt": 5000
+            },
+            {
+              "min_won": 100000,
+              "min_unit": "원",
+              "reward_pt": 10000
+            },
+            {
+              "min_won": 200000,
+              "min_unit": "원",
+              "reward_pt": 20000
+            },
+            {
+              "min_won": 300000,
+              "min_unit": "원",
+              "reward_pt": 30000
+            },
+            {
+              "min_won": 400000,
+              "min_unit": "원",
+              "reward_pt": 40000
+            },
+            {
+              "min_won": 500000,
+              "min_unit": "원",
+              "reward_pt": 50000
+            }
+          ],
+          "simple_range": null
+        }
+      ],
+      "tiers": [
+        {
+          "min_won": 50000,
+          "min_unit": "원",
+          "reward_pt": 5000
+        },
+        {
+          "min_won": 100000,
+          "min_unit": "원",
+          "reward_pt": 10000
+        },
+        {
+          "min_won": 200000,
+          "min_unit": "원",
+          "reward_pt": 20000
+        },
+        {
+          "min_won": 300000,
+          "min_unit": "원",
+          "reward_pt": 30000
+        },
+        {
+          "min_won": 400000,
+          "min_unit": "원",
+          "reward_pt": 40000
+        },
+        {
+          "min_won": 500000,
+          "min_unit": "원",
+          "reward_pt": 50000
+        }
+      ],
+      "max_reward": "50,000P",
+      "event_end": "7.28 23:59",
+      "has_coupon": false,
+      "error": null,
+      "coupon_claimed": false,
+      "simple_ranges": [],
+      "payment": {
+        "qty": 1,
+        "list_price": 72900,
+        "member_price": 65610,
+        "card_slides": [
+          {
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 61,018원",
+            "percent": 7,
+            "price": 61018
+          },
+          {
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 62,330원",
+            "percent": 5,
+            "price": 62330
+          }
+        ],
+        "kakao_price": 61017,
+        "kakao_reward_pt": 5000,
+        "kakao_final_cost": 56017,
+        "paybacks": {},
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 50000,
+          "tier_reward": 5000,
+          "nominal_pct": 10.0,
+          "actual_total": 65610,
+          "actual_reward": 5000,
+          "effective_pct": 7.620789513793628
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 65610,
+        "option_picked": {
+          "idx": 6,
+          "list_price": 72900
+        },
+        "options": [
+          {
+            "idx": 1,
+            "name": "[센텔리안24] 동국제약 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
+            "list_price": 29900
+          },
+          {
+            "idx": 2,
+            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 20개",
+            "list_price": 160000
+          },
+          {
+            "idx": 3,
+            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 20개",
+            "list_price": 125000
+          },
+          {
+            "idx": 4,
+            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 3개",
+            "list_price": 24900
+          },
+          {
+            "idx": 5,
+            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 8개+15ml 1개",
+            "list_price": 62900
+          },
+          {
+            "idx": 6,
+            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 10개",
+            "list_price": 72900
+          },
+          {
+            "idx": 7,
+            "name": "[센텔리안24] 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
+            "list_price": 29900
+          },
+          {
+            "idx": 8,
+            "name": "[센텔리안24] 더마데카크림 50ml 3개+타이트 리프팅 50ml 3개",
+            "list_price": 44900
+          },
+          {
+            "idx": 10,
+            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 10개+15ml 1개",
+            "list_price": 87900
+          },
+          {
+            "idx": 11,
+            "name": "[센텔리안24] 마데카 멜라 캡처 앰플 캡슐 크림 55ml 2개",
+            "list_price": 35900
+          },
+          {
+            "idx": 12,
+            "name": "[센텔리안24] NEW 마데카크림 에이징 포커스 50ml 5개",
+            "list_price": 50900
+          },
+          {
+            "idx": 13,
+            "name": "[센텔리안24] 마데카 크림 파워 부스팅 포뮬러 어드밴스드 50ml 3개 비타민C",
+            "list_price": 25900
+          },
+          {
+            "idx": 14,
+            "name": "[센텔리안24] 동국제약 마데카크림 타이트 리프팅 50ml 6개+15ml 2개",
+            "list_price": 59900
+          },
+          {
+            "idx": 16,
+            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 10개",
+            "list_price": 63900
+          }
+        ]
+      }
+    },
+    {
+      "id": 38,
+      "name": "센텔리안24 마데카크림 타이트 리프팅 50ml 20개 (옵션2)",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546",
+      "ten_percent": true,
+      "phrase": "올인데이 10%적립",
+      "events": [
+        {
+          "prmo": "P202607221074",
+          "name": "올인데이 10%적립",
+          "event_end": "7.28 23:59",
+          "tiers": [
+            {
+              "min_won": 50000,
+              "min_unit": "원",
+              "reward_pt": 5000
+            },
+            {
+              "min_won": 100000,
+              "min_unit": "원",
+              "reward_pt": 10000
+            },
+            {
+              "min_won": 200000,
+              "min_unit": "원",
+              "reward_pt": 20000
+            },
+            {
+              "min_won": 300000,
+              "min_unit": "원",
+              "reward_pt": 30000
+            },
+            {
+              "min_won": 400000,
+              "min_unit": "원",
+              "reward_pt": 40000
+            },
+            {
+              "min_won": 500000,
+              "min_unit": "원",
+              "reward_pt": 50000
+            }
+          ],
+          "simple_range": null
+        }
+      ],
+      "tiers": [
+        {
+          "min_won": 50000,
+          "min_unit": "원",
+          "reward_pt": 5000
+        },
+        {
+          "min_won": 100000,
+          "min_unit": "원",
+          "reward_pt": 10000
+        },
+        {
+          "min_won": 200000,
+          "min_unit": "원",
+          "reward_pt": 20000
+        },
+        {
+          "min_won": 300000,
+          "min_unit": "원",
+          "reward_pt": 30000
+        },
+        {
+          "min_won": 400000,
+          "min_unit": "원",
+          "reward_pt": 40000
+        },
+        {
+          "min_won": 500000,
+          "min_unit": "원",
+          "reward_pt": 50000
+        }
+      ],
+      "max_reward": "50,000P",
+      "event_end": "7.28 23:59",
+      "has_coupon": false,
+      "error": null,
+      "coupon_claimed": false,
+      "simple_ranges": [],
+      "payment": {
+        "qty": 1,
+        "list_price": 160000,
+        "member_price": 144000,
+        "card_slides": [
+          {
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 133,920원",
+            "percent": 7,
+            "price": 133920
+          },
+          {
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 136,800원",
+            "percent": 5,
+            "price": 136800
+          }
+        ],
+        "kakao_price": 133920,
+        "kakao_reward_pt": 10000,
+        "kakao_final_cost": 123920,
+        "paybacks": {},
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 50000,
+          "tier_reward": 5000,
+          "nominal_pct": 10.0,
+          "actual_total": 144000,
+          "actual_reward": 10000,
+          "effective_pct": 6.944444444444445
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 144000,
+        "option_picked": {
+          "idx": 2,
+          "list_price": 160000
+        },
         "options": [
           {
             "idx": 1,
@@ -2638,6 +3034,8 @@
     34,
     35,
     36,
+    37,
+    38,
     39
   ]
 }

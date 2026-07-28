@@ -179,6 +179,8 @@ def _compute_reward(price: int | None, tiers: list[dict], simple_ranges: list[di
 # - unit_list_price: 옵션의 1개당 정가 (None 이면 base.options 에서 자동 lookup)
 ALIAS_META: dict[int, dict] = {
     36: {"option_index": 3},   # 센텔리안24 더 마데카 크림 50ml 20개 [선택3] (사용자 지정 2026-07-28)
+    37: {"option_index": 6},   # 센텔리안24 마데카크림 타임리버스 50ml 10개 [선택6]
+    38: {"option_index": 2},   # 센텔리안24 마데카크림 타이트 리프팅 50ml 20개 [선택2]
     5:  {"alias_of": 4,  "option_keyword": "말차",   "unit_list_price": 99_900},  # codegen 5/15 확정 [선택 2]
     13: {"alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": 26900},
     14: {"alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": None},   # auto-lookup → 26,900
@@ -541,6 +543,40 @@ def _click_coupon(page: Page) -> None:
         page.wait_for_timeout(400)
     except Exception:
         pass
+
+
+def _scrape_options_only(page: Page) -> list[dict]:
+    """구매하기 클릭 → 옵션 리스트만 스크랩 [{idx, name, list_price}] (구매 진행 안 함).
+    다옵션 상품의 지정옵션 정가 확보용 (2026-07-28)."""
+    try:
+        page.locator("button.btn-purchase").first.click()
+        page.wait_for_timeout(1500)
+    except Exception:
+        return []
+    try:
+        return page.evaluate("""() => {
+            const out = [];
+            const spans = Array.from(document.querySelectorAll('span.choice-num.title'))
+                .filter(s => s.offsetParent !== null);
+            for (const s of spans) {
+                const text = (s.textContent || '').trim().replace(/\\s+/g, ' ');
+                const m = text.match(/\\[선택\\s*(\\d+)\\]/);
+                if (!m) continue;
+                const idx = parseInt(m[1]);
+                const name = text.replace(/\\[선택\\s*\\d+\\]/, '').replace(/^\\[우수고객전용\\]/, '').trim();
+                let price = null, cur = s.parentElement;
+                for (let i = 0; i < 5 && cur; i++) {
+                    const pm = (cur.innerText || '').match(/([\\d,]{4,})\\s*원/);
+                    if (pm) { price = parseInt(pm[1].replace(/,/g, '')); break; }
+                    cur = cur.parentElement;
+                }
+                out.push({ idx, name, list_price: price });
+            }
+            const seen = new Set();
+            return out.filter(o => { if (seen.has(o.idx)) return false; seen.add(o.idx); return true; });
+        }""") or []
+    except Exception:
+        return []
 
 
 def _execute_buy_now(page: Page, qty: int, option_keyword: str | None = None,
@@ -953,6 +989,24 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
     except Exception:
         benefit_unit = None
     out["benefit_unit_price"] = benefit_unit
+
+    # 1-b) 다옵션 상품(option_index 지정): PDP '혜택가'는 기본옵션(옵션1) 값이라 지정옵션과 다름.
+    #   React 드롭다운이라 옵션 클릭 자동선택이 불가(2026-07-28 실측) → 옵션 리스트에서 지정옵션 정가를
+    #   스크랩해 benefit_unit = 정가 × 0.9(고정 10% 우수가)로 교체. 카드%는 옵션 무관 동일(이후 기본옵션
+    #   바로구매에서 얻는 card_slides 그대로). 사용자 지시: 고정 할인율이라 옵션정가 −10% −카드% = 결제액.
+    oi = prod.get("option_index")
+    if oi:
+        opt_list = _scrape_options_only(page)
+        tgt = next((o for o in opt_list if o.get("idx") == oi and o.get("list_price")), None)
+        if not tgt:
+            out["error"] = f"옵션{oi} 정가 스크랩 실패 (옵션 {len(opt_list)}개)"
+            return out
+        benefit_unit = round(tgt["list_price"] * 0.9)
+        out["benefit_unit_price"] = benefit_unit
+        out["option_picked"] = {"idx": oi, "list_price": tgt["list_price"]}
+        print(f"     ⓘ #{prod['id']} 옵션{oi} 정가 {tgt['list_price']:,}원 → 우수가 {benefit_unit:,}원 (×0.9 고정)", flush=True)
+        page.goto(url, wait_until="domcontentloaded", timeout=20000)   # 패널 초기화
+        page.wait_for_timeout(1200)
 
     # 2) optimal qty 계산 (≥10% nominal, cap 500K)
     optimal = _find_optimal_qty(benefit_unit, tiers, cap_won=500_000, min_pct=10.0, simple_ranges=simple_ranges)
