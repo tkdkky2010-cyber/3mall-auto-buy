@@ -189,6 +189,34 @@ _GUIDE_ROW_RE = re.compile(
     r"^\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|\s*(https?://www\.hmall\.com/md/pda/itemPtc\?[^\s|]+)"
 )
 
+# ─────────────────────────────────────────────────────────────
+# 시트/콘솔 출력 순서 (사용자 지정 2026-07-31). slitmCd 기준.
+#   · 여기 있는 상품이 이 순서대로 상단에 나감.
+#   · 목록에 없는 나머지는 그 아래에 id 오름차순으로 붙음("여기 없는 건 아래로").
+#   · 아직 시스템에 URL 없는 신규품(6개)은 slitmCd 확보 시 이 리스트 + Guide.md 표에 추가.
+# 매칭은 slitmCd 완전일치 → 상품명이 달라져도 순서 유지.
+DISPLAY_ORDER = [
+    "2154750833",  # 1. 유한건강생활 이너플로라 UREX (※products.json #1 — Guide.md 표엔 아직 없음)
+    "2151046312",  # 2. 하루견과 넛츠시그니처(초록) 100봉
+    "2225431602",  # 3. 하루견과 갈색 100봉
+    "2244409628",  # 4. 이디야 디카페인(초록)
+    "2246603712",  # 5. 이디야 카페인 스페셜(보라)
+    "2246845189",  # 6. 라메종드미엘 프랑스 라벤더 천연꿀
+    "2225275921",  # 7. 루솔 20개
+    "2247036059",  # 8. 데이즈온 원데이 알파(알파시클로덱스트린)
+    "2244934734",  # 9. 올바른건강식품 와이 케어 프로바이오틱스 VL8
+    "2243971283",  # 10. 유기농 석류젤리 빨간스캔들 콜라겐
+    "2202464603",  # 11. 스키니랩 시서스 다이어트
+    # 12. GRN 리셋브이캔디 타트체리맛 ── 신규(URL 필요)
+    # 13. 데이즈온 파라다이스 버닝 ────── 신규(URL 필요)
+    # 14. 데이즈온 프리바이오틱스 FOS 트리플 ─ 신규(URL 필요)
+    # 15. 센텔리안24 시즌6 더 마데카 크림 ── 신규(URL 필요)
+    # 16. 센텔리안24 마데카 크림 타임 리버스 ─ 신규(URL 필요)
+    # 17. 동국제약 마데카 타이트 리프팅 크림 ─ 신규(URL 필요)
+    "2244447362",  # 18. 셀게이트 엑스트라버진 올리브오일(올리브올라이브)
+]
+_DISPLAY_INDEX = {sc: i for i, sc in enumerate(DISPLAY_ORDER)}
+
 
 def _load_products_from_guide() -> list[dict]:
     """Guide.md (Phase 2 상품 표) 를 single source of truth 로 파싱.
@@ -217,7 +245,14 @@ def _load_products_from_guide() -> list[dict]:
         if meta:
             prod.update(meta)
         by_id[pid] = prod  # 같은 id 가 두 표에 있어도 마지막 row 가 승
-    return [by_id[k] for k in sorted(by_id.keys())]
+
+    # DISPLAY_ORDER(사용자 지정 slitmCd 순) 먼저, 나머지는 id 오름차순으로 아래.
+    def _order_key(prod: dict):
+        sc = prod.get("slitmCd")
+        if sc in _DISPLAY_INDEX:
+            return (0, _DISPLAY_INDEX[sc])   # 지정 상품 → 지정 순서
+        return (1, prod["id"])               # 미지정 → id 순으로 아래
+    return sorted(by_id.values(), key=_order_key)
 
 
 PRODUCTS = _load_products_from_guide()

@@ -103,6 +103,7 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 
 | # | 제품명 | URL |
 |---|--------|-----|
+| 1 | 유한건강생활 이너플로라 UREX 프로바이오틱스 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2154750833 |
 | 2 | 하루견과 초록색 100봉 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2151046312&sectId=3059445 |
 | 3 | 하루견과 갈색 100봉 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2225431602&sectId=3059445 |
 | 6 | 레놉티 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244138695&sectId=3059445 |
