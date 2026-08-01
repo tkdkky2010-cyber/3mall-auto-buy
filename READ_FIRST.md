@@ -33,6 +33,22 @@
 - **롯데홈쇼핑 비롯데 카드**: 롯데-side 카드수단 선택은 신규 관찰 필요하나, 카드앱 flow는 재사용. hmall `buy_one` 디스패처 패턴(detect_card→select_card→pay_X)을 그대로 이식.
 - 뷰티포인트 적립 = 주문완료 화면 only(now-or-never), reward(구매사은 적립금)는 신청기간 내 재진입 가능. **뷰티가 reward보다 먼저+성공해야 함**.
 
+## ★★ 롯데 장바구니 담기 — 비밀번호 변경 캠페인 (사용자 4회 지적, 2회 재발)
+
+**로그인 직후 뜨는 비번변경 캠페인을 `30일간 보이지 않기` 로 닫고, 그 다음 본 창에서 담는다.**
+안 닫고 담으면 **미로그인 컨텍스트라 실제로 담기지 않는다** (로그만 성공처럼 찍힘).
+
+- 캠페인은 **별도 window** — `.../member/login/forward.popup_pwd_campaign_av.lotte`.
+  넘겨받은 page 하나만 검사하면 못 찾고 **로그인 성공으로 오판**한다. → `context.pages` **전부** 스캔.
+- 버튼에 **텍스트가 없다**. `<img alt="30일간 보이지 않기">` + 부모 `<a onclick="fn_changeNext()">`.
+  `innerText`/`value` 로만 찾으면 절대 못 잡는다. → **`img[alt]` 매칭 필수.**
+- 닫은 뒤 **창이 실제로 사라졌는지 검증**. 남아 있으면 `context.pages[-1]` 이 그 창을 잡아
+  담기가 헛돌고(카트 0건), 창이 닫히는 순간 `Target page ... has been closed` 로 죽는다.
+- ⚠️ **`지금 변경하기` 절대 클릭 금지** — 비밀번호가 실제로 바뀐다.
+- 정본 = `buy/sulwhasoo.py` `_lotte_campaign_pages` / `_lotte_dismiss_pw_campaign` / `_lotte_pw_campaign_present`.
+- 담기 후 **`카트 N건` 검증 로그 확인** 없이 "담기완료" 라고 보고하지 말 것.
+- 피해 이력: 2026-07-21 1차 재발 / 2026-08-01 #2 카트 0건·#3 page-closed.
+
 ## 규칙
 - 작업 지시 받으면 → 위 목록 읽기 → "흐름 이렇게 이해했다" 짧게 확인 → 작업. **읽기 전 코드 수정 금지.**
 - 실결제(돈)·되돌리기 어려운 행동은 PIN 직전 금액 확인. 단 "N번~M번" 범위 지시는 중간 멈춤 없이 완주(자동메모리 lotte-range-run-no-pause).

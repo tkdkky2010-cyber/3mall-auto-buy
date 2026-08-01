@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r \".tool_input.command // \\\"\\\"\" | grep -qE \"_lotte_cart_fill|sulwhasoo\\.py[[:space:]]+lotte\" && printf \"%s\" \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreToolUse\\\",\\\"additionalContext\\\":\\\"[롯데 카트담기 필수규칙 — READ_FIRST.md ★★] 로그인 직후 비밀번호 변경 캠페인은 별도 창(popup_pwd_campaign)으로 뜬다. img[alt=30일간 보이지 않기]를 클릭해 닫고 창이 사라진 것을 확인한 뒤 본 창에서 담아라. 안 닫으면 미로그인 컨텍스트라 카트 0건인데 로그만 성공처럼 찍힌다. 지금 변경하기 절대 클릭 금지(비번 실변경). 정본=buy/sulwhasoo.py _lotte_dismiss_pw_campaign. 담기 후 카트 N건 검증 로그 확인 없이 완료 보고 금지.\\\"},\\\"systemMessage\\\":\\\"롯데 카트담기: 비번변경 캠페인 창 먼저 닫기 규칙 확인\\\"}\" || true",
+            "statusMessage": "롯데 카트담기 규칙 확인"
+          }
+        ]
+      }
+    ]
+  }
+}

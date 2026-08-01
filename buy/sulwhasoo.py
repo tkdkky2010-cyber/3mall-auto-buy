@@ -547,35 +547,88 @@ def _solve_lotte_captcha(login_page: Page, max_refresh: int = 3) -> str:
     return fallback  # 합의 실패 시 GCV 최선값(이후 로그인 실패하면 재시도 루프가 처리)
 
 
-def _lotte_pw_campaign_present(page: Page) -> bool:
-    """비밀번호 변경 캠페인(팝업/인터스티셜) 감지 — '지금 변경하기'/'30일 후' 버튼 존재로 판정.
-    떠 있으면 아직 실제 로그인 미확정(카트 컨텍스트 무효)."""
+# 비밀번호 변경 캠페인 팝업 '창'의 URL 표식 (2026-08-01 실측: forward.popup_pwd_campaign_av.lotte)
+LOTTE_PW_CAMPAIGN_URL = "popup_pwd_campaign"
+
+# 캠페인 창 안에서 눌러야 하는 것 = '30일간 보이지 않기'.
+# ★라벨이 텍스트가 아니라 <img alt="30일간 보이지 않기"> 이고 클릭 대상은 그 부모 <a onclick="fn_changeNext()">.
+#   (2026-08-01 실측. innerText 만 보던 옛 코드가 못 찾은 직접 원인.)
+_JS_CLICK_DEFER = r"""() => {
+    const imgs = Array.from(document.querySelectorAll('img'));
+    const img = imgs.find(i => /30일간?\s*보이지\s*않기|나중에|다음에\s*변경/.test(i.alt || ''));
+    if (img) { (img.closest('a,button') || img).click(); return 'img-alt'; }
+    // 폴백: 텍스트형 버튼 (레이어형 변형 대비). '지금 변경' 은 절대 제외 — 누르면 비번 실제 변경.
+    const els = Array.from(document.querySelectorAll('a,button,input[type=button],span'));
+    const safe = els.find(el => {
+        const t = (el.innerText || el.value || '').trim();
+        return /30일\s*후|30일간\s*보이지|나중에|다음에\s*변경/.test(t) && !/지금\s*변경/.test(t);
+    });
+    if (safe) { safe.click(); return 'text'; }
+    return null;
+}"""
+
+_JS_CAMPAIGN_PRESENT = r"""() => {
+    const imgs = Array.from(document.querySelectorAll('img'));
+    if (imgs.some(i => /비밀번호\s*변경\s*캠페인|30일간?\s*보이지\s*않기/.test(i.alt || ''))) return true;
+    const els = Array.from(document.querySelectorAll('a,button,input[type=button]'));
+    return els.some(el => /지금\s*변경하기|30일\s*후/.test((el.innerText || el.value || '').trim()));
+}"""
+
+
+def _lotte_campaign_pages(page: Page) -> list[Page]:
+    """캠페인이 떠 있는 page 목록 — ★같은 context 의 **모든 창**을 본다.
+    캠페인은 별도 window 로 열린다(2026-08-01 실측) → 넘겨받은 page 만 보면 영원히 못 찾는다."""
+    out = []
     try:
-        return page.evaluate(r"""() => {
-            const els = Array.from(document.querySelectorAll('a,button,input[type=button]'));
-            return els.some(el => /지금\s*변경하기|30일\s*후/.test((el.innerText||el.value||'').trim()));
-        }""")
+        pages = list(page.context.pages)
     except Exception:
-        return False
+        pages = [page]
+    for pg in pages:
+        try:
+            if pg.is_closed():
+                continue
+            if LOTTE_PW_CAMPAIGN_URL in (pg.url or "") or pg.evaluate(_JS_CAMPAIGN_PRESENT):
+                out.append(pg)
+        except Exception:
+            continue
+    return out
+
+
+def _lotte_pw_campaign_present(page: Page) -> bool:
+    """비밀번호 변경 캠페인 감지 (별도 창 포함). 떠 있으면 실제 로그인 미확정 = 카트 컨텍스트 무효."""
+    return bool(_lotte_campaign_pages(page))
 
 
 def _lotte_dismiss_pw_campaign(page: Page) -> None:
-    """비밀번호 변경 캠페인을 '30일 후'(연기)로 닫음. ⚠️ '지금 변경하기' 절대 클릭 금지(비번 실변경).
-    2026-07-21 사고: dismiss_popup 패턴('30일간 보이지 않기')이 '30일 후' 버튼을 못 잡아 캠페인 위에서
-    카트담기가 미로그인 컨텍스트로 헛돎 → 전용 처리 추가(사용자 지시: 롯데는 '30일 후')."""
+    """비밀번호 변경 캠페인을 **'30일간 보이지 않기'** 로 닫는다. ⚠️'지금 변경하기' 절대 금지(비번 실변경).
+
+    사고 이력:
+    - 2026-07-21: 텍스트 패턴이 버튼을 못 잡아 캠페인 위에서 카트담기가 미로그인 컨텍스트로 헛돎.
+    - 2026-08-01: 위 수정도 무효였음. 실측 결과 원인 2개 —
+        ① 캠페인이 **별도 window**(forward.popup_pwd_campaign_av.lotte)라 page 하나만 보면 장님.
+        ② 버튼 라벨이 텍스트가 아니라 **<img alt="30일간 보이지 않기">**.
+      → 모든 창 스캔 + img[alt] 매칭 + 닫힘 검증으로 교체. (#2 카트 0건 / #3 page-closed 의 직접 원인)
+    """
     for _ in range(3):
-        clicked = page.evaluate(r"""() => {
-            const els = Array.from(document.querySelectorAll('a,button,input[type=button],span'));
-            const safe = els.find(el => {
-                const t = (el.innerText||el.value||'').trim();
-                return /30일\s*후|나중에|다음에\s*변경|30일간\s*보이지/.test(t) && !/지금\s*변경/.test(t);
-            });
-            if (safe) { safe.click(); return true; }
-            return false;
-        }""")
-        if not clicked:
-            break
-        page.wait_for_timeout(1200)
+        targets = _lotte_campaign_pages(page)
+        if not targets:
+            return
+        for pg in targets:
+            try:
+                how = pg.evaluate(_JS_CLICK_DEFER)
+                if how:
+                    print(f"  [popup] 비번변경 캠페인 '30일간 보이지 않기' 클릭 ({how})")
+                    pg.wait_for_timeout(1200)
+            except Exception:
+                pass
+            # 창이 안 닫혔으면 명시적으로 닫는다 — 남아 있으면 pages[-1] 이 이 창을 잡아 담기가 헛돈다.
+            try:
+                if not pg.is_closed() and LOTTE_PW_CAMPAIGN_URL in (pg.url or ""):
+                    pg.close()
+                    print("  [popup] 캠페인 창 close()")
+            except Exception:
+                pass
+        page.wait_for_timeout(600)
 
 
 def lotte_login(page: Page, account_id: str, account_pw: str) -> bool:
@@ -814,6 +867,23 @@ def lotte_add_combo(page: Page, combo_no: int) -> bool:
         print(f"    [INFO] {sku} ({prod['name']}) × {qty}")
         if not lotte_add_product_by_url(page, prod["goods_no"], qty):
             return False
+    # ★담기 검증 (2026-07-28): #saveCart-btn 은 확인 레이어 없이 조용히 처리 → 클릭 성공 ≠ 담김.
+    #   검증 없이 True 반환하면 빈 카트를 '담기완료'로 보고(#4~#7 실측, 폰결제서 CART_FAIL).
+    try:
+        page.get_by_role("link", name="장바구니 장바구니").click(timeout=8000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
+        page.wait_for_timeout(2500)
+        n = page.evaluate("""() => {
+            const m = (document.body.innerText || '').match(/일반\\s*\\(\\d+\\/(\\d+)\\)/);
+            return m ? parseInt(m[1]) : 0;
+        }""")
+        if n < len(combo):
+            print(f"    [ERR] 담기 검증 실패 — 카트 {n}건 (기대 {len(combo)}건)")
+            return False
+        print(f"    [OK] 담기 검증 — 카트 {n}건")
+    except Exception as e:
+        print(f"    [ERR] 담기 검증 예외: {e}")
+        return False
     return True
 
 
@@ -1065,7 +1135,11 @@ def main() -> int:
             return 1
         context = browser.contexts[0] if browser.contexts else browser.new_context()
         # 기존 탭 재사용 — 새 탭 생성(new_page)이 macOS 창 focus 강탈 (2026-07-16 갤러리아 잔재 제거)
-        mall_page = context.pages[-1] if context.pages else context.new_page()
+        # ★단 비번변경 캠페인 창은 제외 (2026-08-01): 그 창을 잡으면 미로그인 컨텍스트라
+        #   담기가 전부 헛돌고(카트 0건), 창이 닫히면 'page has been closed' 로 죽는다.
+        _usable = [pg for pg in context.pages
+                   if not pg.is_closed() and LOTTE_PW_CAMPAIGN_URL not in (pg.url or "")]
+        mall_page = _usable[-1] if _usable else context.new_page()
 
         home = LOTTE_HOME if mall == "lotte" else GALLERIA_HOME
         try:

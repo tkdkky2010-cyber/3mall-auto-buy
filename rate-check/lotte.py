@@ -19,7 +19,7 @@ import gspread
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import (
     combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID,
-    today_tab_name, gs_client, COMBOS, CARD_PAYBACK, PRODUCT_CODES,
+    today_tab_name, gs_client, COMBOS, CARD_PAYBACK, PRODUCT_CODES, PRODUCTS,
     LOTTE_HEADER_ROW, LOTTE_COMBO_END_ROW, CHART_RANGE,
     matched_chromedriver_service,
 )
@@ -41,7 +41,7 @@ except Exception as _e:
     print(f"  [WARN] 캐시 비활성화 실패 ({_e}) — stale 값 주의")
 
 IDS = json.load(open(Path(__file__).resolve().parent.parent / "hsmaster" / "config" / "sulwhasoo-ids.json"))['ids']
-PRICES = {'b':229000,'c':150000,'d':125000,'e':215000,'f':140000,'g':225000,'h':270000}
+PRICES = {c: p["price"] for c, p in PRODUCTS.items()}   # 하드코딩 금지 — 본품 추가 시 자동 반영
 
 def block_dialogs():
     try:
