@@ -19,7 +19,7 @@ import gspread
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import (
     combo_label_ko, load_galleria_composition_from_sheet, RATE_SHEET_ID,
-    today_tab_name, gs_client, COMBOS, CARD_PAYBACK,
+    today_tab_name, gs_client, COMBOS, CARD_PAYBACK, PRODUCT_CODES,
     LOTTE_HEADER_ROW, LOTTE_COMBO_END_ROW, CHART_RANGE,
     matched_chromedriver_service,
 )
@@ -58,7 +58,7 @@ driver.get("https://www.lotteimall.com/main/viewMain.lotte")
 time.sleep(2)
 block_dialogs()
 
-for code in 'bcdefgh':
+for code in PRODUCT_CODES:
     goods = IDS[code]['lotte']
     url = f"https://www.lotteimall.com/goods/viewGoodsDetail.lotte?goods_no={goods}"
     print(f"[{code}] {url}")
@@ -317,7 +317,7 @@ START = LOTTE_HEADER_ROW  # Lotte 헤더 시작행 (_common.py 정의)
 data = []
 data.append(["━━━━ 3단계: 롯데홈쇼핑 공급률 분석 ━━━━"])
 data.append([])
-coupon_str = ", ".join(f"{c}={coupons[c]}%" for c in 'bcdefgh')
+coupon_str = ", ".join(f"{c}={coupons[c]}%" for c in PRODUCT_CODES)
 data.append([f"상품별 쿠폰: {coupon_str}"])
 data.append([f"카드 청구할인: {CARD_NAME} {CARD_PCT}% (페이백 {round(PAYBACK*100,1)}%)"])
 data.append([f"적립금 tiers (전 조합 공통): {GLOBAL_TIERS}"])
@@ -327,8 +327,8 @@ data.append(['조합번호','조합','소비자가','추증','GWP','총샘플','
 for i, r in enumerate(rows):
     cn = combo_label_ko(r['combo'])
     row = [r['idx'], cn, r['소비자가'], r['추증'], GWP_70, r['총샘플'], r['적립'], r['최종'], r['순'], round(r['공급률'],4)]
-    if i < 7:
-        code = 'bcdefgh'[i]
+    if i < len(PRODUCT_CODES):
+        code = PRODUCT_CODES[i]
         cp = coupons.get(code) or 0
         row += ['', code, f"{cp}%"]
     data.append(row)

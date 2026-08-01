@@ -18,7 +18,7 @@ LP 미사용 (scipy 의존 X). 표준 라이브러리만.
 
 데이터 소스 (캐시 X, sheet가 SoT, RULES §1-3):
 - 공급률: rate 시트 오늘 탭 K2:M{1+N} (galleria/hmall/lotte × N조합, N=len(COMBOS))
-- 재고:   INVENTORY 시트 '재고현황' 탭 D6:D12 (b~h) — 참고 출력 전용 (분배 결정엔 미사용)
+- 재고:   INVENTORY 시트 '재고현황' A열 코드 라벨로 조회 — 참고 출력 전용 (분배 결정엔 미사용)
 
 출력:
 - stdout: '=== CART_PLAN_BEGIN === {JSON} === CART_PLAN_END ===' 마커 + product_totals
@@ -115,16 +115,23 @@ def select_channel(rates: list[list[float | None]]) -> str:
 
 
 def read_stocks(gc) -> dict[str, int]:
-    """재고관리 시트 '재고현황' 탭 D6:D12 → {b~h: 재고}."""
-    sh = gc.open_by_key(C.INVENTORY_SHEET_ID)
-    ws = sh.worksheet("재고현황")
-    cells = ws.get("D6:D12")
+    """재고관리 시트 '재고현황' → {본품코드: 현재재고(D열)}.
+
+    ★A열 코드 라벨로 행을 찾는다 (RULES §1-4).
+      옛 코드는 D6:D12 를 위치로 b~h 에 매핑했는데, 실제 행은 e~h 가 5~8행 /
+      b~d 가 27~29행이라 7개 전부 다른 상품(k·l·n·a30 등) 재고를 읽고 있었다 (2026-08-01).
+    """
+    ws = gc.open_by_key(C.INVENTORY_SHEET_ID).worksheet("재고현황")
+    rows = ws.get("A1:D120", value_render_option="UNFORMATTED_VALUE")
+    by_code: dict[str, object] = {}
+    for r in rows:
+        code = str(r[0]).strip() if r and len(r) > 0 else ""
+        if code in C.PRODUCTS and len(r) > 3:
+            by_code[code] = r[3]
     stocks: dict[str, int] = {}
-    padded = cells + [[""]] * 7
-    for code, row in zip("bcdefgh", padded[:7]):
-        v = row[0] if row else ""
+    for code in C.PRODUCT_CODES:
         try:
-            stocks[code] = int(str(v).replace(",", "")) if v else 0
+            stocks[code] = int(str(by_code.get(code, 0)).replace(",", "") or 0)
         except (ValueError, TypeError):
             stocks[code] = 0
     return stocks
@@ -247,9 +254,9 @@ def write_sheet_section(
     grid.append([channel, total_qty, total_pay, round(avg_rate, 4), total_profit_sum])
     # 하단: b~h 제품별 총 수량 (오늘 카트플랜대로 구매 시 받게 되는 본품 합계)
     grid.append([])  # 빈 행 (분리)
-    grid.append(["[b~h 제품별 총 수량 (본)]"])
-    grid.append([f"{c} {C.SHORT_NAME[c]}" for c in "bcdefgh"])
-    grid.append([product_totals.get(c, 0) for c in "bcdefgh"])
+    grid.append(["[본품별 총 수량 (본)]"])
+    grid.append([f"{c} {C.SHORT_NAME[c]}" for c in C.PRODUCT_CODES])
+    grid.append([product_totals.get(c, 0) for c in C.PRODUCT_CODES])
     # 행 너비 정규화 (mixed width → 최대 너비로 padding)
     maxw = max(len(row) for row in grid)
     norm = [row + [""] * (maxw - len(row)) for row in grid]
@@ -328,7 +335,7 @@ def main(argv=None) -> int:
     total_profit = 0
     weighted_rate_sum = 0.0
     total_qty = 0
-    product_totals: dict[str, int] = {code: 0 for code in "bcdefgh"}
+    product_totals: dict[str, int] = {code: 0 for code in C.PRODUCT_CODES}
     for combo_no in sorted(cart):
         qty = cart[combo_no]
         rate = channel_rates[combo_no - 1] or 0.0

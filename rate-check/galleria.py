@@ -112,8 +112,11 @@ def _is_product_page(driver, goods_no: str) -> bool:
     return goods_no in cur
 
 
-def scrape_product(driver, code: str, goods_no: str, *, max_retry: int = 1) -> dict:
-    url = GALLERIA_URL.format(goods_no)
+def scrape_product(driver, code: str, goods_no: str, *, max_retry: int = 1,
+                   url: str | None = None) -> dict:
+    # url = sulwhasoo-ids.json 의 galleria_url (파라미터 전체 포함). 짧은 URL 은
+    # sale_shop_divi_cd 등이 없어 다른 상품으로 리디렉트되는 사례 있음 (2026-08-01).
+    url = url or GALLERIA_URL.format(goods_no)
     print(f"[{code}] → {url}")
     for attempt in range(max_retry + 1):
         driver.get(url)
@@ -497,7 +500,7 @@ def main(argv=None):
     try:
         for code in codes:
             goods_no = ids[code]["galleria"]
-            r = scrape_product(driver, code, goods_no)
+            r = scrape_product(driver, code, goods_no, url=ids[code].get("galleria_url"))
             raw_results[code] = r
             samples, new_items = parse_add_gifts(r["add_blocks"])
             basic, coupon = parse_basic_and_coupon(r)

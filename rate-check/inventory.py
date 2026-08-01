@@ -48,7 +48,7 @@ def load_composition_from_sheet() -> dict:
     if not gwp_set:
         raise ValueError("galleria sheet에서 GWP set 못찾음 — galleria 먼저 실행 필요")
     return {
-        "products": {c: {"add_gifts": products_samples.get(c, [])} for c in "bcdefgh"},
+        "products": {c: {"add_gifts": products_samples.get(c, [])} for c in C.PRODUCT_CODES},
         "gwp": {"set": gwp_set},
     }
 

@@ -34,8 +34,11 @@ PRODUCTS: dict[str, dict] = {
     "f": {"name": "윤조에센스90",    "price": 140_000},
     "g": {"name": "자음생2종",       "price": 225_000},
     "h": {"name": "자음생크림리치",  "price": 270_000},
+    # n = 단품. 재고현황 기존 'n 탄력크림 75ml' 와 같은 SKU 라 i 가 아닌 n 사용 (2026-08-01).
+    # 단품/기획세트가 종종 바뀌므로 링크 변경 시 sulwhasoo-ids.json 갱신.
+    "n": {"name": "탄력크림EX75",    "price": 135_000},
 }
-PRODUCT_CODES = list(PRODUCTS.keys())  # ['b', 'c', 'd', 'e', 'f', 'g', 'h']
+PRODUCT_CODES = list(PRODUCTS.keys())  # ['b', 'c', 'd', 'e', 'f', 'g', 'h', 'n']
 
 # 시트 라벨용 짧은 별명 (예: 'g자생2 2 + h자생크림 1')
 SHORT_NAME: dict[str, str] = {
@@ -46,6 +49,7 @@ SHORT_NAME: dict[str, str] = {
     "f": "윤90",
     "g": "자생2",
     "h": "자생크림",
+    "n": "탄력EX75",
 }
 
 
@@ -65,6 +69,8 @@ def combo_label_ko(combo: list[tuple[str, int]]) -> str:
 PRODUCT_VELOCITY: dict[str, int] = {
     "b": 3, "c": 10, "d": 5,
     "e": 20, "f": 10, "g": 15, "h": 7,
+    # "n": 미정 — 사용자 수치 대기. n 을 COMBOS 에 넣기 전에 반드시 채울 것
+    #      (cart_plan.combo_score 가 이 dict 를 직접 인덱싱 → 없으면 KeyError).
 }
 
 # ============================================================
@@ -80,6 +86,7 @@ PRODUCT_PROFIT: dict[str, int] = {
     "f": 10_892,   # 윤조에센스90 (변경X)
     "g": 12_942,   # 자음생2종 — 5/26 갱신 (네이버 121,120 +3천 배송 → 정산 114,126)
     "h": 38_000,   # 자음생크림리치 (변경X)
+    # "n": 미정 — 탄력크림EX 75ml 수익금 사용자 수치 대기 (COMBOS 투입 전 필수)
 }
 
 # ============================================================
@@ -100,6 +107,7 @@ NAVER_SETTLED: dict[str, int] = {
     "f":  82_200,  # 정산가 직접
     "g": 114_126,  # 121,120 × 0.934 + 1,000 (3천원 배송) — 5/26 갱신
     "h": 165_000,  # 정산가 직접
+    # "n": 미정 — 탄력크림EX 75ml 네이버 판매가/정산가 사용자 확인 대기 (COMBOS 투입 전 필수)
 }
 
 # ============================================================
@@ -200,6 +208,10 @@ SAMPLE_TABLE: list[tuple[str, int, str | None]] = [
     ("자음생크림리치 10ml", 8_000, "s12"),
     ("탄력크림EX 15ml", 3_400, "s06"),         # canonical: 탄력크림 15ml
     ("탄력크림EX 5ml", 1_100, "s05"),
+    # 시트 C열은 '시그니쳐'(쳐), 갤러리아 페이지/GWP 이미지는 '시그니처'(처) 표기 → 처 표기 alias 필요.
+    # (구 s39 = 같은 제품이라 사용자가 s30 으로 통합, 2026-08-01. B열 중문에 '진생솝25g' 이 남아
+    #  있지만 매칭은 C열만 읽으므로 아래 두 줄이 처/구명칭 양쪽을 커버한다.)
+    ("시그니처 진생 페이셜 솝 25g", 1_500, "s30"),
 ]
 
 # ============================================================
@@ -243,7 +255,10 @@ def _normalize(s: str) -> str:
 # 샘플 단가 = 재고현황 시트(SoT)에서 동적 로드 (s코드→단가). SAMPLE_TABLE 은 이름→s코드
 # 매칭(별칭 포함)에만 사용하고, *단가는 시트가 우선*. (하드코딩 drift 방지 — 2026-06-02)
 INVENTORY_STATUS_TAB = "재고현황"
-INVENTORY_PRICE_RANGE = "A55:E91"   # A=s코드, C=제품명, E=단가
+INVENTORY_PRICE_RANGE = "A55:E105"  # A=s코드, C=제품명, E=단가
+# ⚠️ 샘플 블록 끝행이 늘어나면 이 범위도 늘린다. 범위 밖 s코드는 시트단가·이름매칭이
+#    통째로 누락돼 '신규(단가미정)'로 오판된다 (2026-08-01: A55:E91 이라 s33~s39/s02/s11/s22
+#    10건 누락 → s39 시그니쳐진생솝이 GWP 신규품목으로 오판). 코드 필터가 ^s\d+$ 라 여유범위는 무해.
 _SHEET_SAMPLE_PRICES: dict[str, int] | None = None
 _SHEET_SAMPLE_ROWS: list[tuple[str, int, str]] | None = None   # (C열 이름, 단가, s코드)
 
@@ -252,8 +267,10 @@ def sample_prices_from_sheet(force: bool = False) -> dict[str, int]:
     """재고현황 시트에서 {s코드: 단가} 로드 (1회 캐시). 실패 시 빈 dict → SAMPLE_TABLE 폴백.
 
     ★C열 제품명도 함께 로드 (_SHEET_SAMPLE_ROWS) — 시트가 이름 매칭의 SoT.
-      시트에 새 샘플(예: s39 시그니쳐 진생 페이셜 솝)을 추가하면 코드 수정 없이 바로 매칭됨
-      (2026-07-16: SAMPLE_TABLE 하드코딩만 보다가 s39를 '신규'로 오판한 사고 재발 방지)."""
+      시트에 새 샘플을 추가하면 코드 수정 없이 바로 매칭됨
+      (2026-07-16: SAMPLE_TABLE 하드코딩만 보다가 시트 신규 s코드를 '신규'로 오판한 사고 재발 방지).
+      ⚠️ C열 이름만 읽는다 — B열(중문)에 병기된 구명칭은 매칭에 안 쓰이므로,
+         이름이 바뀐 s코드는 SAMPLE_TABLE 에 표기변형 alias 를 남겨둔다 (예: s30 처/쳐)."""
     global _SHEET_SAMPLE_PRICES, _SHEET_SAMPLE_ROWS
     if _SHEET_SAMPLE_PRICES is not None and not force:
         return _SHEET_SAMPLE_PRICES
@@ -426,15 +443,16 @@ def load_galleria_composition_from_sheet(ws) -> dict:
     galleria가 미실행이면 ValueError.
     """
     # 1) 추가증정가치 행 — "추가증정가치" 라벨 검색 (갤러리아 섹션 전체, 위치 가변 안전)
-    block = ws.get("A6:H50")
+    #    열: A=라벨, B~ = PRODUCT_CODES 순서. 상품 수 바뀌면 끝 열도 따라감 (하드코딩 금지).
+    block = ws.get(f"A6:{col_letter(1 + len(PRODUCT_CODES))}{GALLERIA_DATA_END_ROW}")
     add_gift_value = {}
     for row in block:
         if row and row[0].strip().startswith("추가증정가치"):
-            for i, code in enumerate("bcdefgh", start=1):
+            for i, code in enumerate(PRODUCT_CODES, start=1):
                 cell = row[i] if i < len(row) else ""
                 add_gift_value[code] = _parse_won(cell)
             break
-    if not add_gift_value or len(add_gift_value) < 7:
+    if not add_gift_value or len(add_gift_value) < len(PRODUCT_CODES):
         raise ValueError("'추가증정가치' 행 sheet에서 못찾음 — galleria 먼저 실행 필요")
 
     # 2) GWP 1세트/6세트 — "1세트 합계" / "6세트 합계" 라벨 검색 (품목 수 무관, 위치 가변 안전)
@@ -462,8 +480,8 @@ def load_galleria_samples_from_sheet(ws) -> dict:
     Returns: {code: [{name, qty, price, code}, ...]}
     캐시 X — sheet가 SoT. "샘플" 행만 수집, "추가증정가치"에서 종료 → 위치 가변 안전.
     """
-    block = ws.get("A6:H50")
-    products = {c: [] for c in "bcdefgh"}
+    block = ws.get(f"A6:{col_letter(1 + len(PRODUCT_CODES))}{GALLERIA_DATA_END_ROW}")
+    products = {c: [] for c in PRODUCT_CODES}
     for row in block[1:]:  # row 0 = 헤더
         if not row:
             continue
@@ -472,7 +490,7 @@ def load_galleria_samples_from_sheet(ws) -> dict:
             break
         if not label.startswith("샘플"):
             continue
-        for c_idx, code in enumerate("bcdefgh", start=1):
+        for c_idx, code in enumerate(PRODUCT_CODES, start=1):
             cell = row[c_idx] if c_idx < len(row) else ""
             if not cell.strip():
                 continue
