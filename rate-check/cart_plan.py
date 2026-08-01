@@ -36,6 +36,39 @@ import _common as C
 
 CHANNEL_DEFAULT_N = {"galleria": 36, "hmall": 36, "lotte": 7}
 
+# 주로 사는 조합번호 — 결과물 낼 때 조합번호 셀에 색칠(사용자 지시 2026-07-29). idx만 색칠.
+HIGHLIGHT_COMBOS = {3, 5, 12, 13, 14}
+HIGHLIGHT_BG = {"red": 1.0, "green": 0.9, "blue": 0.6}   # 연노랑 (롯데 연두 조건부서식과 구분)
+
+
+def highlight_combo_numbers(ws, combos: set[int]) -> None:
+    """조합번호(combos) 셀만 색칠 — 갤러리아/Hmall/롯데 섹션 A열 + 비교차트 J열.
+    갤러리아는 GWP 품목수로 위치가 가변 → '조합번호' 헤더를 A열에서 동적 탐색."""
+    try:
+        colA = ws.col_values(1)
+        gal_hdr = next((i for i, v in enumerate(colA[:C.HMALL_HEADER_ROW], 1)
+                        if str(v).strip() == "조합번호"), None)
+        cells = []   # (row_1based, col_1based)
+        for n in combos:
+            if gal_hdr:
+                cells.append((gal_hdr + n, 1))                     # 갤러리아 A
+            cells.append((C.HMALL_COMBO_START_ROW + n - 1, 1))     # Hmall A
+            cells.append((C.LOTTE_COMBO_START_ROW + n - 1, 1))     # 롯데 A
+            cells.append((n + 1, 10))                              # 차트 J (J2=조합1)
+        sid = ws.id
+        reqs = [{
+            "repeatCell": {
+                "range": {"sheetId": sid, "startRowIndex": r - 1, "endRowIndex": r,
+                          "startColumnIndex": c - 1, "endColumnIndex": c},
+                "cell": {"userEnteredFormat": {"backgroundColor": HIGHLIGHT_BG}},
+                "fields": "userEnteredFormat.backgroundColor",
+            }
+        } for r, c in cells]
+        ws.spreadsheet.batch_update({"requests": reqs})
+        print(f"→ 조합번호 색칠: {sorted(combos)} (갤러리아/Hmall/롯데 A열 + 차트 J열)")
+    except Exception as e:
+        print(f"  [WARN] 조합번호 색칠 실패(무시): {e}")
+
 
 def read_supply_rates(ws) -> list[list[float | None]]:
     """K2:M{1+N} → N × 3 (galleria, hmall, lotte). 빈셀 = None. N = len(C.COMBOS)."""
@@ -344,6 +377,8 @@ def main(argv=None) -> int:
         product_totals,
     )
     print(f"\n→ 시트 입력: {rng}")
+
+    highlight_combo_numbers(ws, HIGHLIGHT_COMBOS)   # 주로 사는 조합번호 색칠
     return 0
 
 
