@@ -61,6 +61,7 @@ if [ "${HMALL_USE_REAL_CHROME:-0}" = "1" ]; then
   "$CHROME_BIN" --remote-debugging-port=$PORT "--remote-allow-origins=*" \
     --user-data-dir="$USER_DATA_DIR" --profile-directory="$PROFILE_DIR" \
     --no-first-run --no-default-browser-check --disable-popup-blocking \
+    --window-size=1440,1000 \
     "$START_URL" > /dev/null 2>&1 &
   disown
 else
@@ -68,6 +69,7 @@ else
   open -g "$APP_PATH" --args --remote-debugging-port=$PORT "--remote-allow-origins=*" \
     --user-data-dir="$USER_DATA_DIR" --profile-directory="$PROFILE_DIR" \
     --no-first-run --no-default-browser-check --disable-popup-blocking \
+    --window-size=1440,1000 \
     "$START_URL"
 fi
 

@@ -113,13 +113,60 @@ def detect_card_offer(page) -> dict | None:
     return page.evaluate(js)
 
 
+# 장바구니 '담긴 상품' 컨테이너 — '일반상품' 체크박스가 들어있는 div (2026-08-02 DOM 실측).
+# ★이 스코프 밖(페이지 하단 '최근 본 상품'/추천 캐러셀)에도 상품명이 널려 있다.
+CART_SECTION_SEL = "div.shipping-listwrap"
+
+_JS_CART_ITEMS = r"""() => {
+    // '일반상품' 체크박스를 가진 label 의 조상 = 카트 목록 컨테이너. 없으면 클래스 폴백.
+    let sec = null;
+    const lab = Array.from(document.querySelectorAll('label.chklabel'))
+        .find(l => l.querySelector('span') && l.querySelector('span').textContent.trim() === '일반상품');
+    if (lab) {
+        sec = lab;
+        for (let i = 0; i < 10 && sec.parentElement; i++) {
+            sec = sec.parentElement;
+            if (sec.querySelectorAll('input[type=checkbox]').length >= 2) break;
+        }
+    }
+    if (!sec) sec = document.querySelector('div.shipping-listwrap');
+    if (!sec) return [];
+    const names = [];
+    for (const el of sec.querySelectorAll('span,a,strong')) {
+        const t = (el.innerText || '').trim();
+        if (t.length < 8 || t.length > 90 || t.includes('\n')) continue;
+        if (!/설화수|기획세트|\d+ml|\d+개$/.test(t)) continue;
+        if (!names.includes(t)) names.push(t);
+        if (names.length >= 30) break;
+    }
+    return names;
+}"""
+
+
+def cart_items(page) -> list[str]:
+    """실제 장바구니에 담긴 상품명 목록.
+
+    ★페이지 전체(document)를 긁으면 하단 **'최근 본 상품' 캐러셀까지 딸려온다** —
+      2026-08-02 그렇게 읽어서 카트에 없는 상품(에스트라 등)을 '담겨있다'고 오독했다.
+      반드시 카트 섹션 안에서만 읽는다.
+    """
+    try:
+        return page.evaluate(_JS_CART_ITEMS) or []
+    except Exception as e:
+        print(f"    [cart] 목록 읽기 실패: {e}")
+        return []
+
+
 def _cart_is_empty(page) -> bool:
-    """카트가 실제로 비었는지 확인 (clear_cart 검증용). 판정 불가 시 False = 안전측."""
+    """카트가 실제로 비었는지 확인 (clear_cart 검증용). 판정 불가 시 False = 안전측.
+    빈카트 문구 + **카트 섹션 내 실제 품목 수** 둘 다로 판정."""
     try:
         page.goto(CART_URL, wait_until="domcontentloaded")
         page.wait_for_timeout(1200)
         body = page.inner_text("body")
-        return ("장바구니가 비어" in body) or ("담긴 상품이 없" in body)
+        if ("장바구니가 비어" in body) or ("담긴 상품이 없" in body):
+            return True
+        return len(cart_items(page)) == 0
     except Exception as e:
         print(f"    [cart] 빈카트 확인 실패: {e}")
         return False
@@ -160,10 +207,11 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
         page.wait_for_timeout(800)
         if _cart_is_empty(page):
             break
-        print(f"  [WARN] clear_cart 후에도 카트 비어있지 않음 (시도 {attempt}/2)")
+        left = cart_items(page)
+        print(f"  [WARN] clear_cart 후에도 카트 비어있지 않음 (시도 {attempt}/2) — 잔여 {left}")
     else:
         return {"idx": idx, "combo": combo,
-                "error": "clear_cart 실패 — 카트 잔여물 있음(2회 시도). 잔여물 합산 오염 방지로 중단"}
+                "error": f"clear_cart 실패 — 카트 잔여물 {cart_items(page)} (2회 시도). 합산 오염 방지로 중단"}
 
     # 2) 본품 담기
     for c, q in combo:
@@ -229,13 +277,22 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
 
 
 def ensure_logged_in(page) -> bool:
-    """myhome 로 로그인 상태 확인, 로그아웃이면 accounts[0] 으로 재로그인.
+    """로그인 상태 확인, 로그아웃이면 accounts[0] 으로 재로그인.
     반환 True = 로그인됨(이미 또는 재로그인 성공) / False = 재로그인 실패.
-    세션은 측정 중 끊길 수 있어(구매하기→비회원폼/장바구니 바운스) 매 조합 실패 시 재호출한다."""
-    page.goto("https://www.hmall.com/mo/mma/myhome", wait_until="domcontentloaded")
-    page.wait_for_timeout(1200)
-    if "loginForm" not in page.url and "/login" not in page.url:
+    세션은 측정 중 끊길 수 있어(구매하기→비회원폼/장바구니 바운스) 매 조합 실패 시 재호출한다.
+
+    ★2026-08-02: 옛 판정은 `mo/mma/myhome` 로 이동해 URL 에 loginForm 이 없으면 True 였는데,
+      **그 URL 이 죽어서 '페이지를 찾을 수 없습니다' 404 를 반환**한다. 404 에도 loginForm 이
+      없으니 로그아웃 상태여도 무조건 True → 세션 끊김을 영영 못 잡는 오판이었다
+      (자동메모리 hmall-session-drop-preflight 가 경고한 바로 그 형태).
+      → 홈에서 '로그아웃' 링크 존재로 판정한다(로그인 시에만 노출). 실측 확인.
+    """
+    page.goto("https://www.hmall.com/", wait_until="domcontentloaded")
+    page.wait_for_timeout(1500)
+    body = page.inner_text("body")
+    if "로그아웃" in body:
         return True
+    print(f"[INFO] 미로그인 감지 (홈에 '로그아웃' 없음, url={page.url[:60]})")
     cfg = json.load(open(ROOT / "hmall_config.json"))
     acc = cfg["accounts"][0]
     print(f"[INFO] 세션 로그아웃 감지 → 재로그인 {acc['id']}")
