@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """NH농협 일반결제 보안키패드 — Claude 비전 판독 기반 입력 헬퍼 (2026-07-31 라이브 검증).
 
-배경: NH nppfs 셔플 키패드는 방패 아이콘이 숫자 자리에 섞여 로컬 OCR(vision/gcv/easyocr/tesseract)이
-      매핑에 실패한다(_tap_shuffle 2엔진→4엔진×3ROI 전부 실패). 반면 Claude 가 전체화면 스크린샷을
+배경: NH nppfs 셔플 키패드는 방패 아이콘이 숫자 자리에 섞여 로컬 OCR(vision/easyocr)이
+      매핑에 실패한다(_tap_shuffle 사다리×3ROI 전부 실패). 반면 Claude 가 전체화면 스크린샷을
       직접 읽으면 방패가 섞여도 정확히 판독된다 → 판독은 Claude, 실행(탭)은 이 모듈이 담당.
 
 ★ 라이브 검증에서 확인된 규칙 (롯데 #9, 주문 2026-07-31-G83859 성공)

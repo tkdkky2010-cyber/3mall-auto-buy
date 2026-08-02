@@ -1,10 +1,13 @@
-"""4엔진 OCR voting — 보안 키패드 0~9 위치 매핑.
+"""다엔진 OCR voting — 보안 키패드 0~9 위치 매핑.
 
-엔진:
+엔진 (디폴트 = vision + easyocr → 실패 시 claude 승격):
   - EasyOCR (한/영, 로컬)
-  - Tesseract (psm=11, 숫자 only, 로컬)
   - macOS Vision Framework (PyObjC, 로컬)
-  - Google Cloud Vision API (네트워크)
+  - **Claude 비전 (네트워크)** — 2026-08-02 신설. GCV 가 BILLING_DISABLED 로 죽어 그 자리에 투입.
+    API 호출이 아니라 **파일 핸드셰이크** — 스크립트가 스크린샷을 놔두고 stdout 에 판독요청을 찍으면
+    세션에서 돌고 있는 클로드가 직접 읽고 response.json 을 준다. 응답 없으면 타임아웃 후 나머지 엔진으로 진행.
+  - Google Cloud Vision API (네트워크) — 결제 비활성으로 디폴트 제외. 복구 시 engines 에 "gcv" 재투입.
+  - Tesseract (psm=11) — 2026-06-26 제외 (최약체)
 
 처리 흐름:
   1. 각 엔진이 발견한 (digit, cx, cy, conf) 수집
@@ -21,7 +24,9 @@ CLI (단일 이미지 테스트):
   python3 phone_auto/ocr_keypad.py phone_auto/_tmp/keypad_raw.png
 """
 from __future__ import annotations
+import json
 import os
+import re
 import sys
 from pathlib import Path
 from collections import defaultdict
@@ -35,6 +40,13 @@ try:
 except ImportError:
     pass
 
+# ─── 엔진 사다리 (2026-08-02) ───
+# ① 로컬 2엔진(vision+easyocr) union voting — 단일엔진 누락(vision '0' / easyocr 일부)을 상호보완.
+# ② 그래도 0~9 매핑 실패하면 **클로드 포함 3엔진**으로 재시도 (vote_digits 내부에서 클로드 승격).
+ENGINE_FAST = ("vision", "easyocr")            # 1차 = 로컬 2엔진 **둘 다** (union voting)
+ENGINE_FULL = ("vision", "easyocr", "claude")  # 2차 = 실패 시 클로드 포함 3엔진
+ENGINE_LADDER = [ENGINE_FAST, ENGINE_FULL]
+
 # ─── 카드사별 키패드 preset ───
 # 카메라: Continuity Camera (Jason's iPhone15,3), 1920x1080, cam0
 # 카메라 거치 위치 변경 시 roi_y_frac 재측정 필요.
@@ -44,6 +56,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.59, 0.95),
         "layout": "fixed_3x4",      # 1-9 + 0(row4 중앙). 셔플 X.
         "n_digits_pin": 7,
+        "engines": ("vision", "easyocr"),
         "description": "현대카드 7자리 결제 보안번호 (PC 결제 로그인)",
     },
     "hyundai_pin6": {
@@ -51,6 +64,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.74, 0.99),
         "layout": "shuffled_3x4",   # 셔플 — 매번 OCR 필수.
         "n_digits_pin": 6,
+        "engines": ("vision", "easyocr"),
         "description": "현대카드 6자리 결제 비밀번호 (현대 PIN)",
     },
     "hyundai_hmall_pin6": {
@@ -58,9 +72,8 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.33, 0.58),  # 5/29 ADB screencap 실측 10/10 (화면 중앙 키패드). 0.34~0.56 코어.
         "layout": "fixed_3x4",       # 1-9 + 0(row4 중앙). 셔플 X — 좌표만 OCR로 확정([[feedback_phone_coord_no_estimate]]).
         "n_digits_pin": 6,
-        # 깨끗한 ADB screencap → vision+gcv 2엔진이면 10/10 (5/30 bench: 0.6s vs 4엔진 8s).
-        # easyocr/tesseract 제외 — union 으로도 vision 단독 '0' 누락 / gcv 단독 '8,9' 누락 상호보완.
-        "engines": ("vision", "gcv"),
+        # 깨끗한 ADB screencap 이면 로컬 2엔진으로 10/10 (5/30 bench). 실패 시 클로드 승격.
+        "engines": ("vision", "easyocr"),
         "description": "현대몰(Hmall) PIN번호 결제 6자리 (고정 키패드, ADB screencap, 카메라 X)",
     },
     "hyundai_hmall_pw4": {
@@ -68,7 +81,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.35, 0.61),  # 5/29 ADB screencap 실측 10/10 (본인인증 카드비번, PIN보다 살짝 아래).
         "layout": "fixed_3x4",       # 1-9 + 0(row4 중앙). 셔플 X.
         "n_digits_pin": 4,
-        "engines": ("vision", "gcv"),  # PW4 는 단일엔진 누락 발생 → vision+gcv union 필수 (5/30 bench).
+        "engines": ("vision", "easyocr"),  # 1차 로컬2엔진 → 실패 시 사다리가 클로드 포함 3엔진으로
         "description": "현대몰(Hmall) 본인인증 카드비밀번호 4자리 (고정 키패드, ADB screencap, 카메라 X)",
     },
     "hana_code7": {
@@ -76,13 +89,15 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.50, 0.95),
         "layout": "fixed_3x4",      # 1-9 + 0(row4 중앙). 셔플 X.
         "n_digits_pin": 7,
+        "engines": ("vision", "easyocr"),
         "description": "하나카드 7자리 결제 인증코드",
     },
     "hana_pin6": {
         "flip_h": False,
-        "roi_y_frac": (0.62, 0.95),  # 5/29 실측: 키패드 3행 y≈1619/1787/1953 (frac 0.675~0.815) + 4행 재배열. 4엔진 10/10.
+        "roi_y_frac": (0.62, 0.95),  # 5/29 실측: 키패드 3행 y≈1619/1787/1953 (frac 0.675~0.815) + 4행 재배열.
         "layout": "shuffled_4x3_with_logos",  # 4 cols × 3 rows, 12 cells 중 2개는 회색 하나페이 로고 decoy(숫자 없음).
         "n_digits_pin": 6,
+        "engines": ("vision", "easyocr"),
         "description": "하나몰(Hmall) 하나Pay 간편결제 6자리 (com.hanaskcard.paycla nFilter, screencap 읽힘=ADB, 카메라 X)",
     },
     "nh_pin6": {
@@ -90,6 +105,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.67, 0.95),
         "layout": "shuffled_3x4",  # 3 cols × 4 rows (롯데 LOCA Pay 와 동일 구조). row 4 가운데 1 digit + 양쪽 재배열/삭제.
         "n_digits_pin": 6,
+        "engines": ("vision", "easyocr"),
         "description": "농협카드 6자리 결제 비밀번호 (파란 키패드, 롯데 LOCA Pay 와 유사)",
     },
     "nh_code7": {
@@ -97,6 +113,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.28, 0.65),
         "layout": "shuffled_3x4",  # 3 cols × 4 rows, row 4 가운데 1 digit + 양쪽 버튼. 키패드가 화면 상단에 있음 (다른 카드와 정반대).
         "n_digits_pin": 7,
+        "engines": ("vision", "easyocr"),
         "description": "농협카드 7자리 결제코드 (화면 상단 키패드, 셔플)",
     },
     "kb_code7": {
@@ -104,6 +121,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.55, 0.88),
         "layout": "fixed_3x4",  # 표준 1-9 + 0(row4 중앙).
         "n_digits_pin": 7,
+        "engines": ("vision", "easyocr"),
         "description": "KB Pay 7자리 결제 인증코드 (보라/연분홍 배경)",
     },
     "kb_pin6": {
@@ -111,6 +129,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.70, 0.90),
         "layout": "shuffled_4x3",  # 4 cols × 3 rows. row 2 cols 1, 2 = ← 삭제 / 입력완료 버튼.
         "n_digits_pin": 6,
+        "engines": ("vision", "easyocr"),
         "description": "KB Pay 6자리 결제 비밀번호 (보라 배경, 4x3 셔플)",
     },
     "samsung_code7": {
@@ -118,6 +137,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.55, 0.95),
         "layout": "shuffled_3x4",  # 3 cols × 4 rows, row 4 가운데 1 digit + 양쪽 버튼.
         "n_digits_pin": 7,
+        "engines": ("vision", "easyocr"),
         "description": "삼성 Pay 7자리 결제 보안번호 (셔플)",
     },
     "samsung_pin6": {
@@ -125,6 +145,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.55, 0.95),
         "layout": "shuffled_3x4",  # 3 cols × 4 rows, row 4 가운데 1 digit + 양쪽 버튼.
         "n_digits_pin": 6,
+        "engines": ("vision", "easyocr"),
         "description": "삼성 Pay 6자리 결제 비밀번호 (셔플, 7자리와 동일 위치/구조)",
     },
     "bc_login6": {  # 5/20 rename from bc_pin6 — 결제 비번 아니라 앱 로그인 비번
@@ -132,6 +153,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.71, 0.92),
         "layout": "shuffled_4x3",  # 4 cols × 3 rows, row 2 cols 1,2 = 빈 영역 (KB PIN6 와 유사 구조).
         "n_digits_pin": 6,
+        "engines": ("vision", "easyocr"),
         "description": "BC 카드 앱 로그인 6자리 비밀번호 (회색/보라 배경, 셔플) — 결제 비번 별도",
     },
     "bc_code7": {
@@ -139,6 +161,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.54, 0.88),
         "layout": "fixed_3x4",  # 표준 1-9 + 0(row4 중앙). KB Pay 7자리와 동일 위치/구조.
         "n_digits_pin": 7,
+        "engines": ("vision", "easyocr"),
         "description": "BC 카드 7자리 결제코드 (보라/연분홍 배경, 고정)",
     },
     "bc_pin6": {
@@ -146,6 +169,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.65, 0.95),
         "layout": "shuffled_4x3",  # 4 cols × 3 rows, 빈 셀 2개 random (BC 로그인과 동일 구조).
         "n_digits_pin": 6,
+        "engines": ("vision", "easyocr"),
         "description": "BC 카드 결제 6자리 비밀번호 (보라 배경, 셔플) — 로그인 비번 별도 (bc_login6)",
     },
     "payco_pin6": {
@@ -153,6 +177,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.64, 0.90),  # 삼성 PAYCO 결제비번 키패드 y≈1613/1859/2105 (실측 2026-05-31)
         "layout": "shuffled_4x3",     # 4 cols × 3 rows (BC PIN6 와 동일 구조), screencap 읽힘 → 2엔진 OCR
         "n_digits_pin": 6,
+        "engines": ("vision", "easyocr"),
         "description": "삼성카드 PAYCO 간편결제 6자리 결제 비밀번호 (셔플 4x3, FLAG_SECURE 아님=screencap)",
     },
     "lotte_code7": {
@@ -160,6 +185,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.62, 0.95),
         "layout": "shuffled_3x4",  # 3 cols × 4 rows, row 4 가운데 1 digit + 양쪽 버튼. NH7 과 동일 구조.
         "n_digits_pin": 7,
+        "engines": ("vision", "easyocr"),
         "description": "롯데카드 LOCA Pay 7자리 결제 인증코드 (파란 배경, 셔플)",
     },
     "lotte_pin6": {
@@ -167,6 +193,7 @@ KEYPAD_PRESETS: dict[str, dict] = {
         "roi_y_frac": (0.55, 0.95),
         "layout": "shuffled_3x4",  # 3 cols × 4 rows, row 4 가운데 1 digit + 양쪽 버튼. lotte_code7 과 동일 구조.
         "n_digits_pin": 6,
+        "engines": ("vision", "easyocr"),
         "description": "롯데카드 LOCA Pay 6자리 결제 비밀번호 (파란 배경, 셔플)",
     },
 }
@@ -186,6 +213,9 @@ def vote_digits_for_card(
         image_path = capture_frame(cam_idx, warmup_frames=15)
         if not image_path:
             return None
+    # ★preset 의 engines 를 그동안 안 넘기고 있었다(2026-08-02 발견) → 카드별 엔진 지정이 무시됨.
+    if "engines" not in vote_kwargs and preset.get("engines"):
+        vote_kwargs["engines"] = tuple(preset["engines"])
     return vote_digits(
         image_path,
         flip_h=preset["flip_h"],
@@ -252,7 +282,7 @@ def _ocr_tesseract(img_path: str) -> list[tuple[str, int, int, float]]:
     gray_2x = cv2.resize(gray, (gray.shape[1] * 2, gray.shape[0] * 2),
                          interpolation=cv2.INTER_CUBIC)
     # numpy array 직접 전달 시 pytesseract↔py3.13 에서 'utf-8 0x89'(PNG) UnicodeDecodeError 발생 →
-    # 임시 PNG 파일 경로로 우회 (5/29 fix). 4엔진 voting 복구용.
+    # 임시 PNG 파일 경로로 우회 (5/29 fix).
     _tmp2x = "/tmp/_tess_gray2x.png"
     cv2.imwrite(_tmp2x, gray_2x)
     data = pt.image_to_data(
@@ -316,6 +346,72 @@ def _ocr_macos_vision(img_path: str) -> list[tuple[str, int, int, float]]:
             if ch.isdigit():
                 out.append((ch, cx, cy, conf))
     return out
+
+
+# ─── Claude(에이전트) 비전 핸드셰이크 ───────────────────────────────
+# ★API 호출이 아니다. 이 프로젝트는 항상 Claude Code 세션 안에서 돌아가므로,
+#   스크립트가 스크린샷을 놔두면 **세션에서 돌고 있는 클로드가 직접 눈으로 읽고** 답을 파일로 준다.
+#   (선례: phone_auto/nh_vision_input.py — 로컬 OCR 전멸한 NH 방패 키패드를 이 방식으로 뚫고
+#    롯데 #9 결제 성공, 주문 2026-07-31-G83859)
+CLAUDE_OCR_DIR = PROJECT_ROOT / "phone_auto" / "_tmp" / "claude_ocr"
+CLAUDE_OCR_TIMEOUT = float(os.environ.get("CLAUDE_OCR_TIMEOUT", "45"))
+CLAUDE_OCR_POLL = 1.0
+# ★첫 요청이 타임아웃하면(=세션에 클로드가 안 붙어있음) 그 프로세스에선 이후 클로드를 건너뛴다.
+#   키패드마다 45초씩 까먹으면 결제 세션(~5분)이 만료된다.
+_claude_unavailable = False
+
+
+def _ocr_claude(img_path: str) -> list[tuple[str, int, int, float]]:
+    """에이전트(클로드) 비전 판독 — 파일 핸드셰이크.
+
+    프로토콜:
+      1) 스크립트가 `_tmp/claude_ocr/request.png` + `request.json`(요청 id) 을 쓴다
+      2) **stdout 에 `[claude-ocr] 판독요청` 한 줄**을 찍는다 → 세션의 클로드가 이 줄을 보고 개입
+      3) 클로드가 이미지를 읽고 `response.json` 을 쓴다
+         {"id": <요청 id>, "digits": [{"d":"0","x":367,"y":864}, ...]}
+      4) 이 함수가 폴링해서 같은 id 의 응답을 파싱해 반환
+
+    타임아웃(기본 90s, CLAUDE_OCR_TIMEOUT) 이면 예외 → vote_digits 가 [WARN] 후 나머지 엔진으로 진행.
+    ⚠️ 결제화면 세션이 ~5분이라 판독은 빨라야 한다. 무인 실행에선 응답이 없어 타임아웃되고
+       easyocr+vision 만으로 진행된다(= 이전과 동일, 더 나빠지지 않음).
+    """
+    global _claude_unavailable
+    import shutil, time as _time
+    if _claude_unavailable:
+        raise RuntimeError("claude 판독 비활성 (이전 요청 무응답 — 이 프로세스에선 skip)")
+    CLAUDE_OCR_DIR.mkdir(parents=True, exist_ok=True)
+    req_png = CLAUDE_OCR_DIR / "request.png"
+    req_json = CLAUDE_OCR_DIR / "request.json"
+    res_json = CLAUDE_OCR_DIR / "response.json"
+    if res_json.exists():
+        res_json.unlink()                      # 이전 응답 재사용 방지
+    rid = f"{int(_time.time() * 1000)}"
+    shutil.copyfile(img_path, req_png)
+    req_json.write_text(json.dumps({"id": rid, "image": str(req_png),
+                                    "src": str(img_path)}, ensure_ascii=False))
+    print(f"[claude-ocr] 판독요청 id={rid} img={req_png} "
+          f"→ {res_json} 대기 (timeout {CLAUDE_OCR_TIMEOUT:.0f}s)", flush=True)
+
+    deadline = _time.time() + CLAUDE_OCR_TIMEOUT
+    while _time.time() < deadline:
+        if res_json.exists():
+            try:
+                data = json.loads(res_json.read_text())
+            except Exception:
+                _time.sleep(CLAUDE_OCR_POLL); continue
+            if str(data.get("id")) != rid:
+                _time.sleep(CLAUDE_OCR_POLL); continue
+            out: list[tuple[str, int, int, float]] = []
+            for it in data.get("digits", []):
+                d = str(it.get("d", "")).strip()
+                if len(d) == 1 and d.isdigit():
+                    out.append((d, int(it["x"]), int(it["y"]), 1.0))
+            print(f"[claude-ocr] 응답 수신 — {len(out)}개 숫자", flush=True)
+            return out
+        _time.sleep(CLAUDE_OCR_POLL)
+    _claude_unavailable = True
+    raise RuntimeError(f"claude 판독 응답 없음 (id={rid}, {CLAUDE_OCR_TIMEOUT:.0f}s 타임아웃) "
+                       f"— 이 프로세스에선 이후 클로드 skip, 나머지 엔진으로 진행")
 
 
 def _ocr_gcv(img_path: str) -> list[tuple[str, int, int, float]]:
@@ -442,14 +538,17 @@ def _vote_cluster(cluster: dict) -> tuple[str, float, dict]:
 def vote_digits(
     image_path: str | Path,
     dist_threshold: int = 60,
-    engines: tuple[str, ...] = ("easyocr", "vision", "gcv"),   # tesseract 제거(2026-06-26): 최약체(0x89 버그·최저정확·최느림). 키패드 정확도 정본=에이전트(클로드) 비전, 로컬 3엔진은 무인 폴백.
+    engines: tuple[str, ...] = ("vision", "easyocr"),
+    # 2026-08-02: gcv 가 BILLING_DISABLED 로 사망 → **클로드 비전을 엔진으로 배선하고 그 자리에 투입**.
+    # (원래 이 주석이 '키패드 정확도 정본=에이전트(클로드) 비전' 이라 적어놓고 배선은 안 돼 있었다.)
+    # tesseract 제거(2026-06-26): 최약체(0x89 버그·최저정확·최느림).
     min_width: int = 720,
     flip_h: bool = False,
     roi_y_frac: Optional[tuple[float, float]] = None,
     verbose: bool = False,
     allow_partial: bool = False,
 ) -> Optional[dict[str, tuple[int, int]]]:
-    """4엔진 union voting. 0~9 distinct cluster 매핑 성공 시 dict, 실패 시 None.
+    """엔진 union voting (로컬 → 실패 시 클로드 승격). 0~9 distinct cluster 매핑 성공 시 dict, 실패 시 None.
 
     flip_h=False (default): ADB screencap(폰 인앱 결제) = 미러 없음, 반전 안 함.
     Continuity Camera 의 미러 라이브 미리보기를 OCR 할 때만 True (좌우 반전).
@@ -460,6 +559,10 @@ def vote_digits(
 
     Returns {'0': (cx, cy), '1': (cx, cy), ..., '9': (cx, cy)} or None.
     """
+    # ★CLAUDE_OCR_ONLY=1 → 로컬 엔진 전부 건너뛰고 에이전트 비전만 사용 (ROI 무관, UI 이동에 강함).
+    #   로컬 2엔진이 ROI 밴드 밖 키패드에서 구조적으로 실패하는 화면(롯데 일반결제 모달) 실험/운용용.
+    if os.environ.get("CLAUDE_OCR_ONLY", "").strip().lower() in ("1", "true", "yes"):
+        engines = ("claude",)
     import cv2
     image_path = str(image_path)
     img = cv2.imread(image_path)
@@ -487,11 +590,14 @@ def vote_digits(
         "easyocr": _ocr_easyocr,
         "tesseract": _ocr_tesseract,
         "vision": _ocr_macos_vision,
-        "gcv": _ocr_gcv,
+        "claude": _ocr_claude,
+        "gcv": _ocr_gcv,          # BILLING_DISABLED (2026-08-02) — 디폴트에서 제외, 복구 시 재투입
     }
 
     detections: list[tuple[str, str, int, int, float]] = []
     for engine_name in engines:
+        if engine_name == "claude":
+            continue          # 위에서 이미 처리(폴백 시엔 로컬 엔진만 투표)
         fn = fn_map.get(engine_name)
         if not fn:
             continue
@@ -545,6 +651,31 @@ def vote_digits(
 
     expected = set("0123456789")
     found = set(digit_map.keys())
+
+    # ★로컬 실패 시에만 클로드 승격 (2026-08-02 사용자 결정)
+    #   클로드 개입은 사람(에이전트) 왕복이라 느리다 → **로컬 2엔진(vision+easyocr)으로 먼저 시도**,
+    #   0~9 완전 매핑에 실패했을 때만 클로드를 부른다. 성공 시엔 클로드를 아예 안 부르므로
+    #   결제 5분 세션을 잡아먹지 않는다. 클로드가 완전 매핑을 주면 **투표·ROI 없이 정본 채택**.
+    if expected != found and "claude" in engines:
+        print(f"[claude] 로컬 매핑 실패({len(found)}/10) → 클로드 승격", flush=True)
+        try:
+            cres = _ocr_claude(image_path)
+            cmap: dict[str, tuple[int, int]] = {}
+            dup = False
+            for d, cx, cy, _c in cres:
+                if d in cmap:
+                    dup = True
+                cmap[d] = (cx, cy)
+            if not dup and set(cmap) == expected:
+                if verbose:
+                    print("[claude] 0~9 완전 매핑 — 정본 채택")
+                if scale != 1.0:
+                    cmap = {d: (int(x / scale), int(y / scale)) for d, (x, y) in cmap.items()}
+                return cmap
+            print(f"[claude] 불완전({len(cmap)}/10, dup={dup}) — 로컬 결과로 진행", flush=True)
+        except Exception as e:
+            print(f"[WARN] claude 실패: {e}", file=sys.stderr)
+
     if expected != found:
         if verbose:
             missing = sorted(expected - found)
@@ -876,7 +1007,7 @@ def _main():
         sys.exit(1)
     img = sys.argv[1]
     print(f"입력: {img}")
-    print(f"엔진: easyocr + tesseract + macOS vision + gcv\n")
+    print(f"엔진: vision + easyocr → 실패 시 claude 승격\n")
     result = vote_digits(img, verbose=True)
     print()
     if result is None:

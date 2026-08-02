@@ -861,23 +861,13 @@ class FlowRunner:
             if not self.use_camera:
                 raise FlowError("input_pin_fixed_layout: camera mode 필수 (screencap 차단됨)")
             self._log(f"input_pin_fixed_layout digits={len(value)} delay={delay}s")
-            from .ocr_keypad import _load_gcv
-            from google.cloud import vision
+            # ★2026-08-02: GCV 직접 호출 제거(BILLING_DISABLED 로 403). 표준 엔진 스택
+            #   (vision+easyocr → 실패 시 클로드 승격) 으로 교체 — 다른 키패드 경로와 동일 정본.
+            from .ocr_keypad import vote_digits
             import json as _json, cv2 as _cv2, numpy as _np
-            # GCV OCR → digit cam 좌표 + ok button (row4 col3) 추정
             self._cap()
-            client = _load_gcv()
-            with open(self._tmp_img, "rb") as f:
-                resp = client.text_detection(image=vision.Image(content=f.read()))
-            cam_digits = {}
-            for ann in resp.text_annotations[1:]:
-                t = ann.description
-                if t in ("0","1","2","3","4","5","6","7","8","9") and t not in cam_digits:
-                    verts = ann.bounding_poly.vertices
-                    cx = sum(v.x for v in verts) // 4
-                    cy = sum(v.y for v in verts) // 4
-                    if cy > 700:
-                        cam_digits[t] = (cx, cy)
+            _vm = vote_digits(self._tmp_img, allow_partial=True) or {}
+            cam_digits = {d: (cx, cy) for d, (cx, cy) in _vm.items() if cy > 700}
             # 키패드 grid 추정 — col_x cluster (3), row_y cluster (4) from 잡힌 digits
             if len(cam_digits) < 7:
                 raise FlowError(f"input_pin_fixed_layout: OCR 숫자 {len(cam_digits)}개 잡힘 (≥7 필요)")
@@ -1012,7 +1002,7 @@ class FlowRunner:
                 if ref:
                     self._log(f"input_pin: adaptive screen='{screen_name}' anchors={len(ref.get('anchors',[]))}")
 
-            # 4엔진 voting OCR — kind 기반 preset 자동 매핑 (samsung_7digit_shuffle → samsung_code7 등)
+            # 엔진 voting OCR — kind 기반 preset 자동 매핑 (samsung_7digit_shuffle → samsung_code7 등)
             preset_name = action.get("preset")
             if not preset_name:
                 kind_str = action.get("kind", "")
@@ -1037,7 +1027,7 @@ class FlowRunner:
 
             self._log(f"input_pin kind={action.get('kind')} digits={len(value)} delay={delay}s mode={'camera' if self.use_camera else 'adb'}")
             ocr_retry = action.get("ocr_retry", 4)
-            # ★ 시작 전 한 번 4엔진 voting 으로 0~9 매핑 → 캐시 사용
+            # ★ 시작 전 한 번 voting 으로 0~9 매핑 → 캐시 사용
             # 1 digit missing 시 ADB dump button position (10 cell 고정) + cam→phone 변환 후 매칭으로 추정
             digits_cache: dict[str, tuple[int,int]] = {}
             items_full: list[dict] = []
@@ -1148,15 +1138,15 @@ class FlowRunner:
 
             # ADB(screencap) 모드 셔플 키패드: single-pass 4-engine vote_digits.
             # 셔플은 화면 로드시 1회뿐 → 매 키 재OCR 금지([[feedback_shuffle_keypad_ocr_once]]).
-            # 단일엔진 _ocr_digits는 '0' 등 누락(5/29 BC 7/10) → vote_digits 4엔진. 결과=이미 phone 픽셀 좌표.
+            # 단일엔진 _ocr_digits는 '0' 등 누락(5/29 BC 7/10) → vote_digits(로컬2+클로드승격). 결과=이미 phone 픽셀 좌표.
             if not digits_cache and not self.use_camera and preset:
                 from .ocr_keypad import vote_digits
                 need = set(value)
-                # 엔진 사다리: 2엔진(vision=macOS + gcv, ~0.6s) 먼저 → need 못 잡으면 4엔진 승급.
+                # 엔진 사다리: 로컬 2엔진(vision+easyocr) 먼저 → need 못 잡으면 클로드 승격(8/02).
                 # ★ 전 카드 공통 기본=2엔진 (engines 미지정 시). preset에 engines 명시하면 그것 우선.
-                # 10/10(=need 전부) 못 잡으면 결제 실패라 4엔진을 여분으로 항상 남겨둠.
-                FULL4 = ("easyocr", "tesseract", "vision", "gcv")
-                primary = tuple(preset["engines"]) if preset.get("engines") else ("vision", "gcv")
+                # 10/10(=need 전부) 못 잡으면 결제 실패라 클로드 승격을 여분으로 항상 남겨둠.
+                FULL4 = ("vision", "easyocr", "claude")   # 승급용(easyocr 포함=느림). primary=preset(vision+claude)
+                primary = tuple(preset["engines"]) if preset.get("engines") else ("vision", "easyocr")
                 ladder = [primary] + ([FULL4] if set(primary) != set(FULL4) else [])
                 for engines in ladder:
                     for va in range(action.get("vote_retry", 3)):
@@ -1174,9 +1164,9 @@ class FlowRunner:
                     if digits_cache:
                         break
                     if len(ladder) > 1 and engines is primary:
-                        self._log(f"  [adb vote] 2엔진 {primary} 실패 → 4엔진 승급")
+                        self._log(f"  [adb vote] 로컬 {primary} 실패 → 클로드 승격")
                 if not digits_cache:
-                    raise FlowError(f"input_pin(adb): 2엔진+4엔진 모두 PIN digit 못잡음 (need {sorted(set(value))})")
+                    raise FlowError(f"input_pin(adb): 로컬+클로드 모두 PIN digit 못잡음 (need {sorted(set(value))})")
 
             cache_is_phone_coord = digits_cache.pop("__phone_coord__", None) is not None
             for i, d in enumerate(value, 1):

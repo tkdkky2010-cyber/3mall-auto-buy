@@ -46,7 +46,9 @@ from phone_auto.hmall_hyundai_buy import (
     cap, _adb, ocr_find, ocr_tap, wait_text, screen_has, _resolve_serial, _wait_app, wake_screen,
     CARD_ALIASES, CARD_GRID_NAME,
     _card_secrets, _tap_shuffle,        # 삼성 일반결제 공용 헬퍼 (hmall=정본, 양 몰 공용)
-    pay_nh_general,                     # NH 일반결제 SDK(다른결제→일반결제→카드4칸→CVC→확인→6자리) — 몰 무관 공용
+    card_digits_on_screen, next_button_enabled,   # 2026-08-02 공통 검증 헬퍼
+    pay_samsung as _pay_samsung_shared,  # ★삼성 일반결제 = 3사 공용 정본 (몰별 복제 금지)
+    pay_nh_general,                     # ★NH 일반결제 = 3사 공용 정본 (몰 무관, NH_VISION_MODE 지원)
 )
 from phone_auto.flow_runner import _ocr_texts, FlowRunner
 # PATH(bare adb)는 hmall_hyundai_buy import 시 이미 설정됨.
@@ -783,7 +785,7 @@ def handle_ars_call(intro_wait: float = 10.0, interval: float = 5.0, taps: int =
 def pay_lotte_payco(card: str = "삼성") -> dict:
     """비롯데 당일카드(삼성 등) = **PAYCO 간편결제 경유** 결제. 2026-06-02 #10 라이브 풀검증(주문 2026-06-02-F71650).
     경로: (원)결제하기 → 삼성카드 SDK 모달 '간편결제(PAYCO,삼성페이)' → '간편 결제'(PAYCO 박스, '다시 선택하기') → PAYCO 박스
-      → PAYCO 결제확인(금액·SAMSUNGCARD) → 결제하기 → 결제비밀번호(4x3 셔플) payco_pin6 137601(hmall 재사용, 2엔진실패→4엔진)
+      → PAYCO 결제확인(금액·SAMSUNGCARD) → 결제하기 → 결제비밀번호(4x3 셔플) payco_pin6 137601(hmall 재사용, 로컬2엔진 실패→클로드 승격)
       → **ARS 본인인증(전화요청 → ⚠️사용자 통화 인증, 무인 불가)** → 롯데 주문완료.
     ⚠️ ARS 빈도 미확정(계정당1회 가설) — 안 뜨면 바로 주문완료 폴링. ⚠️실 결제."""
     out = {"step": "order_sheet", "card": card}
@@ -862,12 +864,12 @@ def pay_lotte_payco(card: str = "삼성") -> dict:
 # ──────── D'. 삼성 일반결제 (카드번호 직접 — PAYCO/ARS 완전 회피) ────────
 
 # _card_secrets / _tap_shuffle / KEYPAD_ROI_Y = hmall_hyundai_buy 에서 import (정본=hmall, 양 몰 공용). 상단 import 참조.
-# (셔플키패드 2엔진→4엔진 roi 로직·card_secrets 로더는 hmall pay_samsung 과 공유 — 한 곳만 고치면 됨.)
+# (셔플키패드 로컬2엔진→클로드승격 roi 로직·card_secrets 로더는 hmall pay_samsung 과 공유 — 한 곳만 고치면 됨.)
 
 
 def _tap_shuffle_retry(value: str, delay: float = 1.0, tries: int = 3) -> dict:
-    """_tap_shuffle + 매핑 실패 시 '재배열'로 재셔플 후 재시도. 2/4엔진 OCR 오독·매핑실패 대응
-    (2026-07-21 #13 cert 매핑실패/#14 CVC 오독 사고). 재시도마다 force_vote(4엔진)로 정확도↑."""
+    """_tap_shuffle + 매핑 실패 시 '재배열'로 재셔플 후 재시도. 로컬2엔진 OCR 오독·매핑실패 대응
+    (2026-07-21 #13 cert 매핑실패/#14 CVC 오독 사고). 재시도마다 force_vote(클로드 승격 포함)로 정확도↑."""
     r: dict = {}
     for i in range(tries):
         r = _tap_shuffle(value, delay=delay, force_vote=(i > 0))
@@ -881,155 +883,25 @@ def _tap_shuffle_retry(value: str, delay: float = 1.0, tries: int = 3) -> dict:
 
 
 def pay_lotte_samsung_general() -> dict:
-    """삼성카드 **일반결제(카드번호 직접 입력)** — PAYCO/ARS 완전 회피.
-    ✅ 2026-06-02 #12 leenamsu0318 **라이브 풀완주 검증**(주문 2026-06-02-G05038, 뷰티+적립금까지). 1~8단계 전부 동작.
-    고정값 = secrets/card_secrets.json['삼성'](card_no/cvc/pin6/cert_pw6, 김건엽 명의 1장 전계정 공용 — 하드코딩 금지).
-    경로(WORKLOG 2026-06-02 저녁 발견3, 1~8): (원)결제하기 → 삼성 SDK모달 '다른결제'(❌간편결제=PAYCO)
-      → '일반결제(카드번호)'(❌SMS) → 카드번호 15자리 + CVC 3자리 → 다음 → 일반결제 비밀번호(pin6) → 다음
-      → 금융인증서 아래 '모니모 앱'(⚠️공동인증서 모니모 아님) → 인증서카드 → 인증서비번(cert_pw6, ★4엔진 강제)
-      → '인증 성공' OK → 롯데앱 복귀 → 주문완료 폴링. ⚠️실 결제."""
-    sec = _card_secrets().get("삼성", {})
-    card_no, cvc, pin6, cert_pw6 = (sec.get("card_no"), sec.get("cvc"), sec.get("pin6"), sec.get("cert_pw6"))
-    if not all([card_no, cvc, pin6, cert_pw6]):
-        return {"err": "card_secrets['삼성'] 필드 부족(card_no/cvc/pin6/cert_pw6)"}
-    out = {"step": "order_sheet", "card": "삼성"}
-    if screen_has("다음에도") or screen_has("사용할까요"):
-        ocr_tap("사용할게요", contains=True, retries=2)
-    # 1) (원)결제하기 — 하단 'NNN원 결제하기'(cy>2000) → 삼성카드 SDK 모달
-    pay = next((it for it in _ocr_texts(cap()) if "결제하기" in it["text"] and it["cy"] > 2000), None)
-    if pay:
-        _adb().tap(pay["cx"], pay["cy"])
-    elif not ocr_tap("결제하기", contains=True):
-        out["err"] = "원결제하기 실패"; return out
-    time.sleep(3.0)
-    # 2) 삼성카드 SDK 모달 → '다른결제'(일반/SMS) 박스 (❌간편결제=PAYCO=ARS 위험)
-    out["step"] = "samsung_modal"
-    if not wait_text("간편결제", timeout=12) and not screen_has("다른"):
-        out["err"] = "삼성 SDK 모달 미도달"; return out
-    other = next((it for it in _ocr_texts(cap())
-                  if "다른" in it["text"] and "결제" in it["text"] and "간편" not in it["text"]), None)
-    if other:
-        _adb().tap(other["cx"], other["cy"])
-    elif not ocr_tap("다른", contains=True, retries=3):
-        out["err"] = "'다른결제' 선택 실패"; return out
-    time.sleep(2.5)
-    # 3) '다른 결제' 화면 → '일반 결제(카드번호로 결제)' (❌SMS 결제)
-    out["step"] = "general_select"
-    if not wait_text("일반", timeout=10):
-        out["err"] = "일반/SMS 선택 화면 미도달"; return out
-    gn = next((it for it in _ocr_texts(cap())
-               if "일반" in it["text"] and "결제" in it["text"] and "SMS" not in it["text"].upper()), None)
-    if gn:
-        _adb().tap(gn["cx"], gn["cy"])
-    elif not ocr_tap("일반", contains=True, retries=3):
-        out["err"] = "'일반 결제(카드번호)' 선택 실패"; return out
-    time.sleep(2.5)
-    # 4) 일반결제 화면 — 카드번호 + CVC 입력 후 '다음'
-    out["step"] = "card_cvc"
-    if not wait_text("카드번호", timeout=12):
-        out["err"] = "일반결제(카드번호) 화면 미도달"; return out
-    # 4a) 카드번호 필드('카드번호 - 없이 입력') 탭 → 셔플키패드 → 15자리(다 누르면 자동닫힘)
-    fld = next((it for it in _ocr_texts(cap()) if "없이" in it["text"]), None) \
-        or next((it for it in _ocr_texts(cap()) if "카드번호" in it["text"]), None)
-    if fld:
-        _adb().tap(fld["cx"], fld["cy"])
-    else:
-        out["err"] = "카드번호 필드 미발견"; return out
-    time.sleep(1.5)
-    r = _tap_shuffle(card_no, delay=1.0)
-    if not r.get("ok"):
-        out["err"] = f"카드번호 입력 실패: {r.get('err')}"; return out
-    time.sleep(1.5)
-    # 카드번호 셔플키패드 '입력완료' — 15자리 자동닫힘 안 되는 화면 대응
-    #   (2026-07-21 #8 사고: 미탭 → CVC 필드 미출현 → PAY_FAIL@card_cvc). 있을 때만 탭.
-    if screen_has("입력완료"):
-        ocr_tap("입력완료", contains=True); time.sleep(1.5)
-    # 4b) CVC 입력 + '다음' — OCR 오독으로 'CVC 잘못 입력' 뜨면 확인 후 재입력(재셔플). (2026-07-21 #14 사고)
-    cvc_ok = False
-    for cvc_try in range(3):
-        cf = next((it for it in _ocr_texts(cap()) if "CVC" in it["text"].upper()), None)
-        if not cf:
-            out["err"] = "CVC 필드 미발견"; return out
-        _adb().tap(cf["cx"], cf["cy"]); time.sleep(1.5)
-        r = _tap_shuffle_retry(cvc, delay=1.0)
-        if not r.get("ok"):
-            out["err"] = f"CVC 입력 실패: {r.get('err')}"; return out
-        time.sleep(1.0)
-        if screen_has("입력완료"):
-            ocr_tap("입력완료", contains=True); time.sleep(1.2)
-        # 4c) '다음' (카드+CVC 입력되면 파랑 활성)
-        if not ocr_tap("다음", contains=True, retries=4):
-            out["err"] = "카드/CVC '다음' 실패"; return out
-        time.sleep(2.5)
-        # 'CVC 잘못 입력' 에러 감지 → 확인 후 CVC 재입력
-        if screen_has("잘못") or screen_has("다시 확인"):
-            print(f"   [lotte] CVC 오입력 감지 → 확인 후 재입력 (시도 {cvc_try + 1}/3)", flush=True)
-            ocr_tap("확인", contains=True, retries=2); time.sleep(1.5)
-            continue
-        cvc_ok = True
-        break
-    if not cvc_ok:
-        out["err"] = "CVC 재입력 3회 실패(OCR 오독 지속)"; return out
-    # 5) 일반결제 비밀번호 화면 → '숫자 6자리 입력' → 셔플키패드 pin6 → '다음'
-    out["step"] = "pin6"
-    if not wait_text("6자리", timeout=12) and not screen_has("비밀번호"):
-        out["err"] = "일반결제 비밀번호 화면 미도달"; return out
-    pf = next((it for it in _ocr_texts(cap()) if "6자리" in it["text"] or "숫자" in it["text"]), None)
-    if pf:
-        _adb().tap(pf["cx"], pf["cy"]); time.sleep(1.5)
-    r = _tap_shuffle_retry(pin6, delay=0.8)
-    if not r.get("ok"):
-        out["err"] = f"결제비번 입력 실패: {r.get('err')}"; return out
-    time.sleep(1.0)
-    if not ocr_tap("다음", contains=True, retries=4):
-        out["err"] = "결제비번 '다음' 실패"; return out
-    time.sleep(2.5)
-    # 6) 금융인증서/공동인증서 선택 → **금융인증서** 헤더 아래 '모니모 앱' (⚠️공동인증서 모니모/설치하기 아님)
-    out["step"] = "cert_select"
-    if not wait_text("인증서", timeout=12):
-        out["err"] = "인증서 선택 화면 미도달"; return out
-    its = _ocr_texts(cap())
-    fin = next((it for it in its if "금융인증서" in it["text"].replace(" ", "")), None)
-    monimo = [it for it in its if "모니모" in it["text"] and "설치" not in it["text"]]
-    # 금융인증서 헤더 바로 아래(최근접) 모니모 = 금융인증서의 모니모. 공동인증서 모니모는 더 아래/위라 제외됨.
-    cands = [m for m in monimo if fin and m["cy"] > fin["cy"]]
-    tgt = min(cands, key=lambda m: m["cy"]) if cands else None
-    if not tgt:
-        out["err"] = "금융인증서 아래 '모니모 앱' 미발견"; return out
-    _adb().tap(tgt["cx"], tgt["cy"])
-    time.sleep(3.0)
-    # 7) 모니모 앱 → '김건엽님의 금융인증서비스' → 인증서 카드(김건엽 금융인증서/국민은행) 탭 → 셔플키패드(4x3) cert_pw6
-    out["step"] = "monimo_cert"
-    if not wait_text("인증서", timeout=20):
-        out["err"] = "모니모 금융인증서 화면 미도달"; return out
-    if not ocr_tap("김건엽", contains=True, retries=4):
-        if not ocr_tap("국민은행", contains=True, retries=2):
-            out["err"] = "인증서 카드 선택 실패"; return out
-    time.sleep(2.0)
-    if not wait_text("비밀번호", timeout=10):
-        out["err"] = "인증서 비번 화면 미도달"; return out
-    time.sleep(1.0)
-    r = _tap_shuffle_retry(cert_pw6, delay=0.8)   # 2엔진→4엔진(roi). 인증서 키패드도 2엔진 roi 로 0~9 정매핑(#13 검증)
-    if not r.get("ok"):
-        out["err"] = f"인증서 비번 입력 실패: {r.get('err')}"; return out
-    time.sleep(2.0)
-    # 8) '인증에 성공하였습니다' → OK → 롯데앱 복귀 → 주문완료 폴링
-    out["step"] = "cert_done"
-    if wait_text("성공", timeout=20):
-        if not ocr_tap("OK", contains=True, retries=2):
-            ocr_tap("확인", contains=True, retries=2)
-    out["step"] = "order_complete"
-    if not _wait_app(PKG, timeout=30):
-        out["err"] = "롯데앱 복귀 실패(결제 미확정 가능)"; return out
-    time.sleep(3.0)
-    confirmed, order = _poll_order_complete(60)
-    if confirmed:
-        out["ok"] = True; out["order"] = order; return out
-    out["err"] = "주문완료 미확인(timeout)"
-    return out
+    """롯데홈쇼핑 삼성 일반결제 — ★**3사 공용 정본 `hmall_hyundai_buy.pay_samsung` 에 위임**(2026-08-02).
 
+    종전엔 몰별로 같은 시퀀스를 두 벌 갖고 있었다(현대몰 것은 라이브 미검증 포팅본).
+    삼성 SDK 화면은 가맹점 무관 동일하므로 한 벌만 두고, **몰이 다른 '원 결제하기' 탭만 주입**한다.
+    롯데는 하단 'NNN원 결제하기'(cy>2000)를 눌러야 해서 그 부분만 여기서 넘긴다.
 
-# ──────── D''. KB국민카드 결제 (KB Pay 간편결제 — hmall pay_kb 흐름 재사용) ────────
+    검증: 2026-08-02 #16·#3·#5·#15 4계정 연속 라이브 완주(주문 I20794/I21621/I22042/I22245).
+    PAY_VISION_MODE=1 이면 카드번호 화면에서 정지 → 에이전트 수동입력(오늘 4/4 성공 경로).
+    """
+    def _lotte_pay_tap() -> bool:
+        if screen_has("다음에도") or screen_has("사용할까요"):
+            ocr_tap("사용할게요", contains=True, retries=2)
+        pay = next((it for it in _ocr_texts(cap())
+                    if "결제하기" in it["text"] and it["cy"] > 2000), None)
+        if pay:
+            _adb().tap(pay["cx"], pay["cy"]); return True
+        return bool(ocr_tap("결제하기", contains=True))
+
+    return _pay_samsung_shared(pay_tap=_lotte_pay_tap)
 
 def pay_lotte_kb() -> dict:
     """KB국민카드 = KB Pay 간편결제. hmall `pay_kb` 흐름 재사용(카드앱 구간 몰 무관).

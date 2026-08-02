@@ -514,20 +514,25 @@ def _refresh_lotte_captcha(login_page: Page) -> None:
 
 
 def _solve_lotte_captcha(login_page: Page, max_refresh: int = 3) -> str:
-    """롯데 보안문자(캡차) 견고 판독 — ★다중 엔진 투표(GCV + macOS Vision + Tesseract).
+    """롯데 보안문자(캡차) 견고 판독 — 다중 엔진 투표.
     취소선 때문에 단일 엔진이 가끔 자리수 누락/오판 → ≥2 엔진이 같은 6자리에 합의할 때만 채택.
     불합의면 '새로고침' 으로 더 쉬운 캡차로 교체 후 재시도(제출 낭비=anti-bot 자극 방지).
-    합의 못 얻으면 GCV 6자리 폴백(단일 엔진만 살아있는 환경 대비). easyocr/torch 는 lazy."""
+    합의 못 얻으면 첫 엔진의 6자리 폴백. easyocr/torch 는 lazy.
+
+    ⚠️ 2026-08-02: **GCV 를 엔진 목록에서 뺐다** — BILLING_DISABLED(403) 라 매 호출 예외만 나고
+       느려진다. 남은 건 macOS Vision + Tesseract 인데 **tesseract 는 미설치**라 실질 단일엔진이다
+       → 합의가 안 나 '새로고침' 재시도에 의존한다. 캡차 정확도를 올리려면 tesseract 설치 또는
+       GCV billing 복구가 필요하다. (키패드와 달리 캡차는 문자+숫자라 클로드 숫자엔진 재사용 불가)"""
     from collections import Counter
     sys.path.insert(0, str(PROJECT_ROOT / "phone_auto"))
     import ocr_keypad as _K  # noqa: E402
-    engines = [_K._ocr_gcv, _K._ocr_macos_vision, _K._ocr_tesseract]
+    engines = [_K._ocr_macos_vision, _K._ocr_tesseract]   # gcv 제외(8/02 BILLING_DISABLED)
     cap = str(ROOT / "_tmp_lotte_captcha.png")
     fallback = ""
     for _ in range(max_refresh + 1):
         login_page.locator('img[alt="보안문자"]').screenshot(path=cap)
         votes = Counter()
-        gcv6 = ""
+        first6 = ""
         for i, fn in enumerate(engines):
             try:
                 s = _captcha_str(fn(cap))
@@ -536,15 +541,15 @@ def _solve_lotte_captcha(login_page: Page, max_refresh: int = 3) -> str:
             if len(s) == 6:
                 votes[s] += 1
                 if i == 0:
-                    gcv6 = s
-        if gcv6:
-            fallback = gcv6
+                    first6 = s
+        if first6:
+            fallback = first6
         if votes:
             top, n = votes.most_common(1)[0]
             if n >= 2:           # ≥2 엔진 합의 = 고신뢰 → 즉시 채택
                 return top
         _refresh_lotte_captcha(login_page)
-    return fallback  # 합의 실패 시 GCV 최선값(이후 로그인 실패하면 재시도 루프가 처리)
+    return fallback  # 합의 실패 시 첫 엔진 최선값(이후 로그인 실패하면 재시도 루프가 처리)
 
 
 # 비밀번호 변경 캠페인 팝업 '창'의 URL 표식 (2026-08-01 실측: forward.popup_pwd_campaign_av.lotte)
@@ -634,7 +639,7 @@ def _lotte_dismiss_pw_campaign(page: Page) -> None:
 def lotte_login(page: Page, account_id: str, account_pw: str) -> bool:
     """롯데 로그인 — ★팝업/새창 없이 기존 탭을 로그인 URL 로 직접 이동(2026-06-08).
     popup 이 macOS 창 focus 강탈 주범 → 직접 nav 로 Chrome 백그라운드 유지(focus 안 뺏음).
-    보안문자(캡차)는 GCV 자동해결(_solve_lotte_captcha), 틀리면 새로고침 후 최대 3회.
+    보안문자(캡차)는 _solve_lotte_captcha 자동해결(엔진투표), 틀리면 새로고침 후 최대 3회.
     멀티계정: 기존 로그인 상태면 logout 후 fresh login.
     """
     pw_name = "비밀번호(영문+숫자+특수 8~15자)"
@@ -654,7 +659,7 @@ def lotte_login(page: Page, account_id: str, account_pw: str) -> bool:
         except Exception:
             pass
 
-        # 1) 로그인 페이지 직접 진입 + 제출 (캡차 강제 시 GCV 자동, 최대 3회)
+        # 1) 로그인 페이지 직접 진입 + 제출 (캡차 자동판독, 최대 3회)
         for attempt in range(3):
             page.goto(LOTTE_LOGIN_URL, wait_until="domcontentloaded", timeout=20000)
             page.wait_for_timeout(1500)

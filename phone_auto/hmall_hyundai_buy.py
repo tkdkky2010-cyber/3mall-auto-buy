@@ -9,7 +9,7 @@
   2. 장바구니 아이콘 직접 탭(홈 경유 X) → 보이는 카트
   3. [CDP] basktList 헤더 체크박스 = 전체선택 (n/n 검증). native flow 전에 CDP 필수
   4. [OCR] 구매하기 → 결제하기(금액) → PIN번호 결제 → PIN dot 탭 → 키패드
-  5. [input_pin] hyundai_hmall_pin6=137601 (vision+gcv 2엔진, 실패시 4엔진 fallback) → 확인
+  5. [input_pin] hyundai_hmall_pin6=137601 (로컬 vision+easyocr → 실패 시 클로드 승격) → 확인
   6. [OCR] 최종 결제하기 → 안전결제 팝업 확인
   7. 본인인증 — 화면 변종 분기(handle_after_pay):
        · '생년월일' 폼(첫 결제) → enter_identity_auth(이름+생년월일+성별)
@@ -511,7 +511,7 @@ ID_CARDPW_FIELD = (540, 812)      # '카드 비밀번호 4자리' 입력란 (탭
 
 def enter_card_password() -> dict:
     """카드 비밀번호 4자리(secrets 현대.card_pw4) → 확인.
-    PIN과 동일한 고정 키패드 → input_pin hyundai_hmall_pw4 (4엔진 OCR). 입력란(540,812) 탭이 핵심."""
+    PIN과 동일한 고정 키패드 → input_pin hyundai_hmall_pw4 (엔진 voting OCR). 입력란(540,812) 탭이 핵심."""
     out = {"ok": False}
     pw = str((json.loads((ROOT / "secrets" / "card_secrets.json").read_text(encoding="utf-8"))
               .get("현대") or {}).get("card_pw4", ""))
@@ -887,7 +887,7 @@ def pay_bc() -> dict:
     hmall-side(원결제하기)=OCR. 이후 KCP '다음'→페이북앱(kvp.jjy.MispAndroid320)=bc_paybook_isp.json **flow[6:]** 재사용.
     ⚠️⚠️ **페이북앱 기본 결제수단='페이북 머니'(현금/포인트)** — flow[10]에서 반드시 '카드 결제' 선택 + flow[12] verify_selected
        하드가드(페이북머니 selected면 FlowError로 결제중단)가 내장. **페이북머니로 결제 절대금지.**
-    ⚠️ BC 결제비번 키패드 = 셔플, FLAG_SECURE 아님(screencap) → `input_pin kind=bc_pin6`(4엔진 vote_digits 매핑). dump 아님.
+    ⚠️ BC 결제비번 키패드 = 셔플, FLAG_SECURE 아님(screencap) → `input_pin kind=bc_pin6`(vote_digits 매핑). dump 아님.
     ✅ 라이브검증(2026-06-01): KCP '다음'=tap_dump_text·페이북앱 flow[6:] 그대로 통과. 단 카트가 BC 거래한도 이하여야(이전 CC61 한도초과 거절)."""
     out = {"step": "bc"}
     if not ocr_tap("결제하기", contains=True):       # 1) 원 결제하기 (hmall WebView OCR; hmall이 비씨카드 적용)
@@ -926,18 +926,24 @@ KEYPAD_ROI_TOP = (0.20, 0.42)  # 2026-06-11 lotte '일반 결제' 모달 셔플�
                                #   (0.20,0.42)=두 화면 모두 10/10 실측(/tmp/_cvc_now.png,_pin6_now.png). 하단 edge 0.42=placeholder stray('숫자6자리'의 6@0.43, CVC '•••'@0.50) 배제.
 
 
-def _tap_shuffle(value: str, delay: float = 1.0, force_vote: bool = False) -> dict:
+def _tap_shuffle(value: str, delay: float = 0.5, force_vote: bool = False) -> dict:
     """셔플 숫자 키패드에 value(숫자 문자열)를 입력. 키패드는 **로드 시 1회만 셔플**(재배열 X) →
     **1회 OCR 후 value 연속탭**(매 키 사이 delay: 카드/CVC=1.0 / 비번=0.7~0.8).
-    ★엔진 에스컬레이션: **2엔진(vision+gcv) voting → 실패 시 4엔진**. voting 이라 단일엔진 오독(8↔0) 교차검증됨.
+    ★엔진 에스컬레이션: **로컬 2엔진(vision+easyocr) voting → 실패 시 클로드 승격**(2026-08-02, gcv 사망).
+    voting 이라 단일엔진 오독(8↔0) 교차검증됨. 클로드는 로컬이 0~9 완전매핑 실패했을 때만 호출된다.
     둘 다 **키패드 ROI(하단) 제한**으로 stray digit 배제 — 2026-06-02 실측: roi 없으면 상태바'100'→0@(975,46)·
     라벨→8@(453)·카드마스킹 숫자 오매핑돼 비번 틀림. roi 제한+partial 로 해결. 반환 {ok, via, digits, err}."""
     out: dict = {}
     shot = cap("/tmp/_hd_kp.png")
     from phone_auto.ocr_keypad import vote_digits
     need = set(value)
-    passes = [(("easyocr", "tesseract", "vision", "gcv"), "4엔진")] if force_vote else \
-             [(("vision", "gcv"), "2엔진"), (("easyocr", "tesseract", "vision", "gcv"), "4엔진")]
+    # ★엔진 사다리 복원(2026-08-02): 빠른 것부터. easyocr 는 느려서(5/30 bench 8s vs vision 0.6s)
+    #   매번 같이 돌리면 키패드마다 ~10초를 까먹고 결제 5분 세션을 잡아먹는다.
+    #   ① vision 단독(0.6s) → ② +easyocr → ③ +claude(에이전트 판독). 앞 단계에서 성공하면 뒤는 안 돈다.
+    from phone_auto.ocr_keypad import ENGINE_FAST, ENGINE_FULL
+    # ①vision(+claude 승격, 빠름) → ②easyocr 추가. force_vote 면 ②부터.
+    passes = [(ENGINE_FULL, "full")] if force_vote else \
+             [(ENGINE_FAST, "fast"), (ENGINE_FULL, "full")]
     # ROI 에스컬레이션: 하단(hmall/구lotte) → 중앙(신 lotte 카드번호) → 상단(lotte CVC 모달). 하단 우선이라 기존 동작 무회귀.
     rois = [("하단", KEYPAD_ROI_Y), ("중앙", KEYPAD_ROI_MID), ("상단", KEYPAD_ROI_TOP)]
     dmap = None
@@ -950,7 +956,7 @@ def _tap_shuffle(value: str, delay: float = 1.0, force_vote: bool = False) -> di
         if dmap:
             break
     if not dmap:
-        out["err"] = f"키패드 매핑 실패(2/4엔진 × 3ROI, 필요={sorted(need)})"; return out
+        out["err"] = f"키패드 매핑 실패(로컬2엔진+클로드 × 3ROI, 필요={sorted(need)})"; return out
     for d in value:
         x, y = dmap[d]; _adb().tap(x, y)
         time.sleep(delay)
@@ -958,8 +964,51 @@ def _tap_shuffle(value: str, delay: float = 1.0, force_vote: bool = False) -> di
     return out
 
 
-def pay_samsung() -> dict:
-    """삼성카드 **일반결제(카드번호 직접)** — PAYCO/ARS 완전 회피. 롯데 `pay_lotte_samsung_general` 동일 방식 포팅.
+
+# ─── 2026-08-02 라이브 확정 공통 헬퍼 (몰·카드 무관) ────────────────────────
+# 롯데 #16·#3·#5·#15 4계정 연속 검증에서 얻은 3가지. 삼성/NH 등 '일반결제(카드번호 직접)'
+# 경로는 몰이 달라도 SDK 화면이 동일하므로 여기(정본=hmall)에 두고 양 몰이 import 한다.
+
+def card_digits_on_screen() -> int:
+    """화면의 '카드 번호' 필드에 실제로 들어간 자릿수. 마스킹(*)도 1자리로 센다.
+    ★2026-08-02: 탭이 씹혀 15자리 중 9자리만 들어갔는데 아무도 몰랐다(#5).
+      화면에 자릿수가 보이므로 검증이 가능하다 → 넣고 반드시 확인한다."""
+    import re as _re
+    for it in _ocr_texts(cap()):
+        t = it["text"].replace(" ", "")
+        if _re.fullmatch(r"[\d*\-]{8,}", t) and ("-" in t or "*" in t):
+            return len(t.replace("-", ""))
+    return 0
+
+
+def next_button_enabled(y_hint: int = 1377) -> bool:
+    """'다음' 버튼 활성 여부 — 색으로 판정(연한 파랑=비활성 / 진한 파랑=활성).
+    ★2026-08-02 확정: 카드번호·CVC 가 정확히 들어가야 진해진다. 비활성인데 탭하면
+      아무 일도 안 일어나고 다음 화면을 기다리다 타임아웃한다(오늘 PAY_FAIL@pin6 4건의 정체).
+      → 비활성이면 '입력이 틀렸다'는 신호이므로 탭하지 말고 중단한다."""
+    try:
+        from PIL import Image
+        p = cap()
+        im = Image.open(p).convert("RGB")
+        w, _h = im.size
+        px = [im.getpixel((x, y_hint)) for x in range(int(w * 0.35), int(w * 0.65), 10)]
+        # 진한 파랑(활성) ≈ (30,120,240) / 연한 파랑(비활성) ≈ (150,200,250)
+        return sum(1 for r, g, b in px if b > 180 and r < 110) > len(px) // 2
+    except Exception:
+        return True   # 판정 불가 시 막지 않음(기존 동작 유지)
+
+
+def pay_samsung(pay_tap=None) -> dict:
+    """삼성카드 **일반결제(카드번호 직접)** — ★3사 홈쇼핑 공용 정본 (몰 무관).
+
+    2026-08-02 롯데 #16·#3·#5·#15 **4계정 연속 라이브 검증**된 시퀀스가 이 함수다.
+    삼성 SDK 화면(다른결제→일반결제→카드15+CVC3→비번6→금융인증서>모니모>인증서비번6)은
+    **가맹점 무관 동일**하므로 몰별로 복제하지 않는다. 몰이 다른 건 '원 결제하기' 탭 하나뿐 →
+    `pay_tap` 콜러블로 주입한다(미지정 시 ocr_tap('결제하기')).
+
+    ★PAY_VISION_MODE=1 이면 카드번호 화면에서 정지하고 에이전트에게 인계한다(NH_VISION_MODE 와 동일 패턴).
+      로컬 OCR 이 키패드를 못 잡는 날/화면에서 이 방식이 4/4 성공했다.
+    (구 docstring) 롯데 `pay_lotte_samsung_general` 동일 방식 포팅.
     삼성 SDK 모달(다른결제→일반결제→카드번호15+CVC3→비번6→금융인증서>모니모>인증서비번6)은 **가맹점 무관 동일**.
     고정값=secrets/card_secrets.json['삼성'](김건엽 명의 1장 공용). 주문완료는 buy_one wait_order_complete 가 처리.
     ⚠️⚠️ **포팅 후 hmall 라이브 미검증** — 첫 현대몰 삼성결제 때 end-to-end 관찰 필수(롯데 #12 검증과 동일 절차).
@@ -971,8 +1020,11 @@ def pay_samsung() -> dict:
     if not all([card_no, cvc, pin6, cert_pw6]):
         return {"step": "secrets", "err": "card_secrets['삼성'] 필드 부족(card_no/cvc/pin6/cert_pw6)"}
     out = {"step": "samsung_general"}
-    # 1) 원 결제하기 → 삼성 SDK 모달
-    if not ocr_tap("결제하기", contains=True):
+    # 1) 원 결제하기 → 삼성 SDK 모달 (몰별 차이는 여기뿐)
+    if pay_tap is not None:
+        if not pay_tap():
+            out["err"] = "원결제하기 실패"; return out
+    elif not ocr_tap("결제하기", contains=True):
         out["err"] = "원결제하기 실패"; return out
     time.sleep(3.0)
     # 2) SDK 모달 → '다른결제'(일반/SMS) 박스 (❌간편결제=PAYCO=ARS 위험)
@@ -1001,23 +1053,34 @@ def pay_samsung() -> dict:
     out["step"] = "card_cvc"
     if not wait_text("카드번호", timeout=12):
         out["err"] = "카드번호 화면 미도달"; return out
+    # ★PAY_VISION_MODE: 카드번호 화면 도달 → 정지, 에이전트가 화면 보고 직접 입력
+    if os.environ.get("PAY_VISION_MODE", "").strip() in ("1", "true", "yes"):
+        out["step"] = "vision_handoff"
+        out["err"] = "VISION_HANDOFF: 카드번호 화면 도달 — 에이전트 수동입력 대기 (스크립트 정지)"
+        print("\n[VISION_HANDOFF] 카드번호 화면 도달. 스크립트 정지 — 에이전트가 직접 입력합니다.", flush=True)
+        return out
     fld = next((it for it in _ocr_texts(cap()) if "없이" in it["text"]), None) \
         or next((it for it in _ocr_texts(cap()) if "카드번호" in it["text"]), None)
     if not fld:
         out["err"] = "카드번호 필드 미발견"; return out
     _adb().tap(fld["cx"], fld["cy"]); time.sleep(1.5)
-    r = _tap_shuffle(card_no, delay=1.0)
+    r = _tap_shuffle(card_no, delay=0.5)          # ★0.5초 (0.35=오입력 / 1.0=느림, 8/02 실측)
     if not r.get("ok"):
         out["err"] = f"카드번호 입력 실패: {r.get('err')}"; return out
     time.sleep(1.5)
+    got = card_digits_on_screen()                  # ★자릿수 검증 (#5: 15자리 중 9자리만 들어감)
+    if got and got < len(card_no):
+        out["err"] = f"카드번호 미완성 입력 {got}/{len(card_no)}자리 — 탭 유실"; return out
     cf = next((it for it in _ocr_texts(cap()) if "CVC" in it["text"].upper()), None)
     if not cf:
         out["err"] = "CVC 필드 미발견"; return out
     _adb().tap(cf["cx"], cf["cy"]); time.sleep(1.5)
-    r = _tap_shuffle(cvc, delay=1.0)
+    r = _tap_shuffle(cvc, delay=0.5)
     if not r.get("ok"):
         out["err"] = f"CVC 입력 실패: {r.get('err')}"; return out
-    time.sleep(1.0)
+    time.sleep(1.5)
+    if not next_button_enabled():                  # ★활성 검증 — 비활성=입력 틀림. 탭해봐야 헛수고
+        out["err"] = "'다음' 비활성 — 카드번호/CVC 입력값 오류(탭 유실 의심)"; return out
     if not ocr_tap("다음", contains=True, retries=4):
         out["err"] = "카드/CVC '다음' 실패"; return out
     time.sleep(2.5)
@@ -1117,7 +1180,7 @@ def pay_nh() -> dict:
        → 농협카드 팝업에서 **우측상단 '다른 결제' → 우측하단 'PAYCO'** (이 팝업/PAYCO 화면은 FLAG_SECURE 아님, OCR 정상 실측).
     경로: 원결제하기(OCR) → 농협카드 팝업 '다른 결제'(OCR) → 'PAYCO'(OCR)
     → [삼성과 동일] PAYCO 결제확인 → 결제하기 → PIN 4x3 셔플(payco_pin6, 137601) → '확인'(쇼핑몰 복귀=결제확정).
-    ⚠️ PIN: 2엔진(vision,gcv)이 셔플키패드를 고정 1-9로 오독→실패, **4엔진 승급으로 성공**(실측). 박스('다시 선택하기') 단계 없음."""
+    ⚠️ PIN: 로컬 2엔진이 셔플키패드를 고정 1-9로 오독→실패하면 **클로드 승격**으로 해결(8/02 구조). 박스('다시 선택하기') 단계 없음."""
     out = {"step": "nh"}
     if not ocr_tap("결제하기", contains=True):           # 1) 원 결제하기 → 농협카드 팝업
         out["err"] = "원결제하기 실패"; return out
@@ -1237,11 +1300,11 @@ def _wait_keypad(timeout: float = 6) -> bool:
 
 def _kp_read() -> dict:
     """nppfs 보안키패드 현재 셔플 OCR(로컬 3엔진 voting) → {숫자: (x,y)}. ★무인 폴백용.
-    정본은 에이전트(클로드) 비전 — _grid_tap 참조. 로컬 3엔진(easyocr+vision+gcv)은 nppfs 키패드 정확도 낮음(실측).
+    정본은 에이전트(클로드) 비전 — _grid_tap 참조. 로컬 엔진(easyocr+vision)은 nppfs 키패드 정확도 낮음(실측) → 클로드 승격 경로가 정본.
     ROI=하단(0.45,0.98)만 — 카드 키패드(y~0.46-0.63)는 잡고 상단 금액·카드칸 숫자(y<0.40)는 제외."""
     from phone_auto.ocr_keypad import vote_digits
     return vote_digits(cap("/tmp/_nh_sec.png"), flip_h=False, roi_y_frac=(0.45, 0.98),
-                       engines=("easyocr", "vision", "gcv"), allow_partial=True) or {}
+                       engines=("easyocr", "vision", "claude"), allow_partial=True) or {}
 
 
 # ───── nppfs 보안키패드 고정 그리드 (에이전트=클로드 비전 정본, 2026-06-26 라이브 확정) ─────
@@ -1350,7 +1413,11 @@ def pay_nh_general() -> dict:
     out["step"] = "card_no"
     if not wait_text("카드번호", timeout=12):
         out["err"] = "카드번호 화면 미도달"; return out
-    if os.environ.get("NH_VISION_MODE") == "1":     # 카드창 도달 후 정지 — 카드/CVC/비번은 외부(클로드 비전)가 입력
+    if os.environ.get("NH_VISION_MODE") == "1" or \
+       os.environ.get("PAY_VISION_MODE", "").strip() in ("1", "true", "yes"):
+        # ★3사 공용 비전 인계 (2026-07-31 NH #9 성공 / 2026-08-02 삼성 4계정 성공).
+        #   스크립트는 여기서 멈추고, 에이전트가 전체화면 스크린샷을 읽어 직접 탭한다.
+        #   nh_vision_input.tap_digits 사용 — 값은 secrets 에서, 배열은 에이전트가 판독.     # 카드창 도달 후 정지 — 카드/CVC/비번은 외부(클로드 비전)가 입력
         out["step"] = "card_screen_ready"; out["manual"] = True; return out
     boxes = _card_no_boxes()
     if len(boxes) < 4:
@@ -1542,7 +1609,7 @@ def pay_hyundai(pin: str = CARD_PIN) -> dict:
     _adb().tap(*PIN_DOT)
     time.sleep(1.3)
     lap("PIN dot 탭 + 1.3s 렌더대기 후")
-    # 9) PIN 6자리 입력 (OCR 4엔진 고정 키패드)
+    # 9) PIN 6자리 입력 (OCR voting, 고정 키패드)
     FlowRunner(use_camera=False).run_action(
         {"action": "input_pin", "preset": "hyundai_hmall_pin6", "value": pin,
          "tap_delay_sec": 0.4, "use_camera": False})

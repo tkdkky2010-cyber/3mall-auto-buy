@@ -1,5 +1,5 @@
 {
-  "date": "2026-08-01",
+  "date": "2026-08-02",
   "account_used": "tkdkky2002",
   "products": [
     {
@@ -188,14 +188,14 @@
         "member_price": 112970,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 105,058원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 105,058원",
             "percent": 7,
             "price": 105058
           },
           {
-            "alt": "cardCd03",
-            "text": "KB국민 5% 즉시할인 107,317원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 107,317원",
             "percent": 5,
             "price": 107317
           }
@@ -204,12 +204,12 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 102970,
         "paybacks": {
-          "KB국민카드": {
-            "immediate_price": 107317,
+          "삼성카드": {
+            "immediate_price": 105058,
             "payback_pct": 1.0,
-            "after_payback": 106244,
+            "after_payback": 104007,
             "reward_pt": 10000,
-            "final_cost": 96244
+            "final_cost": 94007
           }
         },
         "optimal_tier": {
@@ -342,14 +342,14 @@
         "member_price": 89940,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 83,635원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 83,635원",
             "percent": 7,
             "price": 83635
           },
           {
-            "alt": "cardCd03",
-            "text": "KB국민 5% 즉시할인 85,434원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 85,434원",
             "percent": 5,
             "price": 85434
           }
@@ -358,12 +358,12 @@
         "kakao_reward_pt": 5000,
         "kakao_final_cost": 84940,
         "paybacks": {
-          "KB국민카드": {
-            "immediate_price": 85434,
+          "삼성카드": {
+            "immediate_price": 83635,
             "payback_pct": 1.0,
-            "after_payback": 84580,
+            "after_payback": 82799,
             "reward_pt": 5000,
-            "final_cost": 79580
+            "final_cost": 77799
           }
         },
         "optimal_tier": {
@@ -498,21 +498,21 @@
         "member_price": 68604,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 83,635원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 83,635원",
             "percent": 7,
             "price": 83635
           },
           {
-            "alt": "cardCd03",
-            "text": "KB국민 5% 즉시할인 85,434원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 85,434원",
             "percent": 5,
             "price": 85434
           }
         ],
         "kakao_price": 63802,
         "kakao_reward_pt": 5000,
-        "kakao_final_cost": 58802,
+        "kakao_final_cost": 58164,
         "paybacks": {},
         "error": null
       },
@@ -619,21 +619,21 @@
         "member_price": 68604,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 83,635원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 83,635원",
             "percent": 7,
             "price": 83635
           },
           {
-            "alt": "cardCd03",
-            "text": "KB국민 5% 즉시할인 85,434원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 85,434원",
             "percent": 5,
             "price": 85434
           }
         ],
         "kakao_price": 63802,
         "kakao_reward_pt": 5000,
-        "kakao_final_cost": 58802,
+        "kakao_final_cost": 58164,
         "paybacks": {},
         "error": null
       },
@@ -782,14 +782,14 @@
         "member_price": 64800,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 60,264원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 60,264원",
             "percent": 7,
             "price": 60264
           },
           {
-            "alt": "cardCd03",
-            "text": "KB국민 5% 즉시할인 61,560원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 61,560원",
             "percent": 5,
             "price": 61560
           }
@@ -798,12 +798,12 @@
         "kakao_reward_pt": 5000,
         "kakao_final_cost": 59800,
         "paybacks": {
-          "KB국민카드": {
-            "immediate_price": 61560,
+          "삼성카드": {
+            "immediate_price": 60264,
             "payback_pct": 1.0,
-            "after_payback": 60944,
+            "after_payback": 59661,
             "reward_pt": 5000,
-            "final_cost": 55944
+            "final_cost": 54661
           }
         },
         "optimal_tier": {
@@ -921,14 +921,14 @@
         "member_price": 66340,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 61,696원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 61,696원",
             "percent": 7,
             "price": 61696
           },
           {
-            "alt": "cardCd03",
-            "text": "KB국민 5% 즉시할인 63,023원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 63,023원",
             "percent": 5,
             "price": 63023
           }
@@ -937,12 +937,12 @@
         "kakao_reward_pt": 5000,
         "kakao_final_cost": 61340,
         "paybacks": {
-          "KB국민카드": {
-            "immediate_price": 63023,
+          "삼성카드": {
+            "immediate_price": 61696,
             "payback_pct": 1.0,
-            "after_payback": 62393,
+            "after_payback": 61079,
             "reward_pt": 5000,
-            "final_cost": 57393
+            "final_cost": 56079
           }
         },
         "optimal_tier": {
@@ -1140,14 +1140,14 @@
         "member_price": 72900,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 67,797원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 67,797원",
             "percent": 7,
             "price": 67797
           },
           {
-            "alt": "cardCd03",
-            "text": "KB국민 5% 즉시할인 69,255원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 69,255원",
             "percent": 5,
             "price": 69255
           }
@@ -1156,12 +1156,12 @@
         "kakao_reward_pt": 5000,
         "kakao_final_cost": 67900,
         "paybacks": {
-          "KB국민카드": {
-            "immediate_price": 69255,
+          "삼성카드": {
+            "immediate_price": 67797,
             "payback_pct": 1.0,
-            "after_payback": 68562,
+            "after_payback": 67119,
             "reward_pt": 5000,
-            "final_cost": 63562
+            "final_cost": 62119
           }
         },
         "optimal_tier": {
@@ -1292,14 +1292,14 @@
         "member_price": 62910,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 58,507원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 58,507원",
             "percent": 7,
             "price": 58507
           },
           {
-            "alt": "cardCd03",
-            "text": "KB국민 5% 즉시할인 59,765원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 59,765원",
             "percent": 5,
             "price": 59765
           }
@@ -1308,12 +1308,12 @@
         "kakao_reward_pt": 5000,
         "kakao_final_cost": 57910,
         "paybacks": {
-          "KB국민카드": {
-            "immediate_price": 59765,
+          "삼성카드": {
+            "immediate_price": 58507,
             "payback_pct": 1.0,
-            "after_payback": 59167,
+            "after_payback": 57922,
             "reward_pt": 5000,
-            "final_cost": 54167
+            "final_cost": 52922
           }
         },
         "optimal_tier": {
@@ -1517,14 +1517,14 @@
         "member_price": 84150,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 78,260원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 78,260원",
             "percent": 7,
             "price": 78260
           },
           {
-            "alt": "cardCd03",
-            "text": "KB국민 5% 즉시할인 79,943원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 79,943원",
             "percent": 5,
             "price": 79943
           }
@@ -1533,12 +1533,12 @@
         "kakao_reward_pt": 5000,
         "kakao_final_cost": 79150,
         "paybacks": {
-          "KB국민카드": {
-            "immediate_price": 79943,
+          "삼성카드": {
+            "immediate_price": 78260,
             "payback_pct": 1.0,
-            "after_payback": 79144,
+            "after_payback": 77477,
             "reward_pt": 5000,
-            "final_cost": 74144
+            "final_cost": 72477
           }
         },
         "optimal_tier": {
