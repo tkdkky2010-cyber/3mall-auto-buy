@@ -37,7 +37,9 @@ import _common as C
 CHANNEL_DEFAULT_N = {"galleria": 36, "hmall": 36, "lotte": 7}
 
 # 주로 사는 조합번호 — 결과물 낼 때 조합번호 셀에 색칠(사용자 지시 2026-07-29). idx만 색칠.
-HIGHLIGHT_COMBOS = {3, 5, 12, 13, 14}
+# ★2026-08-02: 하드코딩 {3,5,12,13,14} 는 stale 이었다(오늘 플랜 3·8·12·22·24·25·27 과 무관한
+#   번호가 칠해짐) → **오늘 카트플랜에 실제로 뽑힌 조합**을 색칠한다. 아래는 폴백/수동 override 용.
+HIGHLIGHT_COMBOS_FALLBACK = {3, 5, 12, 13, 14}
 HIGHLIGHT_BG = {"red": 1.0, "green": 0.9, "blue": 0.6}   # 연노랑 (롯데 연두 조건부서식과 구분)
 
 
@@ -385,7 +387,8 @@ def main(argv=None) -> int:
     )
     print(f"\n→ 시트 입력: {rng}")
 
-    highlight_combo_numbers(ws, HIGHLIGHT_COMBOS)   # 주로 사는 조합번호 색칠
+    # 오늘 플랜에 뽑힌 조합번호 색칠 (플랜이 비면 폴백 상수)
+    highlight_combo_numbers(ws, set(cart) or HIGHLIGHT_COMBOS_FALLBACK)
     return 0
 
 

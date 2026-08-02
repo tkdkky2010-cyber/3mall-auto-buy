@@ -155,7 +155,11 @@ COMBOS: list[list[tuple[str, int]]] = [
 # N=20: Hmall 53~78 / Lotte 81~107 / J1:M21 (이전 값과 동일)
 # N=23: Hmall 53~81 / Lotte 84~113 / J1:M24
 # ============================================================
-GALLERIA_DATA_END_ROW = 55   # 2026-07-28: GWP 7품목(여윤팩·상백선크림 추가)로 51행 → 예약 상향(버퍼 포함)
+GALLERIA_DATA_END_ROW = 62   # 2026-08-02: COMBOS 23→27 로 요약블록 +4행 → 실사용 56행. 예약 상향(버퍼 6).
+                             #   (2026-07-28: GWP 7품목으로 51행 → 55 로 상향한 이력)
+                             # ★섹션 길이 = 고정헤더 + GWP품목수 + 샘플행수 + len(COMBOS).
+                             #   조합/GWP 품목이 늘면 여기도 올린다. 초과 시 write_galleria_section 이
+                             #   Hmall 침범 대신 ValueError 로 실패(조용한 덮어쓰기 방지 — 설계된 가드).
 HMALL_HEADER_ROW = GALLERIA_DATA_END_ROW + 3
 HMALL_COMBO_START_ROW = HMALL_HEADER_ROW + 6
 HMALL_COMBO_END_ROW = HMALL_COMBO_START_ROW + len(COMBOS) - 1
@@ -224,6 +228,9 @@ SAMPLE_TABLE: list[tuple[str, int, str | None]] = [
 # ============================================================
 # 카드 페이백 매핑 (가이드 섹션 9-1.5)
 # ============================================================
+# ★여기 없는 카드 = 페이백 0 으로 계산된다. **현대카드는 등재된 적이 없다** — 실제로 없는 건지
+#   미확인인지 불명(2026-08-02 Hmall 당일카드가 현대로 잡혀 0% 로 계산됨). 값 확인되면 추가할 것.
+#   미등재 카드가 잡히면 hmall.lookup_payback 이 [WARN] 을 찍는다(조용한 0% 방지).
 CARD_PAYBACK: dict[str, float] = {
     "롯데카드": 0.02,
     "비씨카드": 0.015,

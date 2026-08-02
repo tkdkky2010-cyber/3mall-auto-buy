@@ -113,13 +113,31 @@ def detect_card_offer(page) -> dict | None:
     return page.evaluate(js)
 
 
+def _cart_is_empty(page) -> bool:
+    """카트가 실제로 비었는지 확인 (clear_cart 검증용). 판정 불가 시 False = 안전측."""
+    try:
+        page.goto(CART_URL, wait_until="domcontentloaded")
+        page.wait_for_timeout(1200)
+        body = page.inner_text("body")
+        return ("장바구니가 비어" in body) or ("담긴 상품이 없" in body)
+    except Exception as e:
+        print(f"    [cart] 빈카트 확인 실패: {e}")
+        return False
+
+
 def lookup_payback(brand: str) -> float:
     """카드 brand → 페이백계수 (없으면 0).
     brand 는 '롯데카드' 또는 간편결제 래핑형 '카카오페이 롯데'/'토스페이 삼성' 등.
-    underlying 카드 stem 으로 매칭 (간편결제도 실제 카드 청구 → 일반결제와 동일 페이백)."""
+    underlying 카드 stem 으로 매칭 (간편결제도 실제 카드 청구 → 일반결제와 동일 페이백).
+
+    ★미등재 카드는 0 이지만 **조용히 넘어가지 않고 경고**한다 (2026-08-02: 당일카드가 현대로
+      바뀌었는데 카탈로그에 현대가 없어 페이백 0% 로 계산됐고, 그게 맞는지 알 길이 없었다).
+    """
     for stem, pct in CARD_STEM_TO_PAYBACK.items():
         if stem in brand:
             return pct
+    print(f"  [WARN] 페이백 카탈로그에 없는 카드 '{brand}' → 0% 적용. "
+          f"실제 페이백이 있으면 _common.CARD_PAYBACK 에 추가할 것 (등재: {list(CARD_STEM_TO_PAYBACK)})")
     return 0.0
 
 
@@ -132,10 +150,20 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
 
     print(f"\n=== 조합 {idx}: {combo} 소비자가 {소비자가:,}원 ===")
 
-    # 1) cart 비우기
+    # 1) cart 비우기 — ★비운 뒤 실제로 비었는지 검증 (2026-08-02 사고).
+    #    clear_cart 는 '일반상품 체크박스 없음'/'선택삭제 버튼 없음' 이어도 조용히 return 한다.
+    #    조합23(h×3) 잔여물 위에 조합24(g2+n2)를 담아 소비자가 720,000 짜리가 1,126,548원으로
+    #    측정되고 그 값이 그대로 시트에 기록됐다. 감지하고도 진행 = 조용한 오염 → 여기서 끊는다.
     print(f"  [STEP] clear_cart")
-    clear_cart(page)
-    page.wait_for_timeout(800)
+    for attempt in (1, 2):
+        clear_cart(page)
+        page.wait_for_timeout(800)
+        if _cart_is_empty(page):
+            break
+        print(f"  [WARN] clear_cart 후에도 카트 비어있지 않음 (시도 {attempt}/2)")
+    else:
+        return {"idx": idx, "combo": combo,
+                "error": "clear_cart 실패 — 카트 잔여물 있음(2회 시도). 잔여물 합산 오염 방지로 중단"}
 
     # 2) 본품 담기
     for c, q in combo:
