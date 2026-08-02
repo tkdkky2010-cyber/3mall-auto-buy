@@ -338,6 +338,14 @@ def add_to_cart(page: Page, product_id: str, info: dict, qty: int) -> bool:
     # click_coupon_receive 는 '쿠폰 받기' 버튼이 없으면 내부에서 no-op 이므로 항상 호출해도 안전.
     click_coupon_receive(page)
 
+    # 쿠폰 레이어 처리 중 페이지가 이탈하는 경우가 있음(2026-07-28 #25: '확인/닫기' 매칭 버튼이
+    # 네비게이션 유발 → Execution context destroyed → btn-purchase 30s timeout).
+    # 상품 페이지를 벗어났으면 1회 복귀 후 진행.
+    if info["slitmCd"] not in page.url:
+        print(f"    [recover] 쿠폰 처리 중 페이지 이탈({page.url[:60]}) → 상품페이지 재진입")
+        page.goto(url, wait_until="domcontentloaded")
+        page.wait_for_timeout(1500)
+
     try:
         purchase = page.locator("button.btn-purchase").first
         purchase.click()

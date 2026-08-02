@@ -521,12 +521,17 @@ class FlowRunner:
             def _row_amt(nodes, iy):
                 # 즉시할인 행과 같은 줄(±60px)의 '~~~원' (결제하기 버튼 제외).
                 # ⚠️ dump가 '574,522' / '원' 을 별도 노드로 쪼갬(#17 실측) → 숫자-only 노드도 매칭.
+                # ★2열 그리드(2026-07-30 실측): '즉시할인'(cy1758)과 금액(cy1845)이 87px 떨어져 ±60 실패
+                #   → 같은 카드 박스 = 아래 180px 이내도 인정. 위쪽은 기존대로 ±60 유지(윗 카드 금액 오매칭 방지).
                 for t, x1, y1, x2, y2 in nodes:
                     if "결제하기" in t:
                         continue
                     tt = t.strip()
                     m = _re.search(r"([\d,]{4,})\s*원", tt) or _re.fullmatch(r"([\d,]{4,})", tt)
-                    if m and abs((y1 + y2) // 2 - iy) < 60:
+                    if not m:
+                        continue
+                    cy = (y1 + y2) // 2
+                    if abs(cy - iy) < 60 or 0 < cy - iy < 180:
                         return int(m.group(1).replace(",", ""))
                 return None
 
@@ -610,6 +615,18 @@ class FlowRunner:
                 if btn:
                     break
                 time.sleep(0.7); nodes = _nodes()
+            if not btn:
+                # ★dump 미노출/실패 폴백 = OCR (2026-07-30 실측: 화면엔 '전액사용'·H.Point 23,590 있는데
+                #   dump 경로가 못 찾아 skip → 포인트 미사용 결제). 카드 단계(_ocr_nodes)와 동일 패턴.
+                self.adb.screencap(self._tmp_img)
+                ocr = [(it["text"], it["cx"] - it["w"] // 2, it["cy"] - it["h"] // 2,
+                        it["cx"] + it["w"] // 2, it["cy"] + it["h"] // 2)
+                       for it in _ocr_texts(self._tmp_img)]
+                btn = next(((x1, y1, x2, y2) for t, x1, y1, x2, y2 in ocr
+                            if "전액사용" in t.replace(" ", "") and (y1 + y2) // 2 < 1900), None)
+                if btn:
+                    nodes = ocr          # before/after 금액도 같은 소스(OCR)로 읽어야 일관
+                    self._log("  [OCR폴백] dump 미검출 → OCR로 '전액사용' 발견")
             if not btn:
                 self._log("  '전액사용' 미발견 — skip (포인트 없음/잔액부족 가능)"); return
             bx1, by1, bx2, by2 = btn

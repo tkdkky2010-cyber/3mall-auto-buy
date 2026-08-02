@@ -1437,8 +1437,13 @@ def detect_card() -> str | None:
             amt_rows = [it for it in region
                         if re.search(r"[\d,]{4,}\s*원", it["text"]) and "결제하기" not in it["text"]]
             for it in sorted(region, key=lambda x: x["cy"]):
+                # ★2열 그리드 레이아웃(2026-07-30 실측): 카드명('KB국민' cy1711)과 금액('77,631원' cy1845)이
+                #   같은 카드 박스 안에서 위/아래로 ~135px 떨어져 ±40px 동일행 매칭이 전부 실패 → DETECT_CARD_FAIL.
+                #   → 카드명 **아래** 220px 이내 + 같은 열(cx 350px 이내) 금액도 같은 박스로 인정.
+                #   ('현대카드 Ed2 7% 청구할인' 배너는 금액이 배너 **위**에 있어 이 조건에 안 걸림 = 오감지 방지 유지)
                 same_row_amt = re.search(r"[\d,]{4,}\s*원", it["text"]) or \
-                    any(abs(a["cy"] - it["cy"]) < 40 for a in amt_rows)
+                    any(abs(a["cy"] - it["cy"]) < 40 for a in amt_rows) or \
+                    any(0 < a["cy"] - it["cy"] < 220 and abs(a["cx"] - it["cx"]) < 350 for a in amt_rows)
                 if not same_row_amt:
                     continue
                 for alias, key in CARD_ALIASES.items():   # 별칭 매핑(현대 외 변형표기 대비, 현대 오폴백 방지)

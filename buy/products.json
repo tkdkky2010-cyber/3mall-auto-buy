@@ -168,9 +168,79 @@
     "option_index": 2,
     "auto_coupon": true
   },
+  "36": {
+    "name": "센텔리안24 더 마데카 크림 50ml 20개 (옵션3)",
+    "slitmCd": "2249003768",
+    "url_extra": "&sectId=2861546",
+    "option_index": 3,
+    "auto_coupon": true
+  },
+  "37": {
+    "name": "센텔리안24 마데카크림 타임리버스 50ml 10개 (옵션6)",
+    "slitmCd": "2249003768",
+    "url_extra": "&sectId=2861546",
+    "option_index": 6,
+    "auto_coupon": true
+  },
+  "38": {
+    "name": "센텔리안24 마데카크림 타이트 리프팅 50ml 20개 (옵션2)",
+    "slitmCd": "2249003768",
+    "url_extra": "&sectId=2861546",
+    "option_index": 2,
+    "auto_coupon": true
+  },
+  "39": {
+    "name": "서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스",
+    "slitmCd": "2244447210",
+    "url_extra": "&sectId=173266",
+    "option_index": 1,
+    "auto_coupon": true
+  },
   "f": {
     "name": "윤조에센스90 (윤조에센스90ml)",
     "slitmCd": "2140423337",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "g": {
+    "name": "자음생2종 (자음생 2종 세트)",
+    "slitmCd": "2215366254",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "b": {
+    "name": "윤조3종 (에센셜 퍼스트케어 세트)",
+    "slitmCd": "2228731835",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "c": {
+    "name": "자음2종 (에센셜 데일리 세트)",
+    "slitmCd": "2228722509",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "d": {
+    "name": "본윤2종 (본윤 데일리 루틴 세트/설화수맨)",
+    "slitmCd": "2141738785",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "e": {
+    "name": "탄력3종 (에센셜 탄력케어 세트)",
+    "slitmCd": "2228731377",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "h": {
+    "name": "자음생크림리치세트 (자음생크림 리치 50ml 기획세트)",
+    "slitmCd": "2215367358",
     "url_extra": "",
     "option_index": 1,
     "auto_coupon": true

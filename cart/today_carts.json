@@ -1,19 +1,18 @@
 {
-  "date": "2026-07-16",
+  "date": "2026-07-30",
   "carts": [
     {
       "mall": "현대",
       "account": 1,
       "items": [
         {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
+          "product": 17,
+          "name": "데이즈온 원데이 알파 18개",
+          "qty": 2,
+          "prmo": "P202607241578"
         }
       ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
+      "amount": 95840,
       "paid": true
     },
     {
@@ -21,14 +20,13 @@
       "account": 2,
       "items": [
         {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
+          "product": 17,
+          "name": "데이즈온 원데이 알파 18개",
+          "qty": 2,
+          "prmo": "P202607241578"
         }
       ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
+      "amount": 95840,
       "paid": true
     },
     {
@@ -36,14 +34,13 @@
       "account": 3,
       "items": [
         {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
+          "product": 17,
+          "name": "데이즈온 원데이 알파 18개",
+          "qty": 2,
+          "prmo": "P202607241578"
         }
       ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
+      "amount": 95840,
       "paid": true
     },
     {
@@ -51,14 +48,13 @@
       "account": 4,
       "items": [
         {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
+          "product": 17,
+          "name": "데이즈온 원데이 알파 18개",
+          "qty": 2,
+          "prmo": "P202607241578"
         }
       ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
+      "amount": 95840,
       "paid": true
     },
     {
@@ -66,14 +62,13 @@
       "account": 5,
       "items": [
         {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
+          "product": 17,
+          "name": "데이즈온 원데이 알파 18개",
+          "qty": 2,
+          "prmo": "P202607241578"
         }
       ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
+      "amount": 95840,
       "paid": true
     },
     {
@@ -81,120 +76,70 @@
       "account": 6,
       "items": [
         {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
+          "product": 39,
+          "name": "서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스",
+          "qty": 1,
+          "prmo": "P202607241578"
         }
       ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
-      "paid": true
+      "amount": 79942,
+      "paid": false
     },
     {
       "mall": "현대",
       "account": 7,
       "items": [
         {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
+          "product": 39,
+          "name": "서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스",
+          "qty": 1,
+          "prmo": "P202607241578"
         }
       ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
-      "paid": true
+      "amount": 79942,
+      "paid": false
     },
     {
       "mall": "현대",
       "account": 8,
       "items": [
         {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
+          "product": 39,
+          "name": "서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스",
+          "qty": 1,
+          "prmo": "P202607241578"
         }
       ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
-      "paid": true
+      "amount": 79942,
+      "paid": false
     },
     {
       "mall": "현대",
       "account": 9,
       "items": [
         {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
+          "product": 39,
+          "name": "서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스",
+          "qty": 1,
+          "prmo": "P202607241578"
         }
       ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
-      "paid": true
+      "amount": 79942,
+      "paid": false
     },
     {
       "mall": "현대",
       "account": 10,
       "items": [
         {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
+          "product": 39,
+          "name": "서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스",
+          "qty": 1,
+          "prmo": "P202607241578"
         }
       ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 11,
-      "items": [
-        {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
-        }
-      ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 12,
-      "items": [
-        {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
-        }
-      ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 13,
-      "items": [
-        {
-          "product": "f",
-          "name": "윤조에센스90 (윤조에센스90ml)",
-          "qty": 5
-        }
-      ],
-      "combo": 1,
-      "card": "현대",
-      "amount": 507680,
-      "paid": true
+      "amount": 79942,
+      "paid": false
     }
   ]
 }
