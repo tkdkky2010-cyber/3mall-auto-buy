@@ -131,24 +131,26 @@ _JS_CART_ITEMS = r"""() => {
     }
     if (!sec) sec = document.querySelector('div.shipping-listwrap');
     if (!sec) return [];
-    const names = [];
-    for (const el of sec.querySelectorAll('span,a,strong')) {
-        const t = (el.innerText || '').trim();
-        if (t.length < 8 || t.length > 90 || t.includes('\n')) continue;
-        if (!/설화수|기획세트|\d+ml|\d+개$/.test(t)) continue;
-        if (!names.includes(t)) names.push(t);
-        if (names.length >= 30) break;
-    }
-    return names;
+    // 카트 섹션 안에서 **행(div.pdwrap) 단위**로 센다 — 상품명 형태에 의존하지 않는다.
+    // 행 1개 = 상품 1건 (삭제 버튼 수와 일치, 2026-08-04 DOM 실측). 상품명 = 행의 첫 줄.
+    return Array.from(sec.querySelectorAll('div.pdwrap')).map(row => {
+        const lines = (row.innerText || '').split('\n').map(s => s.trim()).filter(Boolean);
+        return lines[0] || '';
+    }).filter(Boolean);
 }"""
 
 
 def cart_items(page) -> list[str]:
-    """실제 장바구니에 담긴 상품명 목록.
+    r"""실제 장바구니에 담긴 상품명 목록.
 
     ★페이지 전체(document)를 긁으면 하단 **'최근 본 상품' 캐러셀까지 딸려온다** —
       2026-08-02 그렇게 읽어서 카트에 없는 상품(에스트라 등)을 '담겨있다'고 오독했다.
       반드시 카트 섹션 안에서만 읽는다.
+
+    ★상품명 화이트리스트(`설화수|기획세트|\d+ml|\d+개$`)로 거르면 **패턴에 안 맞는 상품이
+      조용히 누락된다** — 2026-08-04 계정6 카트 2건 중 '…8박스/알파cd'(이름이 'cd'로 끝남)가
+      빠져 1건으로 읽혔고 '담기 실패'로 오판할 뻔했다. 이 함수는 담기 검증·clear_cart
+      검증(_cart_is_empty)에 쓰이므로 누락 = 조용한 오독. → 행(div.pdwrap) 단위로 센다.
     """
     try:
         return page.evaluate(_JS_CART_ITEMS) or []
