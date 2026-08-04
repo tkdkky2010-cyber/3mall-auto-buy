@@ -565,6 +565,7 @@ def matched_chromedriver_service(port):
     import json
     import platform
     import re
+    import sys
     import urllib.request
 
     try:
@@ -576,9 +577,21 @@ def matched_chromedriver_service(port):
     if not m:
         return None
     major = m.group(1)
-    arch = "mac-arm64" if platform.machine() == "arm64" else "mac-x64"
+    # ★플랫폼별 selenium 캐시 디렉터리명 + 실행파일명 (맥/윈 공용, 2026-08-04).
+    #   윈도우는 arch 가 'win64'/'win32' 이고 실행파일이 chromedriver.exe 라
+    #   맥 이름으로 찾으면 항상 캐시 미스 → None → Selenium Manager 로 넘어가
+    #   이 함수가 막으려던 '매 실행 첫 attach 버전 mismatch 실패'가 그대로 재현된다.
+    if sys.platform == "darwin":
+        arch = "mac-arm64" if platform.machine() == "arm64" else "mac-x64"
+        exe = "chromedriver"
+    elif sys.platform.startswith("win"):
+        arch = "win64" if platform.machine().endswith("64") else "win32"
+        exe = "chromedriver.exe"
+    else:
+        arch = "linux64"
+        exe = "chromedriver"
     base = Path.home() / ".cache" / "selenium" / "chromedriver" / arch
-    cands = sorted(glob.glob(str(base / f"{major}.*" / "chromedriver")))
+    cands = sorted(glob.glob(str(base / f"{major}.*" / exe)))
     if not cands:
         return None
     from selenium.webdriver.chrome.service import Service

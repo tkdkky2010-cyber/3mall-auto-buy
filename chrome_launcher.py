@@ -10,6 +10,8 @@
 from __future__ import annotations
 import os
 import subprocess
+import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -44,8 +46,59 @@ def _ensure_tab(endpoint: str) -> None:
         pass
 
 
+def _windows_cft_bin() -> Path | None:
+    """윈도우 CFT 실행파일 탐색. CFT_BIN 환경변수가 1순위(다른 위치에 깔았을 때).
+
+    맥 launcher(.sh) 와 같은 규칙: @puppeteer/browsers 기본 설치 경로에서 최신 버전을 고른다.
+    못 찾으면 None → 호출부가 '수동 실행 필요' 안내.
+    """
+    env_bin = os.environ.get("CFT_BIN", "").strip()
+    if env_bin:
+        p = Path(env_bin)
+        return p if p.exists() else None
+    roots = [Path.home() / "ChromeForTesting", Path.home() / "chrome-for-testing"]
+    cands: list[Path] = []
+    for root in roots:
+        if root.exists():
+            cands += sorted(root.glob("chrome/win*/chrome-win*/chrome.exe"))
+    return cands[-1] if cands else None
+
+
+def _launch_windows(port: int, timeout: int = 30) -> bool:
+    """윈도우: .sh/osascript 를 못 쓰므로 CFT 를 직접 띄운다.
+    맥 launcher 와 동일한 플래그(포트/프로필/팝업차단해제)를 준다."""
+    exe = _windows_cft_bin()
+    if exe is None:
+        print("[WARN] 윈도우 CFT 실행파일 미발견 — CFT_BIN 환경변수로 지정하거나 수동 실행 필요\n"
+              "       설치: npx -y @puppeteer/browsers install chrome@stable --path %USERPROFILE%\\ChromeForTesting")
+        return False
+    user_data = os.environ.get("CFT_USER_DATA_DIR", "") or str(
+        Path.home() / "AppData" / "Local" / "Google" / "Chrome for Testing" / "User Data")
+    print(f"[INFO] CDP {port} launch 시도 — {exe.name} (windows)")
+    try:
+        subprocess.Popen([str(exe),
+                          f"--remote-debugging-port={port}",
+                          "--remote-allow-origins=*",
+                          f"--user-data-dir={user_data}",
+                          "--profile-directory=Profile 1",
+                          "--no-first-run", "--no-default-browser-check",
+                          "--disable-popup-blocking", "about:blank"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as e:
+        print(f"[WARN] CFT 실행 실패: {e}")
+        return False
+    for _ in range(timeout):
+        if _alive(port):
+            return True
+        time.sleep(1)
+    return _alive(port)
+
+
 def _launch(port: int, timeout: int = 30) -> bool:
-    """launch 스크립트를 지정 포트로 실행. 성공(포트 응답) 여부 반환."""
+    """launch 스크립트를 지정 포트로 실행. 성공(포트 응답) 여부 반환.
+    ★맥=기존 .sh(무변화) / 윈도우=CFT 직접 실행 (.sh·osascript·pgrep 을 못 쓰므로)."""
+    if sys.platform.startswith("win"):
+        return _launch_windows(port, timeout=timeout)
     if not LAUNCHER.exists():
         print(f"[WARN] {LAUNCHER} 없음 — Chrome 수동 실행 필요")
         return False

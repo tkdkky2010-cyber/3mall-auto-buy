@@ -35,30 +35,36 @@ def _pick_cdp_backend(endpoint: str):
     """CDP connect 백엔드 선택 — patchright 우선. Chrome 147+ 에서 patchright connect_over_cdp 가
     행(무한대기)/에러 가능(run.py 와 동일 이슈) → 12s 프로브로 확인, 실패/행이면 plain playwright fallback.
     (2026-06-01 step1 Hmall 이 patchright connect 에서 15분 무한대기한 사건 재발방지.)"""
-    import signal
+    import threading
     try:
         from patchright.sync_api import sync_playwright as _patch
     except ImportError:
         from playwright.sync_api import sync_playwright as _plain
         return _plain
 
-    def _on_alarm(_s, _f):
-        raise TimeoutError("patchright connect_over_cdp 12s 초과 (행 의심)")
-    old = signal.signal(signal.SIGALRM, _on_alarm)
-    try:
-        signal.alarm(12)
-        with _patch() as pw:
-            pw.chromium.connect_over_cdp(endpoint, timeout=10000).close()
-        signal.alarm(0)
+    # ★signal.SIGALRM/alarm 은 **윈도우에 없다**(AttributeError) → 워커 스레드 + join(timeout) 으로 교체.
+    #   맥/윈 공용. 행이면 join 이 12s 뒤 그냥 리턴하고, 스레드는 데몬이라 프로세스를 잡지 않는다.
+    #   sync playwright 는 스레드별 인스턴스면 안전 — 생성·사용·종료가 전부 워커 안에서 끝난다.
+    probe: dict = {}
+
+    def _probe():
+        try:
+            with _patch() as pw:
+                pw.chromium.connect_over_cdp(endpoint, timeout=10000).close()
+            probe["ok"] = True
+        except Exception as e:
+            probe["err"] = str(e)
+
+    t = threading.Thread(target=_probe, daemon=True)
+    t.start()
+    t.join(12)
+    if probe.get("ok"):
         print("[INFO] CDP backend: patchright")
         return _patch
-    except Exception as e:
-        signal.alarm(0)
-        print(f"[WARN] patchright CDP 연결 실패/행 ({str(e)[:100]}) → plain playwright fallback")
-        from playwright.sync_api import sync_playwright as _plain
-        return _plain
-    finally:
-        signal.signal(signal.SIGALRM, old)
+    print(f"[WARN] patchright CDP 연결 실패/행 "
+          f"({probe.get('err', '12s 초과 (행 의심)')[:100]}) → plain playwright fallback")
+    from playwright.sync_api import sync_playwright as _plain
+    return _plain
 
 IDS = json.load(open(ROOT / "hsmaster" / "config" / "sulwhasoo-ids.json"))["ids"]
 

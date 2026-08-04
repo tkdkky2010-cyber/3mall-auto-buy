@@ -1,5 +1,25 @@
-patchright>=1.55.0
+# 3mall auto buy 의존성 — 맥/윈도우 공용.
+#   설치: python3 -m pip install -r buy/requirements.txt   (윈도우: python -m pip ...)
+#
+# ⚠️ 2026-08-04 이전엔 patchright/python-dotenv 2개뿐이었다. 실제로는 step1(갤러리아·롯데=selenium,
+#    Hmall=playwright, 시트=gspread)이 전부 필요해서, 그대로 설치하면 다른 컴퓨터에서 ImportError 로 죽는다.
+
+# ── step1 / step2 (PC 브라우저 + 시트) — 맥/윈도우 둘 다 필요 ──
+patchright>=1.55.0        # stealth playwright (Hmall). 실패 시 plain playwright 로 폴백
+playwright>=1.50.0        # patchright 폴백 경로 + cart 담기
+selenium>=4.20.0          # 갤러리아 / 롯데 rate-check
+gspread>=6.0.0            # 구글 시트 입출력
+requests>=2.31.0
 python-dotenv>=1.0.0
-# Phase 3-B 폰 자동화 도착 시 추가:
-# Pillow>=10.0
-# easyocr>=1.7
+Pillow>=10.0              # 픽셀 판정(체크박스/버튼 활성) — check10·카트 경로에서도 사용
+
+# ── 폰 자동화 (phone_auto) — 결제 돌릴 컴퓨터에서만 필요 ──
+easyocr>=1.7              # 키패드 OCR 2엔진 voting 중 하나. 첫 실행 시 모델 자동 다운로드(~100MB)
+pytesseract>=0.3.10       # 보조 OCR (tesseract 바이너리 별도 설치 필요)
+opencv-python>=4.9        # 이미지 전처리
+numpy>=1.26
+
+# ── macOS 전용 (윈도우에선 설치하지 말 것 — pip 가 실패한다) ──
+# 폰 화면 텍스트 OCR = Apple Vision Framework. 윈도우엔 대응물이 없다.
+#   pip install pyobjc-framework-Vision pyobjc-framework-Quartz
+# 윈도우에서 폰 결제를 돌리려면 flow_runner._ocr_texts 에 easyocr/클로드 사다리가 먼저 필요하다.
