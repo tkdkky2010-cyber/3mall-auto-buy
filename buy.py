@@ -116,10 +116,40 @@ def pay_galleria(cart: dict) -> tuple[bool, str]:
     return ok, out[-800:]
 
 
+TODAY_JSON = ROOT / "cart" / "today.json"
+
+
+def prmos_for_product(pid) -> list[str]:
+    """cart/today.json 의 그 상품 `events[]` 에서 prmo 를 **전부** 뽑는다.
+
+    ★한 상품에 **적립 이벤트가 2개 이상**일 수 있다 (2026-08-05 실측: 데이즈온 17·34 는
+      `P202608043368` 건강식품 특별전 + `P202607292371` 데이즈온 10% = **2군데**).
+      하나만 신청하면 절반을 놓친다 — 사용자 지시 "데이즈온은 적립 2군데 해야 돼".
+    ★today_carts.json 의 손으로 적은 `prmo` 필드에 의존하지 말 것 — stale 되면 조용히 0건이 된다
+      (2026-08-05 실측: 7/30 자 파일이라 적립·구매대장이 동시에 조용히 누락)."""
+    try:
+        d = json.loads(TODAY_JSON.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    p = next((x for x in d.get("products", []) if str(x.get("id")) == str(pid)), None)
+    return [e["prmo"] for e in (p or {}).get("events", []) or [] if e.get("prmo")]
+
+
+def cart_prmos(cart: dict) -> list[str]:
+    """카트의 모든 상품에 대한 prmo 합집합(순서 유지). today.json events 가 정본,
+    today_carts.json 에 손으로 적힌 `prmo` 는 보조로만 합친다."""
+    out: list[str] = []
+    for it in cart.get("items", []):
+        for pr in prmos_for_product(it.get("product")) + ([it["prmo"]] if it.get("prmo") else []):
+            if pr not in out:
+                out.append(pr)
+    return out
+
+
 def apply_reward(cart: dict) -> None:
     """결제 성공 후 H.Point 적립신청 — 그 상품에 10% prmo 있을 때만.
     쿠폰만 있거나 적립이벤트 없으면(prmo 없음) skip. 결제 성공/실패 판정과 무관(best-effort)."""
-    prmos = [it["prmo"] for it in cart.get("items", []) if it.get("prmo")]
+    prmos = cart_prmos(cart)
     if not prmos:
         print("  [적립] 10% prmo 없음 (쿠폰만/적립없음) — 적립단계 skip", flush=True)
         return
@@ -217,6 +247,27 @@ def main() -> int:
     # status 만 출력
     if args and args[0] == "status":
         return cmd_status(data)
+
+    # ★적립신청만 단독 실행 — 폰 결제(phone_auto.*)는 이 스크립트를 안 거치므로 결제 직후 여기로 온다.
+    #   `python3 buy.py reward <계정> [상품키워드...]`
+    #   키워드는 분리주문(only=데이즈온 등)일 때 **이번에 결제한 상품만** 적립 대상으로 거르기 위한 것.
+    if args and args[0] == "reward":
+        if len(args) < 2 or not args[1].isdigit():
+            print("[ERR] 사용: python3 buy.py reward <계정번호> [상품키워드...]")
+            return 1
+        acct, kws = int(args[1]), args[2:]
+        cart = next((c for c in data["carts"]
+                     if MALL.get(c["mall"]) == "hmall" and c["account"] == acct), None)
+        if cart is None:
+            print(f"[적립] ⚠️ today_carts.json 에 현대 #{acct} 카트 없음 — 적립 대상 불명(수동 확인 필요)")
+            return 1
+        items = [it for it in cart.get("items", [])
+                 if not kws or any(k in (it.get("name") or "") for k in kws)]
+        if not items:
+            print(f"[적립] ⚠️ #{acct} 키워드 {kws} 에 맞는 상품 없음 — skip")
+            return 1
+        apply_reward({"account": acct, "items": items})
+        return 0
 
     # 몰+계정 명시 결제
     if args and args[0] in MALL:

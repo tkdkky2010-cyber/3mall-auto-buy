@@ -1969,7 +1969,36 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
                                order_no=order_no, card=res.get("card"))
     except Exception as e:
         print(f"   [ledger] 기록 실패(무시): {e}", flush=True)
+    apply_reward_now(idx, only)          # ★H.Point 적립신청 (결제 직후 자동)
     return res
+
+
+def apply_reward_now(idx: int, only: list[str] | None = None) -> None:
+    """★결제 직후 H.Point 적립신청 — **코드가 자동으로 한다. 사람이 기억할 일이 아니다.**
+
+    2026-08-05 사고: 폰 결제(이 모듈)는 `buy.py` 를 안 거치는데 적립은 `buy.py apply_reward` 에만
+    있었다 → **12계정을 결제하는 동안 적립이 한 건도 안 걸렸고, 에러도 안 났다.** 사용자가
+    지적해서야 발견했다(전 계정 사후 신청으로 복구). 같은 실수를 막으려고 여기서 직접 호출한다.
+
+    · prmo 는 `cart/today.json` events 가 정본 — 한 상품에 이벤트가 2개일 수 있다
+      (데이즈온 = 건강식품 특별전 + 데이즈온 10% = 2군데).
+    · only 지정(분리주문)이면 **이번에 결제한 상품만** 적립 대상.
+    · best-effort — 실패해도 결제 결과엔 영향 없음. 단 **반드시 로그로 드러낸다**(조용한 누락 금지).
+    """
+    if os.environ.get("HMALL_NO_REWARD") == "1":
+        print(f"[#{idx}] [적립] HMALL_NO_REWARD=1 — skip", flush=True)
+        return
+    cmd = [sys.executable, str(ROOT / "buy.py"), "reward", str(idx)] + list(only or [])
+    try:
+        r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, timeout=600)
+        tail = (r.stdout or "").strip().splitlines()
+        print(f"[#{idx}] [적립] {tail[-1] if tail else 'no-output'}", flush=True)
+        if r.returncode != 0:
+            print(f"[#{idx}] [적립] ⚠️ rc={r.returncode} — 수동 확인 필요 "
+                  f"(python3 buy.py reward {idx})", flush=True)
+    except Exception as e:
+        print(f"[#{idx}] [적립] ⚠️ 호출 실패(결제는 정상): {e} — "
+              f"수동: python3 buy.py reward {idx}", flush=True)
 
 
 def _do_beauty(res: dict) -> None:

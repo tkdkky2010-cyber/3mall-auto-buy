@@ -15,14 +15,22 @@
   python3 -m phone_auto.nh_enter box1                      # 1칸 = 비보안 IME (배열 불필요)
   python3 -m phone_auto.nh_enter box2 "9,0,4,6,shield,1" "8,7,2,shield,3,5"
   python3 -m phone_auto.nh_enter cvc  "..." "..."
+  python3 -m phone_auto.nh_enter pinfield                  # 결제비번 칸 탭(키패드 소환)
   python3 -m phone_auto.nh_enter pin6 "..." "..."
   python3 -m phone_auto.nh_enter confirm                   # '확인' 탭
+  python3 -m phone_auto.nh_enter finish 5 데이즈온          # ★주문완료 화면에서 대장+적립 마무리
+
+★★`finish` 를 빼먹지 말 것. NH 는 buy_one 이 핸드세이크 지점에서 일찍 return 하므로
+   구매대장·H.Point 적립 자동단계를 **안 탄다**. 2026-08-05 에 이걸 몰라 적립 12계정이
+   조용히 누락됐다(에러도 안 남). 전체 순서:
+     box1 → box2 → box3 → box4 → cvc → confirm → pinfield → pin6 → confirm → **finish**
 
 ⚠️ 자릿수는 화면에서 검증한다(card_digits_on_screen). 틀린 키를 누르면 카드사 입력오류가
    누적돼 3회에 카드가 잠길 수 있으므로, 매핑에 없는 숫자가 있으면 탭하지 않고 중단한다.
 """
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import time
@@ -100,6 +108,46 @@ def main() -> int:
         ok = B.ocr_tap("확인", contains=True, retries=4)
         print(f"[confirm] {'✓' if ok else '✗'}")
         return 0 if ok else 1
+
+    if cmd == "finish":
+        # ★NH 마무리 — 주문번호 판독 → 구매대장 → **H.Point 적립신청**.
+        #   NH 는 buy_one 이 핸드세이크 지점에서 일찍 return 하므로 대장/적립 자동단계를 **안 탄다.**
+        #   그래서 여기서 반드시 마무리해야 한다. (2026-08-05: 이걸 안 해서 적립 12계정 누락)
+        if len(args) < 2 or not args[1].isdigit():
+            print("[ERR] 사용: python3 -m phone_auto.nh_enter finish <계정번호> [상품키워드...]")
+            return 1
+        idx, kws = int(args[1]), args[2:]
+        its = B._ocr_texts(B.cap())
+        txt = " ".join(i["text"] for i in its)
+        m = __import__("re").search(r"주문번호\s*[:：]?\s*(\d{8,})", txt) or \
+            __import__("re").search(r"\b(2026\d{9,})\b", txt)
+        order_no = m.group(1) if m else None
+        if not order_no:
+            print("[finish] ⚠️ 주문번호 미판독 — 주문완료 화면인지 확인할 것 (대장은 order_no 없이 기록)")
+        else:
+            print(f"[finish] 주문번호 {order_no}")
+
+        accounts = json.loads(B.hw.ACCOUNTS_FILE.read_text(encoding="utf-8"))["accounts"]
+        acct_id = accounts[idx - 1].get("id")
+        # 구매대장 — 이번에 결제한 상품만(키워드 필터)
+        try:
+            mf = json.loads((B.ROOT / "cart" / "today_carts.json").read_text(encoding="utf-8"))
+            cart = next((c for c in mf.get("carts", [])
+                         if c.get("mall") in ("현대", "hmall") and c.get("account") == idx), None)
+            sys.path.insert(0, str(B.ROOT))
+            import purchase_ledger as PL
+            n = 0
+            for it in (cart or {}).get("items", []):
+                if kws and not any(k in (it.get("name") or "") for k in kws):
+                    continue
+                PL.record_food("현대Hmall", acct_id, it.get("product"), qty=it.get("qty"),
+                               order_no=order_no, card="NH")
+                n += 1
+            print(f"[finish] 구매대장 {n}건 기록")
+        except Exception as e:
+            print(f"[finish] ⚠️ 대장 기록 실패: {e}")
+        B.apply_reward_now(idx, kws or None)      # ★적립 (코드가 한다)
+        return 0
 
     if cmd == "pinfield":
         # 카드 확인 후 '일반결제비밀번호(숫자 6자리)' 칸 — **탭해야 보안키패드가 뜬다.**
