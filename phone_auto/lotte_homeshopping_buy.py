@@ -1353,10 +1353,20 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
     elif use_card == "현대":
         pay = pay_lotte_hyundai()               # ✅ 2026-06-12 #1 B87302 라이브검증 (앱카드)
     elif use_card == "NH":
-        pay = pay_nh_general()                  # 일반결제(카드번호 직접) — 사용자 지정 2026-06-25. ⚠️라이브 첫검증 필요
+        # ✅ 2026-07-31 #9 wlstmdlsfk 라이브검증 (주문 2026-07-31-G83859 / 547,319원 / 뷰티 5,701P).
+        # ★NH 는 **항상 에이전트 비전 핸드세이크**로 정지한다(3사 공용 정본, 환경변수 없음).
+        #   pay_nh_general 이 manual=True 로 돌아오면 phone_auto/nh_enter.py 로 이어받을 것:
+        #     box1(IME) → box2~4 / cvc / pin6 (칸마다 새 스크린샷 판독 — 칸 바뀌면 재셔플)
+        pay = pay_nh_general()                  # 일반결제(카드번호 직접) — 사용자 지정 2026-06-25
     else:
         res["status"] = f"UNVERIFIED_CARD:{use_card}(롯데 결제경로 미검증 — 라이브 필요)"; return res
     res["pay"] = pay
+    # ★NH 는 카드번호 화면에서 에이전트 비전 인계로 정지한다 = 실패 아님(정상 대기).
+    #   여기서 return 해야 다음 계정이 콜드런치로 이 결제화면을 날려버리지 않는다.
+    #   이어받기 = phone_auto/nh_enter.py. 완주 후 구매대장은 **수동 기록**해야 한다
+    #   (아래 자동 기록 블록을 안 타므로 — record_combo 로 조합/주문번호 남길 것).
+    if pay.get("manual"):
+        res["status"] = "NH_HANDOFF(카드번호 화면 — 에이전트 비전 입력 대기)"; return res
     if not pay.get("ok"):
         res["status"] = f"PAY_FAIL@{pay.get('step')}:{pay.get('err')}"; return res
     res["status"] = f"DONE(주문 {pay.get('order')})"

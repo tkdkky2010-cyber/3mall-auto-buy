@@ -352,6 +352,67 @@ def cdp_select_all(timeout: float = 25) -> tuple[bool, str]:
     return False, last
 
 
+_SEL_ONLY_JS = """(function(kws, doClick){
+  var cbs=document.querySelectorAll('input[type=checkbox][name=backet]');
+  var res=[];
+  for(var i=0;i<cbs.length;i++){
+    var cb=cbs[i];
+    var row=cb.closest('li')||cb.parentElement;
+    var t=((row&&row.innerText)||'').replace(/\\s+/g,' ');
+    var want=false;
+    for(var k=0;k<kws.length;k++){ if(t.indexOf(kws[k])>=0){ want=true; break; } }
+    if(doClick && cb.checked!==want){ cb.click(); }
+    res.push({t:t.slice(0,60), want:want, now:cb.checked});
+  }
+  return JSON.stringify({n:cbs.length, items:res});
+})(%s, %s)"""
+
+
+def cdp_select_only(keywords: list[str], timeout: float = 25) -> tuple[bool, str]:
+    """카트에서 **상품명에 keywords 중 하나가 포함된 상품만** 선택하고 나머지는 해제 → (ok, 요약).
+
+    혼합 카트를 카드별로 나눠 주문하기 위한 것 (2026-08-05 사용자 지시: 데이즈온=NH / 나머지=KB.
+    한 주문 = 카드 하나라 상품별로 카드를 다르게 하려면 주문 자체를 나눠야 한다).
+
+    ★DOM 을 정본으로 쓴다(OCR/픽셀 아님) — 개별 상품 체크박스는 헤더와 달리 **상품 수·구성에 따라
+      위치가 움직여** 좌표 추정이 위험하고, DOM 은 상품명이 같이 읽혀 '무엇을 골랐는지' 확정된다.
+      실측 구조(2026-08-05 #7): 개별상품 = `input[type=checkbox][name=backet]`,
+      행 innerText 에 상품명. 헤더(전체선택)는 name 이 없어 자연히 제외된다.
+    ⚠️ `cb.checked = true` 직접 대입 금지 — 페이지 핸들러(합계금액 갱신)가 안 돈다. 반드시 `.click()`.
+    ⚠️ 선택 0건이면 실패 처리 — 키워드 오타로 전부 해제된 채 '구매하기'로 넘어가는 사고 방지."""
+    kw_js = json.dumps(keywords, ensure_ascii=False)
+    end = time.time() + timeout
+    last = "no-cart(basktList WebView 미부착)"
+    while time.time() < end:
+        c = attach_visible_url("basktList")
+        if c is None:
+            time.sleep(0.8); continue
+        try:
+            c.ev(_SEL_ONLY_JS % (kw_js, "true"), timeout=10)      # 선택/해제 클릭
+            time.sleep(1.2)                                        # 핸들러(합계 갱신) 반영 대기
+            raw = c.ev(_SEL_ONLY_JS % (kw_js, "false"), timeout=10)  # 상태 재확인(클릭 없이)
+        except Exception as e:
+            last = f"CDP 실패: {e}"
+            time.sleep(0.8); continue
+        finally:
+            c.close()
+        try:
+            d = json.loads(raw)
+        except Exception:
+            time.sleep(0.8); continue
+        items = d.get("items", [])
+        bad = [i for i in items if i["now"] != i["want"]]
+        picked = [i for i in items if i["now"]]
+        last = f"({len(picked)}/{len(items)})"
+        if items and not bad and picked:
+            for i in items:
+                print(f"[cart] {'✓ 선택' if i['now'] else '· 제외'}: {i['t']}", flush=True)
+            return True, last
+        print(f"[cart] 선택 불일치 {len(bad)}건 / 선택 {len(picked)}건 → 재시도", flush=True)
+        time.sleep(1.0)
+    return False, last
+
+
 def beauty_reauth(profile: dict, timeout: float = 12) -> dict:
     """주문완료(orderComplete) 페이지 CDP 뷰티포인트 재인증.
     재인증 클릭 → 이름+카드4칸 → 확인 → '적립신청 완료'. (#3 검증 루트)"""
@@ -592,39 +653,57 @@ def _pick_card_from_grid(grid_name: str = "현대카드") -> bool:
     #   → ③ 탭형 UI(둘 다 없음): '페이/Pay' 탭 → 다시 '카드' 탭 = '카드 선택' 전체 그리드 등장
     #     (사용자 실측 2026-06-06 #17: 탭형 주문서에서 전 카드 목록 뜨는 유일 경로)
     opened = False
+    opener_was_dropdown = False        # ★opener 가 '신용카드 선택' 그 자체였는가 (아래 재탭 금지 판정용)
     for _ in range(5):
         its = _ocr_texts(cap())
-        op = next((it for it in its if "결제수단변경" in it["text"]), None) or \
-             next((it for it in its if "신용카드 선택" in it["text"]), None)
+        chg = next((it for it in its if "결제수단변경" in it["text"]), None)
+        drop = next((it for it in its if "신용카드 선택" in it["text"]), None)
+        op = chg or drop
         if op:
-            _adb().tap(op["cx"], op["cy"]); time.sleep(1.8)
+            opener_was_dropdown = chg is None
+            print(f"[grid] opener='{'결제수단변경' if chg else '신용카드 선택'}' 탭 "
+                  f"@({op['cx']},{op['cy']})", flush=True)
+            # 대기 2.5s — 1.8s 로는 바텀시트가 안 떠서 아래 재탭 분기로 빠졌다(2026-08-05 수동 실측).
+            _adb().tap(op["cx"], op["cy"]); time.sleep(2.5)
             opened = True
             break
         pay_tab = next((it for it in its if "페이" in it["text"] and "Pay" in it["text"]), None)
         card_tab = next((it for it in its if it["text"].strip() == "카드"), None)
         if pay_tab and card_tab:
+            print("[grid] opener=탭형(페이→카드)", flush=True)
             _adb().tap(pay_tab["cx"], pay_tab["cy"]); time.sleep(1.5)
             _adb().tap(card_tab["cx"], card_tab["cy"]); time.sleep(1.5)
             opened = True
             break
         _adb().swipe(540, 1700, 540, 900, 400); time.sleep(0.8)   # 결제수단 보이게 스크롤 다운
     if not opened:
+        print("[grid] ✗ opener 미발견(결제수단 섹션 못 찾음)", flush=True)
         return False
     its2 = _ocr_texts(cap())
     if not any(_fuzzy_has(it["text"].strip(), grid_name) for it in its2):  # 신용카드 선택 드롭다운 한 단계 더
-        sc = next((it for it in its2 if "신용카드 선택" in it["text"]), None)
-        if sc:
-            _adb().tap(sc["cx"], sc["cy"]); time.sleep(1.5)
+        if opener_was_dropdown:
+            # ★★재탭 금지 — opener 가 이미 '신용카드 선택' 이었으면 방금 연 바텀시트를 **닫아버린다**.
+            #   이게 2026-08-05 NH SELECT_CARD_FAIL 의 원인(워크로그 §5-10): 재탭으로 시트가 닫혀
+            #   이후 스와이프가 시트가 아니라 주문서를 긁었고, 드롭다운은 '신용카드 선택'(비어있음)으로 남았다.
+            print(f"[grid] '{grid_name}' 아직 안 보임 — opener 가 드롭다운이므로 재탭 금지, 스크롤 탐색", flush=True)
+        else:
+            sc = next((it for it in its2 if "신용카드 선택" in it["text"]), None)
+            if sc:
+                print(f"[grid] '신용카드 선택' 한 단계 더 탭 @({sc['cx']},{sc['cy']})", flush=True)
+                _adb().tap(sc["cx"], sc["cy"]); time.sleep(2.5)
     # '카드 선택' 그리드는 카드 많아 길 수 있음 → grid_name 안 보이면 그리드 영역 스크롤하며 탐색
     # _fuzzy_has: '비씨카드(페이북)' 접미사(startswith 상위집합) + '혀대카드' 류 OCR 오독 대응(#17).
     hd = None
-    for _ in range(5):
+    for i in range(5):
         hd = next((it for it in _ocr_texts(cap()) if _fuzzy_has(it["text"].strip(), grid_name)), None)
         if hd:
             break
+        print(f"[grid] '{grid_name}' 미발견 #{i+1} → 그리드 스크롤", flush=True)
         _adb().swipe(540, 1750, 540, 1050, 400); time.sleep(0.8)   # 그리드 스크롤 다운
     if not hd:
+        print(f"[grid] ✗ '{grid_name}' 최종 미발견 — 선택 실패", flush=True)
         return False
+    print(f"[grid] ✓ '{grid_name}' 탭 @({hd['cx']},{hd['cy']})", flush=True)
     _adb().tap(hd["cx"], hd["cy"]); time.sleep(2.0)
     return True
 
@@ -1413,66 +1492,24 @@ def pay_nh_general() -> dict:
     out["step"] = "card_no"
     if not wait_text("카드번호", timeout=12):
         out["err"] = "카드번호 화면 미도달"; return out
-    if os.environ.get("NH_VISION_MODE") == "1" or \
-       os.environ.get("PAY_VISION_MODE", "").strip() in ("1", "true", "yes"):
-        # ★3사 공용 비전 인계 (2026-07-31 NH #9 성공 / 2026-08-02 삼성 4계정 성공).
-        #   스크립트는 여기서 멈추고, 에이전트가 전체화면 스크린샷을 읽어 직접 탭한다.
-        #   nh_vision_input.tap_digits 사용 — 값은 secrets 에서, 배열은 에이전트가 판독.     # 카드창 도달 후 정지 — 카드/CVC/비번은 외부(클로드 비전)가 입력
-        out["step"] = "card_screen_ready"; out["manual"] = True; return out
-    boxes = _card_no_boxes()
-    if len(boxes) < 4:
-        out["err"] = f"카드번호 입력칸 {len(boxes)}개(4 기대) — dump 미검출, 라이브 화면 확인 필요"; return out
-    groups = [card_no[i:i + 4] for i in range(0, 16, 4)]
-    # box1(cardno1)=비보안 IME칸 → adb input text. ★이 IME 입력완료가 box2 nppfs 보안키패드를 자동 소환함
-    #   (2026-06-25 실측: _tap_shuffle 키 탭으로 box1 채우면 다음 칸 키패드가 안 떠 box2에서 막힘).
-    _adb().tap(boxes[0][0], boxes[0][1]); time.sleep(1.0)
-    subprocess.run(["adb", "shell", "input", "text", groups[0]], capture_output=True)
-    time.sleep(1.5)
-    # box2~4=보안 nppfs 셔플 → 칸 탭 → 키패드 등장 폴링(~2.5s) → _tap_shuffle. 재탭 금지(키패드 리셋).
-    # ★칸 좌표를 매번 fresh 재검출 — box1 입력 후 카드칸 레이아웃이 아래로 이동함(2026-06-25 실측 y721→y856).
-    #   로드 시점 좌표를 재사용하면 box2를 빗나가 키패드가 안 떠 실패.
-    for bi in range(2, 5):
-        bx = _card_no_boxes()
-        if len(bx) < 4:
-            out["err"] = f"카드번호 {bi}칸 재검출 실패({len(bx)}개)"; return out
-        box, grp = bx[bi - 1], groups[bi - 1]
-        _adb().tap(box[0], box[1])
-        _wait_keypad(timeout=6); time.sleep(1.0)    # 보안키패드 렌더 완전 안정 후 OCR
-        r = _tap_secure_each(grp)                   # 매 자리 재OCR (키패드가 키마다 재셔플되므로)
-        if not r.get("ok"):
-            out["err"] = f"카드번호 {bi}칸 입력 실패: {r.get('err')}"; return out
-    time.sleep(1.0)
-    # 5) CVC — 입력칸 resource-id 'inputCVC' 우선, 없으면 OCR 'CVC' 라벨 폴백 (보안키패드 셔플)
-    out["step"] = "cvc"
-    cbox = _edit_box_by_id("cvc")
-    if cbox is None:
-        cf = next((it for it in _ocr_texts(cap()) if "CVC" in it["text"].upper()), None)
-        if not cf:
-            out["err"] = "CVC 칸 미발견"; return out
-        cbox = (cf["cx"], cf["cy"])
-    _adb().tap(cbox[0], cbox[1])
-    _wait_keypad(timeout=6); time.sleep(1.0)        # 보안키패드 렌더 안정 후 OCR
-    r = _tap_secure_each(cvc)                       # 매 자리 재OCR (보안키패드 매 키 재셔플)
-    if not r.get("ok"):
-        out["err"] = f"CVC 입력 실패: {r.get('err')}"; return out
-    time.sleep(1.0)
-    # 6) '확인'
-    out["step"] = "confirm"
-    if not ocr_tap("확인", contains=True, retries=4):
-        out["err"] = "'확인' 탭 실패"; return out
-    time.sleep(2.5)
-    # 7) '숫자 6자리' 결제비밀번호 칸 → 팝업 키패드 → 6자리
-    out["step"] = "pin6"
-    if not wait_text("6자리", timeout=12) and not screen_has("비밀번호"):
-        out["err"] = "결제비밀번호 팝업 미도달"; return out
-    pf = next((it for it in _ocr_texts(cap()) if "6자리" in it["text"] or "숫자" in it["text"]), None)
-    if pf:
-        _adb().tap(pf["cx"], pf["cy"]); time.sleep(1.0)
-    _wait_keypad(timeout=6); time.sleep(1.0)        # 6자리 팝업 보안키패드 렌더 대기
-    r = _tap_secure_each(pin6)                       # ★카드와 동일 검증식 — 6자리 팝업도 매 키 재셔플 가정 (옛 _tap_shuffle 은 첫자리만 맞고 실패)
-    if not r.get("ok"):
-        out["err"] = f"결제비번 입력 실패: {r.get('err')}"; return out
-    out["ok"] = True
+    # ★★NH = **항상 에이전트 비전 핸드세이크** (사용자 지시 2026-08-05, 3사 공용 정본).
+    #   근거: nppfs 셔플 키패드는 방패 아이콘이 숫자 자리에 섞여 **로컬 OCR 이 매핑에 실패**한다
+    #        (_tap_shuffle 사다리 × 3ROI 전부 실패 — 2026-07-31 실측). 반면 에이전트가 전체화면을
+    #        직접 읽으면 방패가 섞여도 정확히 판독된다 → **판독=에이전트 / 탭=nh_vision_input**.
+    #   파일 핸드셰이크(_ocr_claude request.png/response.json)는 왕복이 분 단위라 결제 세션(~5분)에
+    #   부적합해 폐기됐다(커밋 b2f1f46: "정지-인계(PAY_VISION_MODE)를 정본으로 채택").
+    #
+    #   ⚠️ 옛 로컬 OCR 자동입력 경로(_card_no_boxes + _tap_secure_each 로 카드번호/CVC/비번)는
+    #      **제거했다 — 되살리지 말 것.** 환경변수 게이트(NH_VISION_MODE/PAY_VISION_MODE)도 제거:
+    #      플래그를 깜빡하면 조용히 옛 경로로 떨어져 실패했다(2026-08-05 #10·#5 실패 원인).
+    #      **기본값이 곧 핸드세이크다.**
+    #
+    #   이어받기: phone_auto/nh_vision_input.py — 칸마다 새 스크린샷 판독(칸 바뀌면 재셔플),
+    #            KEY_COLS/ROW_CARD/ROW_CVC/ROW_PIN6 좌표, tap_digits(값은 secrets, 배열은 판독값).
+    out["step"] = "card_screen_ready"
+    out["manual"] = True
+    print("[NH] ★카드번호 화면 도달 — 에이전트 비전 인계 대기 "
+          "(카드번호 16 → CVC 3 → '확인' → 결제비번 6)", flush=True)
     return out
 
 
@@ -1556,24 +1593,33 @@ def _select_toss_card() -> dict:
 
 
 def select_card(card: str, day: str | None = None) -> dict:
-    """결제수단을 card로 설정. 당일 할인카드면 캐러셀(할인 적용), 아니면 그리드(할인 없음).
-    당일카드는 캐러셀로(메모리: 굳이 그리드 우회 X — 오류↑). day=호출측이 감지한 당일카드(중복 감지 회피)."""
-    if day is None:
-        day = detect_card()
+    """결제수단을 card로 설정. **1순위 = 카드할인 캐러셀에서 카드명으로 지목**(할인 적용),
+    캐러셀에 그 카드가 없으면 그리드(할인 없음). day = 호출측이 감지한 당일카드(로그용).
+
+    ★2026-08-05 변경 (워크로그 §5-10 SELECT_CARD_FAIL 근본수정)
+      예전엔 `day == card` 일 때만 캐러셀을 썼다. 그런데 **즉시할인 카드가 여러 장인 날**
+      (NH·BC 가 둘 다 5%) `detect_card()` 는 맨 위 1장(BC)만 반환 → NH 는 `day != card` 로
+      분류돼 그리드/드롭다운으로 우회 → 거기서 이중탭 버그로 실패했다.
+      카드할인은 **주문(상품)별로 다르다** (데이즈온 주문서=NH / 석류젤리 주문서=KB — 사용자 실측).
+      → 당일카드 추측에 기대지 말고 **캐러셀에서 카드명으로 직접 지목**한다."""
     if card == "토스":                    # 토스페이 = 전용 셀렉터(700px 캐러셀 미지원, 카드박스 직접 탭)
         return _select_toss_card()
     grid_name = CARD_GRID_NAME.get(card, card + "카드")
-    if day == card:
-        # ★당일카드 = 700px 정본(flow_runner hmall_select_card_discount, 식품 flow와 동일):
-        #   맨위→700px→캐러셀 '즉시할인' 행 금액 == 하단 결제버튼 금액 판정(2026-06-06 사용자 지정).
-        #   동일=선택됨(탭 X, 토글 보호) / 다름=탭→재확인 / 불일치 지속=raise(결제 차단).
-        #   ⚠️ fallback 금지 — 정본이 차단한 결제를 다른 검증으로 통과시키면 가드 무력화.
-        try:
-            FlowRunner(use_camera=False).run_action({"action": "hmall_select_card_discount"})
-            return {"ok": True, "via": "700px"}
-        except Exception as e:
-            return {"ok": False, "via": "700px", "err": f"카드할인 적용 확인 실패(결제 차단): {e}"}
-    ok = _pick_card_from_grid(grid_name)                        # 그리드 (오늘 할인 아님 — 강제선택)
+    # ① 캐러셀 카드명 타깃 — 700px 정본 가드 유지(캐러셀 '즉시할인' 행 금액 == 하단 결제버튼 금액.
+    #    동일=선택됨(탭 X, 토글 보호) / 다름=탭→재확인 / 불일치 지속=raise=결제 차단).
+    try:
+        FlowRunner(use_camera=False).run_action(
+            {"action": "hmall_select_card_discount", "card": card})
+        # ★금액 일치만으론 '어느 카드가' 설정됐는지 모른다 (NH·BC 처럼 같은 5% 면 금액도 같다)
+        #   → 결제수단 행 아래 카드명 **양성 검증** 필수. 실패면 진행 금지(딴 카드 결제 방지).
+        if _verify_pay_method(grid_name):
+            return {"ok": True, "via": "캐러셀"}
+        return {"ok": False, "via": "캐러셀",
+                "err": f"{card} 캐러셀 탭 후 결제수단에 '{grid_name}' 미확인 — 오결제 방지 중단"}
+    except Exception as e:
+        print(f"[card] 캐러셀에서 {card} 미확보({e}) → 그리드 경로(할인 없음)", flush=True)
+    # ② 그리드 (이 주문서 캐러셀에 없는 카드 — 강제선택, 즉시할인 없음)
+    ok = _pick_card_from_grid(grid_name)
     ok = ok and _verify_pay_method(grid_name)                   # 양성 검증 (그리드 탭≠설정 보장, #17 교훈)
     return {"ok": ok, "via": "grid", "err": None if ok else f"{card} 그리드 선택/검증 실패"}
 
@@ -1750,7 +1796,8 @@ def handle_after_pay(timeout: float = 30) -> str:
 
 # ──────────────────────────── 1계정 오케스트레이션 ────────────────────────────
 
-def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None) -> dict:
+def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
+            only: list[str] | None = None) -> dict:
     serial = hw._serial()
     res = {"idx": idx, "status": None, "combo_idx": combo_idx}
     print(f"\n{'='*54}\n[#{idx}] 앱 콜드런치 → 로그인...", flush=True)
@@ -1780,12 +1827,18 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None) -> 
     lap_reset(); lap("측정시작(로그인+카트확인 후)")
     if not goto_cart():
         res["status"] = "CART_NAV_FAIL"; return res
-    # 전체선택 (CDP)
-    ok, sel = cdp_select_all()
-    print(f"[#{idx}] 전체선택 {sel} ok={ok}", flush=True)
-    if not ok:
-        res["status"] = f"SELECT_ALL_FAIL:{sel}"; return res
-    lap("카트진입 + 전체선택")
+    # 선택 — only 지정이면 해당 상품만(혼합 카트 카드별 분리주문), 아니면 전체선택
+    if only:
+        ok, sel = cdp_select_only(only)
+        print(f"[#{idx}] 부분선택[{','.join(only)}] {sel} ok={ok}", flush=True)
+        if not ok:
+            res["status"] = f"SELECT_ONLY_FAIL:{sel}"; return res
+    else:
+        ok, sel = cdp_select_all()
+        print(f"[#{idx}] 전체선택 {sel} ok={ok}", flush=True)
+        if not ok:
+            res["status"] = f"SELECT_ALL_FAIL:{sel}"; return res
+    lap("카트진입 + 선택")
     # 구매하기 → 주문서 (공통, 카드무관)
     if not ocr_tap("구매하기"):
         res["status"] = "BUY_FAIL(구매하기)"; return res
@@ -1862,6 +1915,10 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None) -> 
     elif use_card == "NH":
         np_ = pay_nh_general()          # 일반결제(카드번호 직접) — 사용자 지정 2026-06-25. (구 PAYCO=pay_nh 폴백)
         res["pay"] = np_
+        # ★NH 는 카드번호 화면에서 에이전트 비전 인계로 정지한다 = 실패 아님(정상 대기 상태).
+        #   여기서 return 해야 다음 계정이 콜드런치로 이 화면을 날려버리지 않는다.
+        if np_.get("manual"):
+            res["status"] = "NH_HANDOFF(카드번호 화면 — 에이전트 비전 입력 대기)"; return res
         if not np_.get("ok"):
             res["status"] = f"NH_FAIL@{np_.get('step')}:{np_.get('err')}"; return res
     elif use_card == "토스":
@@ -1904,6 +1961,10 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None) -> 
             cart = next((c for c in mf.get("carts", [])
                          if c.get("mall") in ("현대", "hmall") and c.get("account") == idx), None)
             for it in (cart or {}).get("items", []):
+                # ★부분선택 주문이면 **이번에 결제한 상품만** 기록 (안 그러면 나머지 상품까지
+                #   중복/선결제로 대장에 올라간다). 키워드는 카트 선택과 동일한 것을 쓴다.
+                if only and not any(k in (it.get("name") or "") for k in only):
+                    continue
                 PL.record_food("현대Hmall", res.get("id"), it.get("product"), qty=it.get("qty"),
                                order_no=order_no, card=res.get("card"))
     except Exception as e:
@@ -2027,12 +2088,16 @@ def main() -> int:
     only = [int(a) for a in args if a.isdigit()]
     card_override = next((a for a in args if a in CARD_GRID_NAME), None)   # '현대'/'롯데' 강제 (없으면 당일 자동감지)
     combo_idx = next((int(a.split("=", 1)[1]) for a in args if a.startswith("combo=")), None)  # 설화수 기록용
+    # only=데이즈온 / only=석류,견과 → 카트에서 그 상품만 선택해 주문(혼합 카트 카드별 분리주문).
+    only_kw = next(([s for s in a.split("=", 1)[1].split(",") if s]
+                    for a in args if a.startswith("only=")), None)
     plan = only or PLAN
-    print(f"[serial] {hw._serial()}  plan={plan}  card={card_override or '당일 자동감지'}", flush=True)
+    print(f"[serial] {hw._serial()}  plan={plan}  card={card_override or '당일 자동감지'}"
+          f"{'  only=' + ','.join(only_kw) if only_kw else ''}", flush=True)
     summary = []
     for idx in plan:
         try:
-            r = buy_one(idx, card=card_override, combo_idx=combo_idx)
+            r = buy_one(idx, card=card_override, combo_idx=combo_idx, only=only_kw)
         except Exception as e:
             r = {"idx": idx, "status": f"EXC:{e}"}
         print(f"[#{idx}] => {r.get('status')}", flush=True)

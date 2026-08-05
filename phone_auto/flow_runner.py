@@ -518,11 +518,16 @@ class FlowRunner:
             # ★판정(2026-06-06 사용자 지정): 캐러셀 '즉시할인' 행 오른쪽 '~~~원' == 하단 '~~~원 결제하기'
             #   동일 → 카드 선택됨(탭 불필요/완료). 다름 → 미선택 → '즉시할인' 탭 → 재확인(동일해야 함).
             #   (캐러셀 행 = 토글이라 무조건 탭 금지 — 적용 상태서 탭하면 해제. 금액 일치가 유일 신뢰 신호)
-            def _row_amt(nodes, iy):
+            def _row_amt(nodes, iy, ix=None):
                 # 즉시할인 행과 같은 줄(±60px)의 '~~~원' (결제하기 버튼 제외).
                 # ⚠️ dump가 '574,522' / '원' 을 별도 노드로 쪼갬(#17 실측) → 숫자-only 노드도 매칭.
                 # ★2열 그리드(2026-07-30 실측): '즉시할인'(cy1758)과 금액(cy1845)이 87px 떨어져 ±60 실패
                 #   → 같은 카드 박스 = 아래 180px 이내도 인정. 위쪽은 기존대로 ±60 유지(윗 카드 금액 오매칭 방지).
+                # ★2열이면 같은 행/아래에 **다른 카드의 금액**도 잡힌다(2026-08-05 실측: 왼쪽 226,328
+                #   cx=379 / 오른쪽 226,328 cx=891). 오늘은 두 금액이 같아 안 드러났을 뿐 latent bug.
+                #   → 후보를 모아 **탭할 카드와 cx 가 가장 가까운 것**을 고른다. 1열이면 후보가 하나라
+                #   기존 동작 그대로(회귀 없음).
+                cands = []
                 for t, x1, y1, x2, y2 in nodes:
                     if "결제하기" in t:
                         continue
@@ -532,36 +537,89 @@ class FlowRunner:
                         continue
                     cy = (y1 + y2) // 2
                     if abs(cy - iy) < 60 or 0 < cy - iy < 180:
-                        return int(m.group(1).replace(",", ""))
+                        cands.append((int(m.group(1).replace(",", "")), (x1 + x2) // 2))
+                if not cands:
+                    return None
+                if ix is None or len(cands) == 1:
+                    return cands[0][0]
+                return min(cands, key=lambda c: abs(c[1] - ix))[0]
+
+            # ★카드 지정(action["card"]) — 캐러셀에 즉시할인 카드가 **여러 장**일 때 특정 카드를 지목한다.
+            #   근거(2026-08-05 실측): NH·BC 가 **둘 다 '즉시할인 5%'** 로 나란히 떠서 '맨 위 즉시할인' 규칙으론
+            #   NH 를 지목할 방법이 없었다 → 그리드 경로로 우회하다 SELECT_CARD_FAIL (워크로그 §5-10).
+            #   미지정이면 기존 동작 그대로(맨 위 = 할인율 최고 카드).
+            _CARD_TOKENS = {
+                "현대": ["현대"], "롯데": ["롯데"], "KB": ["KB국민", "KB", "국민"], "하나": ["하나"],
+                "삼성": ["삼성"], "NH": ["NH농협", "NH", "농협"], "BC": ["BC", "비씨", "페이북"],
+            }
+            want = str(action.get("card") or "").strip()
+            tokens = _CARD_TOKENS.get(want, [want] if want else [])
+            if want:
+                self._log(f"  카드 지정={want} (토큰 {tokens}) — 캐러셀에서 이 카드만 탭")
+
+            # ★★열 폭 — 캐러셀이 **2열**이면 "같은 행"에 **다른 카드**가 있다(2026-08-05 실측:
+            #   비씨 cx=114 / NH cx=621, 각자의 '5% 즉시할인' cx=181 / cx=695).
+            #   열 검사 없이 같은 행만 보면 왼쪽(비씨) 즉시할인이 오른쪽 NH 이름과 매칭돼
+            #   **NH 를 지목했는데 비씨가 탭된다** — 실제로 #10 에서 그렇게 됐다(오결제 직전, 가드가 막음).
+            COL = 300      # 같은 카드 박스로 인정할 최대 cx 차이 (열 간격 ~500px, 박스 내 최대 ~200px)
+
+            def _is_want(tt, x1, y1, x2, y2, nodes):
+                """이 '즉시할인' 노드가 want 카드의 것인가.
+                OCR 은 한 행에 카드명이 함께 온다('NH 5% 즉시할인') → substring 으로 끝.
+                dump 는 카드명이 **별도 노드**라 같은 카드 박스에서 찾는다.
+                ⚠️ 같은 행이어도 **같은 열이어야** 같은 카드다(위 COL 주석)."""
+                if any(a in tt for a in tokens):
+                    return True
+                cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+                for nt, a1, b1, a2, b2 in nodes:
+                    if not any(a in nt for a in tokens):
+                        continue
+                    ncx, ncy = (a1 + a2) // 2, (b1 + b2) // 2
+                    if abs(ncx - cx) >= COL:          # 다른 열 = 다른 카드
+                        continue
+                    if abs(ncy - cy) < 60 or 0 < cy - ncy < 180:
+                        return True
+                return False
+
+            def _find(nodes, exact):
+                for t, x1, y1, x2, y2 in nodes:
+                    tt = t.strip()
+                    if (tt == "즉시할인") if exact else ("즉시할인" in tt):
+                        if want and not _is_want(tt, x1, y1, x2, y2, nodes):
+                            continue
+                        return (x1, y1, x2, y2)
                 return None
 
             taps = 0
             for _ in range(9):
                 nodes = _nodes()
-                cand = next(((x1, y1, x2, y2) for t, x1, y1, x2, y2 in nodes if t.strip() == "즉시할인"), None)
+                cand = _find(nodes, True)
                 if cand is None:
                     # dump 가 '즉시할인' 미검출(WebView) → OCR 폴백. OCR 행은 'NH 5% 즉시할인' 식이라 substring 매칭.
                     nodes = _ocr_nodes()
-                    cand = next(((x1, y1, x2, y2) for t, x1, y1, x2, y2 in nodes if "즉시할인" in t), None)
+                    cand = _find(nodes, False)
                 if not cand or (cand[1] + cand[3]) // 2 > 1900:   # 안전위치 미확보 → 캐러셀 위로 끌어올림
                     cy = (cand[1] + cand[3]) // 2 if cand else None
-                    self._log(f"  즉시할인 위치 {cy} 미확보(결제버튼 근처/미발견) → 더 스크롤(위로 끌어올림)")
+                    self._log(f"  {want or '즉시할인'} 위치 {cy} 미확보(결제버튼 근처/미발견) → 더 스크롤(위로 끌어올림)")
                     self.adb.swipe(540, 1500, 540, 1150, 300); time.sleep(1.0)
                     continue
                 ix1, iy1, ix2, iy2 = cand
-                iy = (iy1 + iy2) // 2
-                row, pay = _row_amt(nodes, iy), _pay(nodes)
+                iy, ix = (iy1 + iy2) // 2, (ix1 + ix2) // 2
+                row, pay = _row_amt(nodes, iy, ix), _pay(nodes)
                 if row is not None and pay is not None and row == pay:
-                    self._log(f"  ✓ 캐러셀 금액 == 결제버튼 금액 ({row:,}원) — 카드 선택됨")
+                    self._log(f"  ✓ 캐러셀 금액 == 결제버튼 금액 ({row:,}원) — {want or '즉시할인'} 카드 선택됨")
                     return
                 if taps >= 2:
                     raise FlowError(
-                        f"hmall_select_card_discount: 탭 {taps}회에도 금액 불일치 (캐러셀 {row} vs 결제 {pay}) — 결제 중단")
+                        f"hmall_select_card_discount[{want or '자동'}]: 탭 {taps}회에도 금액 불일치 "
+                        f"(캐러셀 {row} vs 결제 {pay}) — 결제 중단")
                 self.adb.tap((ix1 + ix2) // 2, iy)
                 taps += 1
-                self._log(f"  즉시할인 탭 #{taps} @ ({(ix1+ix2)//2},{iy}) (캐러셀 {row} vs 결제 {pay} 불일치)")
+                self._log(f"  {want or '즉시할인'} 탭 #{taps} @ ({(ix1+ix2)//2},{iy}) (캐러셀 {row} vs 결제 {pay} 불일치)")
                 time.sleep(2.2)
-            raise FlowError("hmall_select_card_discount: 즉시할인 카드 안전위치/금액일치 확보 실패 — 결제 중단")
+            # ★want 지정인데 여기 왔다 = 캐러셀에 그 카드가 없다는 뜻일 수 있다. 추측 탭 금지(오결제) → 중단.
+            raise FlowError(
+                f"hmall_select_card_discount[{want or '자동'}]: 즉시할인 카드 안전위치/금액일치 확보 실패 — 결제 중단")
 
         elif kind == "hmall_use_all_points":
             # 주문페이지 맨 위로 → 700px 1회 고정 스크롤 → '전액사용'(텍스트) 탭. H.Point <100p 면 skip.
