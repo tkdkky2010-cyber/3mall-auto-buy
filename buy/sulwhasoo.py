@@ -54,6 +54,7 @@ GALLERIA_PRODUCTS = {
     "f": {"name": "윤조에센스90",        "goods_no": "2204658942"},
     "g": {"name": "자음생2종",          "goods_no": "2408977039"},
     "h": {"name": "자음생크림리치세트", "goods_no": "2408977059"},
+    "n": {"name": "탄력크림EX75",       "goods_no": "2502913443"},
 }
 
 # 롯데 상품 정보 (hsmaster/config/sulwhasoo-ids.json 기준, 월 1회 갱신)
@@ -65,6 +66,7 @@ LOTTE_PRODUCTS = {
     "f": {"name": "윤조에센스90",        "goods_no": "2091578259"},
     "g": {"name": "자음생2종",          "goods_no": "2719761525"},
     "h": {"name": "자음생크림리치세트", "goods_no": "2719761746"},
+    "n": {"name": "탄력크림EX75",       "goods_no": "2923426629"},
 }
 
 # 조합 = rate-check/_common.py 의 COMBOS 단일 소스 (TOP 20).
