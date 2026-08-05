@@ -101,36 +101,23 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 
 ### 상품 목록
 
+**이 표의 행 순서 = 검사·출력·시트 입력 순서다** (ID 숫자순으로 재정렬하지 않는다).
+사용자가 2026-08-05 에 지정한 목록.
+
 | # | 제품명 | URL |
 |---|--------|-----|
+| 1 | 이너플로라 유산균 60정 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2154750833 |
+| 1-1 | 이너플로라 유산균 30정 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2201017629&sectId=3060687 |
 | 2 | 하루견과 초록색 100봉 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2151046312&sectId=3059445 |
 | 3 | 하루견과 갈색 100봉 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2225431602&sectId=3059445 |
-| 6 | 레놉티 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244138695&sectId=3059445 |
-| 7 | 락토핏 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2151878435 |
 | 8 | 이디야 디카페인 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244409628&sectId=3059445 |
 | 9 | 이디야 카페인 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2246603712&sectId=3059445 |
-| 10 | 이경제 더힘찬녹용 30포 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2240802022&ordpreview=true |
 | 11 | 라메종드미엘 프랑스 라벤더 천연꿀 8병 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2246845189&sectId=3059445 |
-| 12 | 갱년기 다이어트 리얼퀸 3병 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847&sectId=3059445 |
-| 13 | GRN 핑크 초록이 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847 |
-| 14 | GRN 곰돌이 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2202276847&sectId=3059445
-| 15 | 셀게이트 글루타치온 30p | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244515588 |
 | 16 | 루솔 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2225275921 |
-
-### 추가 제품 (필요 시 아래에 행 추가)
-
-| # | 제품명 | URL |
-|---|--------|-----|
 | 17 | 데이즈온 원데이 알파 18개 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2247036059&sectId=3059445 |
-| 20 | 바디랩 유기농 레몬즙 1박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244671296&sectId=3059445 |
 | 22 | 올바른건강식품 와이 9박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244934734&sectId=3059445 |
-| 23 | 셀게이트 컬리케일 6박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244447010&sectId=3059445 |
 | 25 | 유기농 석류젤리 9박(90개) | https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445 |
-| 26 | 오라틱스 구강유산균 10박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244032427&sectId=3059445 |
 | 28 | 스키니랩 시서스 다이어트 11박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2202464603&sectId=3059445 |
-| 29 | 아이클타임 키성장 에프지오 6박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2237140367 |
-| 31 | 닥터린 알파CD 원데이 핏 6박스 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2245068818 |
-| 32 | 셀게이트 엑스트라버진 올리브오일 그리스 30포 6박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244447362 |
 | 33 | GRN 붓기캔디 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2250831230&sectId=3060687 |
 | 34 | 데이즈온 파라다이스 버닝 9박스 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2250397383&sectId=3060687 |
 | 35 | 데이즈온 프리바이오틱스 에프오에스 트리플 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2247305088 |
@@ -138,6 +125,11 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 | 37 | 센텔리안24 마데카크림 타임리버스 50ml 10개 (옵션6) | https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546 |
 | 38 | 센텔리안24 마데카크림 타이트 리프팅 50ml 20개 (옵션2) | https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546 |
 | 39 | 서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244447210&sectId=173266 |
+
+### 추가 제품 (필요 시 아래에 행 추가)
+
+| # | 제품명 | URL |
+|---|--------|-----|
 
 ---
 

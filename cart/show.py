@@ -43,7 +43,7 @@ def fmt_paybacks(pb: dict | None) -> str:
 def main(argv=None):
     p = argparse.ArgumentParser()
     p.add_argument("--only-10pct", action="store_true", help="10%% 적립 상품만")
-    p.add_argument("--raw", type=int, metavar="ID", help="특정 상품 ID raw JSON 덤프")
+    p.add_argument("--raw", metavar="ID", help="특정 상품 ID raw JSON 덤프 ('1-1' 같은 id 포함)")
     args = p.parse_args(argv)
 
     if not TODAY.exists():
@@ -54,7 +54,7 @@ def main(argv=None):
 
     # raw 모드
     if args.raw is not None:
-        prod = next((r for r in d["products"] if r["id"] == args.raw), None)
+        prod = next((r for r in d["products"] if str(r["id"]) == args.raw), None)
         if not prod:
             print(f"[ERR] ID {args.raw} 없음")
             return 1

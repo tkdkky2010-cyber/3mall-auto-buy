@@ -177,18 +177,20 @@ def _compute_reward(price: int | None, tiers: list[dict], simple_ranges: list[di
 # - alias_of: base 상품 id (benefit_ratio 재사용)
 # - option_keyword: base 페이지에서 클릭할 옵션 키워드 (실제 DOM 텍스트에 포함되어야 매칭)
 # - unit_list_price: 옵션의 1개당 정가 (None 이면 base.options 에서 자동 lookup)
-ALIAS_META: dict[int, dict] = {
-    36: {"option_index": 3},   # 센텔리안24 더 마데카 크림 50ml 20개 [선택3] (사용자 지정 2026-07-28)
-    37: {"option_index": 6},   # 센텔리안24 마데카크림 타임리버스 50ml 10개 [선택6]
-    38: {"option_index": 2},   # 센텔리안24 마데카크림 타이트 리프팅 50ml 20개 [선택2]
-    5:  {"alias_of": 4,  "option_keyword": "말차",   "unit_list_price": 99_900},  # codegen 5/15 확정 [선택 2]
-    13: {"alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": 26900},
-    14: {"alias_of": 12, "option_keyword": "벨리곰", "unit_list_price": None},   # auto-lookup → 26,900
+# ★ id 는 문자열이다 ('1-1' 같은 소수점 id 허용, 2026-08-05 사용자 지정 목록)
+ALIAS_META: dict[str, dict] = {
+    "36": {"option_index": 3},   # 센텔리안24 더 마데카 크림 50ml 20개 [선택3] (사용자 지정 2026-07-28)
+    "37": {"option_index": 6},   # 센텔리안24 마데카크림 타임리버스 50ml 10개 [선택6]
+    "38": {"option_index": 2},   # 센텔리안24 마데카크림 타이트 리프팅 50ml 20개 [선택2]
+    "5":  {"alias_of": "4",  "option_keyword": "말차",   "unit_list_price": 99_900},  # codegen 5/15 확정 [선택 2]
+    "13": {"alias_of": "12", "option_keyword": "벨리곰", "unit_list_price": 26900},
+    "14": {"alias_of": "12", "option_keyword": "벨리곰", "unit_list_price": None},   # auto-lookup → 26,900
 }
 
 GUIDE_PATH = Path(__file__).parent / "Hmall 10% Check Guide.md"
+# ★ id 는 '1' 뿐 아니라 '1-1' 형태도 받는다. \d+ 로 두면 '1-1' 행이 조용히 누락된다.
 _GUIDE_ROW_RE = re.compile(
-    r"^\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|\s*(https?://www\.hmall\.com/md/pda/itemPtc\?[^\s|]+)"
+    r"^\|\s*(\d+(?:-\d+)?)\s*\|\s*([^|]+?)\s*\|\s*(https?://www\.hmall\.com/md/pda/itemPtc\?[^\s|]+)"
 )
 
 
@@ -198,14 +200,15 @@ def _load_products_from_guide() -> list[dict]:
     | # | 제품명 | URL | 행을 모두 추출해서 PRODUCTS 리스트 생성.
     URL 에서 slitmCd / 나머지 query 분리 → url_extra 필드 채움.
     alias 상품은 ALIAS_META 의 메타데이터 자동 병합.
+    ★ 순서 = 표에 적힌 행 순서 그대로 (id 숫자순 재정렬 금지, 2026-08-05 사용자 지정).
     """
     text = GUIDE_PATH.read_text(encoding="utf-8")
-    by_id: dict[int, dict] = {}
+    by_id: dict[str, dict] = {}
     for line in text.splitlines():
         m = _GUIDE_ROW_RE.match(line)
         if not m:
             continue
-        pid = int(m.group(1))
+        pid = m.group(1)
         name = m.group(2).strip()
         url = m.group(3).strip()
         qs = url.split("?", 1)[1]
@@ -219,7 +222,7 @@ def _load_products_from_guide() -> list[dict]:
         if meta:
             prod.update(meta)
         by_id[pid] = prod  # 같은 id 가 두 표에 있어도 마지막 row 가 승
-    return [by_id[k] for k in sorted(by_id.keys())]
+    return list(by_id.values())  # 표 등장 순서 유지
 
 
 PRODUCTS = _load_products_from_guide()
@@ -1400,7 +1403,7 @@ def _run(context, acc, acc_idx: int = 1) -> int:
     results: list[dict] = []
     # CHECK10_ONLY="34,35" → 해당 id 만 검사(부분 실행). 나머지는 기존 today.json 결과를 병합해
     #   전체를 다시 기록한다(write_to_sheet 가 ws.clear() 하므로 부분만 쓰면 기존 행이 날아감 — 2026-07-23).
-    only_ids = {int(x) for x in os.environ.get("CHECK10_ONLY", "").replace(" ", "").split(",") if x.isdigit()}
+    only_ids = {x for x in os.environ.get("CHECK10_ONLY", "").replace(" ", "").split(",") if x}
     if os.environ.get("DEBUG_ORDER"):
         products_to_run = PRODUCTS[:1]
     elif only_ids:
@@ -1458,7 +1461,10 @@ def _run(context, acc, acc_idx: int = 1) -> int:
             if prev.get("date") == datetime.now().strftime("%Y-%m-%d"):
                 merged = {r["id"]: r for r in (prev.get("products") or [])}
                 merged.update({r["id"]: r for r in results})
-                results = [merged[k] for k in sorted(merged)]
+                # Guide.md 표 순서 유지 (표에 없는 잔여 id 는 뒤에 붙임)
+                order = [p["id"] for p in PRODUCTS if p["id"] in merged]
+                order += [k for k in merged if k not in set(order)]
+                results = [merged[k] for k in order]
                 print(f"[OK] 기존 결과 병합 → 총 {len(results)}개 (신규/갱신 {len(only_ids)}개)", flush=True)
             else:
                 print(f"[WARN] {TODAY_OUT.name} 날짜가 오늘이 아님({prev.get('date')}) — 병합 skip", flush=True)
