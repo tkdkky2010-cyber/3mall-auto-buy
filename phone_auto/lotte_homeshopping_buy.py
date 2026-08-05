@@ -139,6 +139,67 @@ def _dump_nodes() -> list[dict]:
     return nodes
 
 
+# 현대카드 앱 결제화면에서 **반드시 이 카드로** 결제한다 (사용자 지정 2026-08-05).
+HYUNDAI_TARGET_CARD = "현대홈쇼핑 현대카드 Edition2"
+
+
+def _hyundai_cards() -> list[dict]:
+    """현대카드 앱 결제화면 카드 목록 → [{name, cx, cy, selected}].
+
+    ★좌표 하드코딩 금지 — 카드 순서가 매번 바뀐다(사용자 지적 2026-08-05). 이름으로 행을 찾는다.
+    선택 표시 = 행(btnRoot) 안의 **ivCheckcardRegi 존재**. 정확히 한 행에만 붙는다(2026-08-05 실측:
+    CJ-M 선택 상태 → 현대홈쇼핑 탭 → 마커가 그 행으로 이동).
+    ⚠️ 이 화면은 FLAG_SECURE(screencap 99.7% 검정) 라 OCR/픽셀 검증 불가 — dump 가 유일한 신호다.
+    ⚠️ ivCheckSelect 는 전 행에 항상 있어 선택 신호가 **아니다**(혼동 주의)."""
+    import re as _re, xml.etree.ElementTree as _ET
+    serial = hw._serial()
+    subprocess.run([hw.ADB, "-s", serial, "shell", "uiautomator", "dump", "/sdcard/_hc.xml"],
+                   capture_output=True)
+    raw = subprocess.run([hw.ADB, "-s", serial, "exec-out", "cat", "/sdcard/_hc.xml"],
+                         capture_output=True).stdout
+    try:
+        root = _ET.fromstring(raw)
+    except Exception:
+        return []
+    out: list[dict] = []
+    for row in root.iter("node"):
+        if not (row.get("resource-id") or "").endswith("btnRoot"):
+            continue
+        name, sel = "", False
+        for d in row.iter("node"):
+            rid = (d.get("resource-id") or "").split("/")[-1]
+            if rid == "tvCardName":
+                name = d.get("text", "")
+            elif rid == "ivCheckcardRegi":
+                sel = True
+        m = _re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", row.get("bounds", ""))
+        if name and m:
+            x1, y1, x2, y2 = map(int, m.groups())
+            out.append({"name": name, "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2, "selected": sel})
+    return out
+
+
+def _hyundai_select_card(target: str = HYUNDAI_TARGET_CARD, tries: int = 3) -> dict:
+    """목표 카드 선택 + dump 재확인. **검증 실패면 ok=False** → 호출부가 결제를 중단한다
+    (딴 카드로 결제되는 것보다 안 되는 게 낫다)."""
+    for _ in range(tries):
+        cards = _hyundai_cards()
+        if not cards:
+            time.sleep(1.5)
+            continue
+        hit = next((c for c in cards if target in c["name"]), None)
+        if not hit:
+            return {"ok": False, "err": f"'{target}' 없음 (목록={[c['name'] for c in cards]})"}
+        if hit["selected"]:
+            print(f"   [카드] '{hit['name']}' 선택 확인", flush=True)
+            return {"ok": True, "card": hit["name"]}
+        print(f"   [카드] '{hit['name']}' 탭 @({hit['cx']},{hit['cy']})", flush=True)
+        _adb().tap(hit["cx"], hit["cy"])
+        time.sleep(1.5)
+    now = next((c["name"] for c in _hyundai_cards() if c["selected"]), None)
+    return {"ok": False, "err": f"카드 선택 검증 실패 — 현재 선택={now!r}"}
+
+
 def _dump_find(nodes: list[dict], key: str, cls: str = "") -> dict | None:
     """nodes 에서 text/desc 에 key 포함(+선택 class 필터) 첫 노드."""
     for n in nodes:
@@ -165,7 +226,9 @@ def reset_lotte_app() -> None:
 
 
 # 비번변경 캠페인 흰버튼(좌) — ⚠️ 검정 '지금 변경하기'(우) 절대 금지
-POPUP_DISMISS = ("30일간 보이지 않기", "나중에 할게요", "오늘 하루", "보지 않기", "다음에", "닫기")
+# ★'오늘 그만 보기' 추가 (2026-08-05): 실제 광고 버튼 문구가 이것인데 목록에 없어서 매번 '닫기'로만
+#   닫혔다 → 계정 전환마다 광고가 다시 떴다. '닫기'보다 앞에 둬야 우선 매칭된다(첫 매칭 승).
+POPUP_DISMISS = ("30일간 보이지 않기", "나중에 할게요", "오늘 그만 보기", "오늘 하루", "보지 않기", "다음에", "닫기")
 POPUP_BLOCK = ("지금 변경하기",)
 
 
@@ -985,7 +1048,16 @@ def pay_lotte_hyundai() -> dict:
     out["step"] = "hyundai_app"
     if not _wait_app("com.hyundaicard.appcard", timeout=15):
         out["err"] = "현대카드 앱 미진입"; return out
-    time.sleep(2.0)
+    # ★카드 목록 렌더 대기 — LoadingForPayActivity 에서 오래 비어 있는다(2026-08-05 #1·#15·#16 실패:
+    #   진입 직후 12초만 기다려 '결제 비밀번호 인증' 을 못 찾고 죽었다). 목록이 뜰 때까지 최대 30초.
+    end = time.time() + 30
+    while time.time() < end and not _hyundai_cards():
+        time.sleep(1.0)
+    # ★목표 카드 선택 (앱 기본값은 딴 카드다 — 실측: The CJ-M Edition2 가 선택돼 있었다)
+    sel = _hyundai_select_card()
+    if not sel.get("ok"):
+        out["err"] = f"카드선택 실패: {sel.get('err')}"; return out
+    out["card_selected"] = sel["card"]
     fr = FlowRunner(use_camera=False)
     try:
         fr.run_action({"action": "tap_dump_text", "text": "결제 비밀번호 인증", "timeout_sec": 12})
