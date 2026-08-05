@@ -46,7 +46,9 @@ LOGIN_URL = "https://www.hmall.com/mo/cob/loginForm"
 CART_URL = "https://www.hmall.com/mo/odb/basktList"
 ITEM_URL_FMT = "https://www.hmall.com/md/pda/itemPtc?slitmCd={slitmCd}{extra}"
 
-ACCOUNT_DELAY_SEC = 420  # 7분 — 본사 주소/IP 추적 회피 (같은 계정 product 사이 + 계정 사이 둘 다 적용)
+# ★7분 대기는 **결제(buy)** 용이다. 이 파일은 담기 전용이라 계정 간 대기가 필요 없다
+#   (사용자 지시 2026-08-05: "buy 에는 7분인데 담는거엔 필요없어"). 14계정 × 7분 = 91분 헛대기였다.
+ACCOUNT_DELAY_SEC = 420  # 7분 — 결제 경로 전용. 본사 주소/IP 추적 회피.
 CDP_PORT = os.environ.get("CDP_PORT", "9222")
 CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
 
@@ -55,8 +57,10 @@ CDP_ENDPOINT = f"http://127.0.0.1:{CDP_PORT}"
 # CART_ONLY: 계정별로 plan 의 모든 상품을 장바구니에 누적 담기만 하고 checkout/결제는 안 함.
 # (쿠폰 받기는 add_to_cart 안에서 '있으면 무조건' 수행 — 우수식품 규칙, auto_coupon 게이팅 제거됨)
 # 계정당 clear_cart 1회 후 전 상품 add → 재시도 시에도 중복 없이 plan 그대로 재구성.
-CART_ONLY = os.environ.get("CART_ONLY", "false").lower() == "true"
-CART_ONLY_DELAY_SEC = int(os.environ.get("CART_ONLY_DELAY_SEC", "20"))  # cart-only 계정 간 대기(결제 없어 추적위험 낮음)
+# ★이 파일은 담기 전용(결제 코드는 폐기됨) → CART_ONLY 기본 true, 계정 간 대기 0.
+#   담기는 돈이 안 나가서 추적 위험이 없다(사용자 지시 2026-08-05).
+CART_ONLY = os.environ.get("CART_ONLY", "true").lower() == "true"
+CART_ONLY_DELAY_SEC = int(os.environ.get("CART_ONLY_DELAY_SEC", "0"))  # 담기 = 대기 불필요
 
 # 캐러셀 <img alt="cardCdXX"> → 내부 brand 코드
 CARD_CD_TO_BRAND = {

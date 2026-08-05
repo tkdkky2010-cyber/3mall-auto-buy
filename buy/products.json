@@ -8,9 +8,16 @@
     "auto_coupon": "[DEPRECATED/미사용] 쿠폰은 우수식품 규칙상 '있으면 무조건 받기' 라 run.py add_to_cart 가 플래그 무관하게 항상 click_coupon_receive 호출. (이전 주석 '하루견과 직접 받으므로 false' = 오류, 사용자는 수동으로 안 받음)"
   },
   "1": {
-    "name": "이너플로라 (유한건강생활 3박스)",
+    "name": "이너플로라 유산균 60정 (유한건강생활 3박스)",
     "slitmCd": "2154750833",
     "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "1-1": {
+    "name": "이너플로라 유산균 30정",
+    "slitmCd": "2201017629",
+    "url_extra": "&sectId=3060687",
     "option_index": 1,
     "auto_coupon": true
   },
@@ -42,11 +49,32 @@
     "option_index": 2,
     "auto_coupon": true
   },
+  "7": {
+    "name": "락토핏",
+    "slitmCd": "2151878435",
+    "url_extra": "",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "8": {
+    "name": "이디야 디카페인",
+    "slitmCd": "2244409628",
+    "url_extra": "&sectId=3059445",
+    "option_index": 1,
+    "auto_coupon": true
+  },
   "9": {
     "name": "이디야 카페인",
     "slitmCd": "2246603712",
     "url_extra": "&sectId=3059445",
     "option_index": 1,
+    "auto_coupon": true
+  },
+  "9-2": {
+    "name": "이디야 스페셜에디션 아메리카노 (9번 옵션2)",
+    "slitmCd": "2246603712",
+    "url_extra": "&sectId=3059445",
+    "option_index": 2,
     "auto_coupon": true
   },
   "10": {
@@ -162,10 +190,17 @@
     "auto_coupon": true
   },
   "34": {
-    "name": "이디야 스페셜에디션 아메리카노 (9번 옵션2)",
-    "slitmCd": "2246603712",
-    "url_extra": "&sectId=3059445",
-    "option_index": 2,
+    "name": "데이즈온 파라다이스 그레인 버닝 6+3박스 (총 18주분)",
+    "slitmCd": "2250397383",
+    "url_extra": "&sectId=3060687",
+    "option_index": 1,
+    "auto_coupon": true
+  },
+  "35": {
+    "name": "데이즈온 프리바이오틱스 에프오에스 트리플",
+    "slitmCd": "2247305088",
+    "url_extra": "",
+    "option_index": 1,
     "auto_coupon": true
   },
   "36": {
