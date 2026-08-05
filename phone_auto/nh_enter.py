@@ -61,6 +61,54 @@ def _keypad_up() -> bool:
     return B.screen_has("가상키패드")
 
 
+def _nh_field_len(substr: str = "cardno") -> dict[int, int] | None:
+    """NH 카드번호 4칸 각각에 **실제로 들어간 글자 수** {1:4, 2:4, ...}. 못 읽으면 None(=검증 불가).
+
+    ★왜 필요한가: 공용 `card_digits_on_screen()` 은 `1234-****-****-5678` 같은 **한 덩어리 마스킹
+      필드**를 찾는다(`[\\d*\\-]{8,}` + '-'/'*' 포함). NH 는 **4칸이 따로 떨어져** 있고 채워진 표시가
+      `•` 라 정규식이 절대 안 맞아 **항상 0** 을 반환한다 → 오늘(8/5) 매번 '자릿수 0' 이 찍혔다.
+      즉 2026-08-02 에 넣은 '탭 씹힘' 가드가 NH 에선 무방비였다.
+      7/31 실측: ADB `input tap` 이 NH 보안키패드에서 **간헐적으로 씹힌다**(4탭→2개 인식).
+      틀린 자릿수로 진행하면 카드사 입력오류가 쌓이고 3회면 카드가 잠긴다 → 반드시 칸별로 검증한다.
+
+    dump 의 EditText `text` 를 우선 보고, 비어 보이면 `content-desc` 로 폴백한다."""
+    import re as _re
+    import xml.etree.ElementTree as ET
+    p = "/tmp/_nh_fieldlen.xml"
+    try:
+        B._adb().dump_ui(p)
+        root = ET.parse(p).getroot()
+    except Exception:
+        return None
+    out: dict[int, int] = {}
+    for n in root.iter():
+        if "EditText" not in n.attrib.get("class", ""):
+            continue
+        m = _re.search(rf"{substr}(\d)", n.attrib.get("resource-id", ""))
+        if not m:
+            continue
+        val = (n.attrib.get("text") or "").strip() or (n.attrib.get("content-desc") or "").strip()
+        out[int(m.group(1))] = len(val)
+    return out or None
+
+
+def _verify_box(n: int, expect: int = 4) -> bool:
+    """n번째 칸이 expect 자리로 채워졌는지. 검증 불가면 True(진행)하되 **경고를 남긴다** —
+    조용히 넘어가면 8/5 처럼 '검증한 줄 알았는데 안 한' 상태가 된다."""
+    st = _nh_field_len()
+    if st is None or n not in st:
+        print(f"  [verify] ⚠️ {n}칸 자릿수 판독 불가 — 검증 없이 진행(화면 직접 확인 권장)")
+        return True
+    got = st[n]
+    if got == expect:
+        print(f"  [verify] ✓ {n}칸 {got}자리")
+        return True
+    print(f"  [verify] ✗ {n}칸 {got}자리 (기대 {expect}) — **탭 씹힘 의심. 중단한다.**\n"
+          f"           '모두지움' 후 그 칸부터 다시 판독·입력할 것 "
+          f"(틀린 채 진행하면 카드사 입력오류 누적 → 3회에 카드 잠김)")
+    return False
+
+
 def _tap_box(n: int, force: bool = False) -> None:
     """카드번호 n번째 칸 탭. box1 입력 후 레이아웃이 아래로 이동하므로 매번 fresh 재검출.
 
@@ -101,8 +149,8 @@ def main() -> int:
         subprocess.run(["adb", "shell", "input", "text", sec["card_no"][:4]],
                        capture_output=True)
         time.sleep(1.5)
-        print(f"[box1] IME 입력 완료 — 화면 자릿수 {B.card_digits_on_screen()}")
-        return 0
+        print("[box1] IME 입력 완료")
+        return 0 if _verify_box(1) else 1
 
     if cmd == "confirm":
         ok = B.ocr_tap("확인", contains=True, retries=4)
@@ -117,15 +165,20 @@ def main() -> int:
             print("[ERR] 사용: python3 -m phone_auto.nh_enter finish <계정번호> [상품키워드...]")
             return 1
         idx, kws = int(args[1]), args[2:]
+        import re as _re
         its = B._ocr_texts(B.cap())
         txt = " ".join(i["text"] for i in its)
-        m = __import__("re").search(r"주문번호\s*[:：]?\s*(\d{8,})", txt) or \
-            __import__("re").search(r"\b(2026\d{9,})\b", txt)
+        m = _re.search(r"주문번호\s*[:：]?\s*(\d{8,})", txt) or _re.search(r"\b(2026\d{9,})\b", txt)
         order_no = m.group(1) if m else None
-        if not order_no:
-            print("[finish] ⚠️ 주문번호 미판독 — 주문완료 화면인지 확인할 것 (대장은 order_no 없이 기록)")
-        else:
-            print(f"[finish] 주문번호 {order_no}")
+        # ★주문완료 화면인지 **먼저** 확인 — 결제가 안 됐는데 대장·적립을 기록하면
+        #   있지도 않은 구매가 장부에 남는다(더 나쁜 오류). 확인 안 되면 아무것도 하지 않는다.
+        completed = bool(order_no) or ("주문이" in txt and "완료" in txt) or "주문 완료" in txt
+        if not completed:
+            print("[finish] ✗ 주문완료 화면이 아니다 (주문번호·완료문구 없음) — "
+                  "대장/적립 **기록하지 않고 중단**.\n"
+                  "         결제가 실제로 끝났는지 화면을 확인하고, 끝났으면 그 화면에서 다시 실행할 것.")
+            return 1
+        print(f"[finish] 주문완료 확인 — 주문번호 {order_no or '(미판독)'}")
 
         accounts = json.loads(B.hw.ACCOUNTS_FILE.read_text(encoding="utf-8"))["accounts"]
         acct_id = accounts[idx - 1].get("id")
@@ -186,9 +239,13 @@ def main() -> int:
     # ⚠️ 값 자체는 절대 출력하지 않는다 (자릿수만).
     print(f"[{cmd}] {'✓' if r.get('ok') else '✗'} {r.get('digits', 0)}자리"
           f"{'' if r.get('ok') else ' — ' + str(r.get('err'))}")
+    if not r.get("ok"):
+        return 1
+    # ★탭 씹힘 검증 — 여기서 안 잡으면 틀린 번호로 '확인'까지 가서 카드사 입력오류가 쌓인다.
     if cmd.startswith("box"):
-        print(f"  화면 누적 자릿수 {B.card_digits_on_screen()}")
-    return 0 if r.get("ok") else 1
+        time.sleep(0.6)
+        return 0 if _verify_box(int(cmd[-1])) else 1
+    return 0
 
 
 if __name__ == "__main__":
