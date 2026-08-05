@@ -526,6 +526,14 @@ def use_all_points() -> dict:
         btns.sort(key=lambda it: it["cy"])
         _adb().tap(btns[0]["cx"], btns[0]["cy"]); time.sleep(1.2)
         out["used"] += 1
+        # ★잔액 0 계정 — '사용할 수 있는 보유금액이 없습니다' 알럿이 떠서 화면을 덮는다.
+        #   안 닫으면 다음 루프의 OCR 에 '전액사용' 이 안 보여 조용히 break 하고, 알럿이 남은 채로
+        #   진행돼 **청구할인 배너를 못 읽어 CARD_FAIL** 이 된다 (2026-08-05 #19 ybkim9960 적립금 0원,
+        #   2회 재현). 적립금 있는 계정은 알럿이 안 떠서 여태 안 걸렸다.
+        if screen_has("보유금액"):
+            ocr_tap("확인", retries=2)
+            out["alert"] = out.get("alert", 0) + 1
+            time.sleep(0.8)
     out["ok"] = True
     return out
 
@@ -1029,6 +1037,12 @@ def pay_lotte_hyundai() -> dict:
     if not pin6:
         return {"err": "card_secrets['현대'].pin6 없음"}
     out = {"step": "order_sheet", "card": "현대"}
+    # ★이전 세션이 남은 현대카드 앱이 새 결제를 막는다 — LoadingForPayActivity 에서 카드목록이
+    #   영영 안 뜨고 30초를 넘긴다(2026-08-05 #1·#15·#16 실패). 사용자가 앱을 직접 닫자 정상 동작한
+    #   것이 유일한 단서 → 결제 진입 전에 항상 깨끗한 상태로 만든다. (롯데앱 reset 과 같은 패턴)
+    subprocess.run([hw.ADB, "-s", hw._serial(), "shell", "am", "force-stop",
+                    "com.hyundaicard.appcard"], capture_output=True)
+    time.sleep(1.0)
     if screen_has("다음에도") or screen_has("사용할까요"):
         ocr_tap("사용할게요", contains=True, retries=2)
     # 1) (원)결제하기 — 하단 'NNN원 결제하기'
