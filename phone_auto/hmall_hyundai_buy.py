@@ -79,6 +79,52 @@ def _ledger_append(idx: int, acct_id: str | None, profile_key: str | None) -> No
         BP_LEDGER.write_text(json.dumps(led, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception as e:
         print(f"   [ledger] 기록 실패(무시): {e}", flush=True)
+
+
+# ──────── 결제 전 preflight — 오늘자 데이터 확인 (3사 공용) ────────
+TODAY_JSON = ROOT / "cart" / "today.json"
+TODAY_CARTS = ROOT / "cart" / "today_carts.json"
+
+
+def preflight_today_files() -> bool:
+    """★결제 시작 전 `cart/today.json` · `cart/today_carts.json` 이 **오늘자인지** 확인.
+    stale 이면 False → 호출측이 결제를 **중단**한다.
+
+    왜 하드스톱인가 (2026-08-05 실측 사고):
+      `today_carts.json` 이 7/30 자였는데 **아무 에러 없이** 결제가 다 돌았다. 그 결과
+        · 구매대장 기록 0건 — record_food 가 계정을 못 찾아 빈 루프로 조용히 통과
+        · H.Point 적립 0건 — 적립 대상 상품/prmo 를 못 찾음
+      둘 다 '조용히' 실패해서 사후에야 발견했다(12계정). 금액도 옛 단가로 기록될 수 있다.
+      → 조용한 오작동보다 **시끄러운 정지**가 낫다.
+
+    stale 이면 step1/step2 를 다시 돌려 갱신할 것. 정말 의도한 경우에만
+    `ALLOW_STALE_CART=1` 로 우회(로그에 크게 남는다)."""
+    today = time.strftime("%Y-%m-%d")
+    bad = []
+    for p in (TODAY_JSON, TODAY_CARTS):
+        try:
+            d = json.loads(p.read_text(encoding="utf-8")).get("date")
+        except Exception as e:
+            bad.append(f"{p.name}: 읽기 실패({e})")
+            continue
+        if d != today:
+            bad.append(f"{p.name}: {d} (오늘 {today})")
+    if not bad:
+        print(f"[preflight] ✓ 오늘자 데이터 확인 ({today})", flush=True)
+        return True
+    print(f"\n{'='*54}\n[preflight] ✗ 오늘자가 아닌 데이터로 결제하려 함:", flush=True)
+    for b in bad:
+        print(f"    - {b}", flush=True)
+    if os.environ.get("ALLOW_STALE_CART") == "1":
+        print("[preflight] ⚠️⚠️ ALLOW_STALE_CART=1 — stale 인 걸 알면서 진행한다.\n"
+              "            구매대장/적립이 조용히 누락될 수 있으니 결제 후 반드시 수동 확인할 것.",
+              flush=True)
+        return True
+    print("[preflight] → 결제 중단. step1/step2 로 갱신 후 다시 실행할 것.\n"
+          f"            (의도한 경우에만 ALLOW_STALE_CART=1)\n{'='*54}", flush=True)
+    return False
+
+
 LOTTE_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "lotte_card.json"   # 검증된 롯데 결제흐름(5/29)
 KB_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "kb_kbpay.json"        # KB 결제흐름(DRAFT, 라이브검증중)
 HANA_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "hana_card.json"     # 하나 결제흐름(5/29 nFilter검증, flow[16:]=하나앱)
@@ -2121,6 +2167,8 @@ def main() -> int:
     only_kw = next(([s for s in a.split("=", 1)[1].split(",") if s]
                     for a in args if a.startswith("only=")), None)
     plan = only or PLAN
+    if not preflight_today_files():      # ★stale 데이터로 결제 금지 (대장/적립 조용한 누락 방지)
+        return 1
     print(f"[serial] {hw._serial()}  plan={plan}  card={card_override or '당일 자동감지'}"
           f"{'  only=' + ','.join(only_kw) if only_kw else ''}", flush=True)
     summary = []

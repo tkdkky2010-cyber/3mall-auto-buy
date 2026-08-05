@@ -269,6 +269,16 @@ def main() -> int:
         apply_reward({"account": acct, "items": items})
         return 0
 
+    # ★결제 전 preflight — today.json/today_carts.json 이 오늘자가 아니면 중단.
+    #   (stale 이면 구매대장·적립이 **둘 다 조용히** 누락된다 — 2026-08-05 실측. 정본은
+    #    phone_auto.hmall_hyundai_buy.preflight_today_files, 3사 공용.)
+    #   status/reward 는 결제가 아니므로 통과시킨다.
+    if not (args and args[0] in ("status", "reward")):
+        sys.path.insert(0, str(ROOT))
+        from phone_auto.hmall_hyundai_buy import preflight_today_files
+        if not preflight_today_files():
+            return 1
+
     # 몰+계정 명시 결제
     if args and args[0] in MALL:
         if len(args) < 2 or not args[1].isdigit():

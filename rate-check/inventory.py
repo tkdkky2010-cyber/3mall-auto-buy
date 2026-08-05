@@ -220,25 +220,38 @@ def append_combo_rows(ws, today_combos: dict[int, dict[str, int]],
     return rng
 
 
-def append_map_in_labels(map_ws, in_ws, suffix: str) -> tuple[str, str]:
+def append_map_in_labels(map_ws, in_ws, suffix: str, date_label: str | None = None) -> tuple[str, str]:
     """MAP·IN 시트 A열에 1{suffix}~N{suffix} 라벨 추가 (N = len(C.COMBOS)).
 
     각 시트의 A열 마지막 사용 행 다음부터 N행 추가.
     MAP은 A열만, IN은 A+B열 (B는 조합명).
+
+    ★IN A열에는 **버전이 바뀐 날짜**를 라벨 뒤에 붙인다 — 예 `1d 8/7` (사용자 지정 2026-08-06).
+      샘플/추가증정이 바뀌어 새 버전(c→d)을 딸 때, 그게 **며칠부터인지** 시트만 봐도 알게 하려는 것.
+      전 조합(1~N)에 동일하게 붙인다(사용자: "모든 조합번호 뒤에 넣어도 상관없음").
+
+      안전한 이유(2026-08-06 실측 확인):
+        · 재고현황 수식은 `SUMPRODUCT(INDEX(MAP!$B$2:$BC$301,…), INDEX(IN!$C$2:$CZ$301,…))` 로
+          **행 위치를 맞춰** 계산한다. **A열 라벨을 참조하는 수식은 0건**이라 라벨을 바꿔도 안 깨진다.
+        · 반대로 C열 이후에 열을 끼우면 `C:CZ` 범위가 밀려 깨진다 → 날짜는 **A열 뒤**가 제일 안전하다.
+      ⚠️ **MAP A열엔 붙이지 않는다.** `find_active_version` 이 `^\\d+[a-z]$` 로 정확매칭해
+         활성 버전을 찾기 때문에, 뒤에 뭐가 붙으면 버전 판별이 깨진다.
     """
     n = len(C.COMBOS)
-    # MAP
+    # MAP — 라벨만 (날짜 금지, 위 주석 참조)
     map_a = [r[0] if r else "" for r in map_ws.get_all_values()]
     map_start = find_last_data_row([[v] for v in map_a]) + 1
     map_grid = [[f"{idx}{suffix}"] for idx in range(1, n + 1)]
     map_rng = f"A{map_start}:A{map_start + n - 1}"
     map_ws.update(values=map_grid, range_name=map_rng, value_input_option="USER_ENTERED")
 
-    # IN
+    # IN — 라벨 + 변경일
+    if date_label is None:
+        date_label = f"{datetime.now().month}/{datetime.now().day}"
     in_rows = in_ws.get_all_values()
     in_a = [r[0] if r else "" for r in in_rows]
     in_start = find_last_data_row([[v] for v in in_a]) + 1
-    in_grid = [[f"{idx}{suffix}", combo_label(idx)] for idx in range(1, n + 1)]
+    in_grid = [[f"{idx}{suffix} {date_label}", combo_label(idx)] for idx in range(1, n + 1)]
     in_rng = f"A{in_start}:B{in_start + n - 1}"
     in_ws.update(values=in_grid, range_name=in_rng, value_input_option="USER_ENTERED")
 
@@ -254,6 +267,9 @@ def main(argv=None):
                    help="차이 발견 시 새 버전 자동 추가 (디폴트: dry-run)")
     p.add_argument("--gwp-sets", type=int, default=4,
                    help="조합당 GWP 세트 수 (2026-07-28~ 기본 4, 400K~700K 조합이면 2)")
+    p.add_argument("--date", default=None,
+                   help="IN 시트 조합번호 뒤에 붙일 변경일 (예: 8/7). 미지정=오늘. "
+                        "하루 늦게 돌릴 때 실제 변경일로 맞추는 용도")
     args = p.parse_args(argv)
 
     date = datetime.now().strftime("%Y-%m-%d")
@@ -305,9 +321,10 @@ def main(argv=None):
     qty_start = find_last_data_row(qty_rows) + 1
     qty_rng = append_combo_rows(qty_ws, today_combos, new_suf, qty_start)
     print(f"    조합별입고수량: {qty_rng}")
-    map_rng, in_rng = append_map_in_labels(map_ws, in_ws, new_suf)
-    print(f"    MAP: {map_rng}")
-    print(f"    IN:  {in_rng}")
+    date_label = args.date or f"{datetime.now().month}/{datetime.now().day}"
+    map_rng, in_rng = append_map_in_labels(map_ws, in_ws, new_suf, date_label)
+    print(f"    MAP: {map_rng}  (라벨만 — 날짜 금지, find_active_version 매칭)")
+    print(f"    IN:  {in_rng}  → A열 '1{new_suf} {date_label}' … '{len(C.COMBOS)}{new_suf} {date_label}'")
     print(f"  ✓ 새 버전 {new_suf!r} 생성 완료. 오늘부터 IN 시트의 새 버전 행에 구매 입력.")
     return 0
 

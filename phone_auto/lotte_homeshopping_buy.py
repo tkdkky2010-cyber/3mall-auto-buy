@@ -48,7 +48,8 @@ from phone_auto.hmall_hyundai_buy import (
     _card_secrets, _tap_shuffle,        # 삼성 일반결제 공용 헬퍼 (hmall=정본, 양 몰 공용)
     card_digits_on_screen, next_button_enabled,   # 2026-08-02 공통 검증 헬퍼
     pay_samsung as _pay_samsung_shared,  # ★삼성 일반결제 = 3사 공용 정본 (몰별 복제 금지)
-    pay_nh_general,                     # ★NH 일반결제 = 3사 공용 정본 (몰 무관, NH_VISION_MODE 지원)
+    pay_nh_general,                     # ★NH 일반결제 = 3사 공용 정본 (몰 무관, 항상 비전 핸드세이크)
+    preflight_today_files,              # ★결제 전 오늘자 데이터 확인 (3사 공용)
 )
 from phone_auto.flow_runner import _ocr_texts, FlowRunner
 # PATH(bare adb)는 hmall_hyundai_buy import 시 이미 설정됨.
@@ -1404,6 +1405,8 @@ def main() -> int:
             print(f"  ({t['cx']:4d},{t['cy']:4d})  {t['text']}")
         return 0
     idxs = [int(x) for x in a if x.isdigit()]
+    if idxs and not preflight_today_files():   # ★stale 데이터로 결제 금지 (대장/적립 조용한 누락 방지)
+        return 1
     card = next((x for x in a if x in CARD_GRID_NAME), None)   # 당일카드 override (예: 삼성). 미지정=자동감지
     combo_idx = next((int(x.split("=", 1)[1]) for x in a if x.startswith("combo=")), None)  # 구매대장 기록용
     results = []
