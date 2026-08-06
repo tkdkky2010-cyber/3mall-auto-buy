@@ -41,5 +41,11 @@ echo
 echo "═════════ 5/5 카트플랜 (O열) ═════════"
 python3 rate-check/cart_plan.py || { echo "❌ cart_plan 실패 — O열 미입력"; exit 1; }
 
+# 6) 재고관리 시트 '당일 설화수' 탭에 미러 (사용자 지시 2026-08-06 — 날짜탭 신설 없이 덮어쓰기).
+#    기존 출력(공급률 시트 M.D 탭)은 그대로 두고 한 벌 더 남기는 것 → 실패해도 step1 은 성공 처리.
+echo
+echo "═════════ 6/6 당일 설화수 미러 ═════════"
+python3 rate-check/mirror_daily.py sulwhasoo || echo "⚠️ 미러 실패 — 원본(M.D 탭)은 정상. 수동: python3 rate-check/mirror_daily.py sulwhasoo"
+
 echo
 echo "✅ Step 1 완료 — 3사 공급률 + 재고관리(n버전) + 카트플랜(O열) 모두 입력됨 — $(date '+%H:%M:%S')"
