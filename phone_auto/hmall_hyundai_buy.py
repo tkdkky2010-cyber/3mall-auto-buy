@@ -1569,6 +1569,21 @@ def pay_nh_general() -> dict:
     return out
 
 
+def _row_amt_of(it: dict, amt_rows: list[dict]) -> int | None:
+    """카드명 아이템 `it` 이 속한 **카드 박스의 금액**. 없으면 None(=금액 없는 배너 행 → 제외).
+    박스 규칙은 종전 same_row 판정 그대로: 같은 아이템 안 / 같은 행 ±40px / 바로 아래 220px·같은 열."""
+    m = re.search(r"(\d{1,3}(?:,\d{3})+)", it["text"])
+    if m:
+        return int(m.group(1).replace(",", ""))
+    same = [a for a in amt_rows if abs(a["cy"] - it["cy"]) < 40] or \
+           [a for a in amt_rows if 0 < a["cy"] - it["cy"] < 220 and abs(a["cx"] - it["cx"]) < 350]
+    for a in sorted(same, key=lambda a: abs(a["cy"] - it["cy"])):
+        m = re.search(r"(\d{1,3}(?:,\d{3})+)", a["text"])
+        if m:
+            return int(m.group(1).replace(",", ""))
+    return None
+
+
 def detect_card() -> str | None:
     """주문서에서 '카드할인' 섹션까지 **스크롤하며** 금액행 카드사 토큰 추출 ('현대 5% 즉시할인'→'현대').
     구매하기 직후 주문서 상단엔 상품정보뿐 → 카드할인은 아래라 스크롤 필수(#4 실측). 없으면 None."""
@@ -1596,20 +1611,32 @@ def detect_card() -> str | None:
             #    '현대' 오감지 → 당일카드가 롯데인데 현대로 진행하는 사고(#17 2026-06-05 오진 원인 후보).
             amt_rows = [it for it in region
                         if re.search(r"[\d,]{4,}\s*원", it["text"]) and "결제하기" not in it["text"]]
+            cands: list[tuple[int, str]] = []          # (그 카드로 결제 시 금액, 카드키)
             for it in sorted(region, key=lambda x: x["cy"]):
                 # ★2열 그리드 레이아웃(2026-07-30 실측): 카드명('KB국민' cy1711)과 금액('77,631원' cy1845)이
                 #   같은 카드 박스 안에서 위/아래로 ~135px 떨어져 ±40px 동일행 매칭이 전부 실패 → DETECT_CARD_FAIL.
                 #   → 카드명 **아래** 220px 이내 + 같은 열(cx 350px 이내) 금액도 같은 박스로 인정.
                 #   ('현대카드 Ed2 7% 청구할인' 배너는 금액이 배너 **위**에 있어 이 조건에 안 걸림 = 오감지 방지 유지)
-                same_row_amt = re.search(r"[\d,]{4,}\s*원", it["text"]) or \
-                    any(abs(a["cy"] - it["cy"]) < 40 for a in amt_rows) or \
-                    any(0 < a["cy"] - it["cy"] < 220 and abs(a["cx"] - it["cx"]) < 350 for a in amt_rows)
-                if not same_row_amt:
+                box_amt = _row_amt_of(it, amt_rows)
+                if box_amt is None:
                     continue
                 for alias, key in CARD_ALIASES.items():   # 별칭 매핑(현대 외 변형표기 대비, 현대 오폴백 방지)
                     if alias in it["text"]:
-                        return key
-            return None
+                        cands.append((box_amt, key))
+                        break
+            if not cands:
+                return None
+            # ★★**가장 싼 카드**를 고른다 (사용자 지시 2026-08-06 "가장 할인율 높은 카드를 선택해야지").
+            #   종전엔 `sorted(cy)` 의 첫 매칭 = **화면 맨 위** 카드였다. 그런데 캐러셀은 2열 그리드라
+            #   좌/우 칸의 cy 차이가 6px(OCR 흔들림 수준)밖에 안 난다 → 어느 카드가 뽑히는지가 사실상 무작위.
+            #   8/6 실측: #10 은 현대(97,052) / #11 은 삼성(92,069) 로 갈렸고, 같은 상품인데 계정마다
+            #   다른 카드로 결제됐다. **싼 쪽을 놓치면 그만큼 손해**다.
+            best = min(cands, key=lambda c: c[0])
+            if len(cands) > 1:
+                s = " / ".join(f"{k} {a:,}" for a, k in sorted(cands))
+                print(f"   [detect_card] 후보 {len(cands)}개 — {s} → **최저 {best[1]} {best[0]:,}원** 선택",
+                      flush=True)
+            return best[1]
         _adb().swipe(540, 1700, 540, 800, 400); time.sleep(0.8)   # 카드할인 보이게 스크롤 다운
     return None
 
