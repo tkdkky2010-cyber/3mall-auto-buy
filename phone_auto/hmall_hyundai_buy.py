@@ -864,20 +864,47 @@ ORDER_DONE_MARKERS = ("주문이 완료", "주문번호", "재인증")          
 ORDER_FAIL_MARKERS = ("승인 요청 실패", "한도초과", "승인 실패", "결제 실패", "실패하였습니다")  # KCP/카드 거절
 
 
-def wait_order_complete(timeout: float = 20) -> dict:
-    """결제 직후 hmall orderComplete 렌더를 폴링 (전 카드 공통). 두 목적:
+def scan_order_no(txt: str) -> str | None:
+    """주문완료 화면 텍스트에서 주문번호. hmall 형식 = `YYYYMMDD` + 6자리 = 14자리(20260805138960).
+    라벨이 안 잡히는 프레임도 있어 **번호 단독 패턴**도 같이 본다."""
+    m = re.search(r"주문번호\s*[:：]?\s*(\d{10,})", txt) or re.search(r"\b(20\d{12})\b", txt)
+    if m:
+        return m.group(1)
+    # OCR 이 `20260805 138960` 처럼 두 덩어리로 끊어 읽는 프레임 대비 — 공백 1개만 허용해 이어붙인다.
+    # (전체 공백 제거는 금지: 관계없는 숫자들이 붙어 가짜 14자리가 생긴다.)
+    m = re.search(r"\b(20\d{6})\s(\d{6})\b", txt)
+    return m.group(1) + m.group(2) if m else None
+
+
+def wait_order_complete(timeout: float = 20, order_grace: float = 3.0) -> dict:
+    """결제 직후 hmall orderComplete 렌더를 폴링 (전 카드 공통). 세 목적:
       ① 주문완료 마커 확인 → beauty가 너무 일찍 돌아 '재인증' 못 찾는 타이밍버그 해결(KB #1 실측).
       ② 거절 마커 감지 → 'hmall 복귀=성공' 오보고 방지(BC 한도초과 CC61 실측).
-    완료=ok:True, 거절=ok:False+reason, 타임아웃=ok:False."""
+      ③ **주문번호 판독** — 2026-08-06 신설.
+    완료=ok:True(+order), 거절=ok:False+reason, 타임아웃=ok:False.
+
+    ★③ 을 왜 여기서 하나: 종전엔 `pay.get("order")` 로 대장에 넣었는데 **현대/KB/BC/삼성 경로의
+      `pay_*` 는 "order" 를 아예 안 채운다**(NH 만 nh_enter finish 에서 따로 읽었다). 그래서 8/5 KB 9건,
+      8/6 현대 8건이 전부 `주문 -` 로 기록됐다. 주문완료 화면을 이미 OCR 하는 이 함수가 제자리다.
+    ★`order_grace`: 마커가 뜬 뒤에도 번호가 **지연 렌더**될 수 있다(롯데 `_poll_order_complete` 가
+      같은 이유로 번호 잡힐 때까지 재OCR — 2026-06-08/06-22 번호 None 사고). 다만 hmall 주문완료는
+      곧 home 으로 자동이동하고 뷰티 재인증이 뒤에 있어 **무한정 기다리면 안 된다** → 짧게 3초만.
+    """
     end = time.time() + timeout
     while time.time() < end:
         txt = " ".join(it["text"] for it in _ocr_texts(cap()))
         for fm in ORDER_FAIL_MARKERS:
             if fm in txt:
                 return {"ok": False, "reason": f"결제거절:{fm}"}
-        for dm in ORDER_DONE_MARKERS:
-            if dm in txt:
-                return {"ok": True, "reason": dm}
+        dm = next((d for d in ORDER_DONE_MARKERS if d in txt), None)
+        if dm:
+            order = scan_order_no(txt)
+            g_end = time.time() + order_grace
+            while not order and time.time() < g_end:      # 번호만 늦게 뜨는 프레임 대비 (짧게)
+                time.sleep(0.6)
+                order = scan_order_no(" ".join(it["text"] for it in _ocr_texts(cap())))
+            print(f"   [order] {order or '✗판독실패 — 대장에 주문번호 없이 기록된다'}", flush=True)
+            return {"ok": True, "reason": dm, "order": order}
         time.sleep(0.8)
     return {"ok": False, "reason": "주문완료 미확인(timeout — 거절/지연 가능)"}
 
@@ -1997,7 +2024,14 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
     # combo=NN 지정(설화수) → 조합가 기록 / 미지정(식품) → cart/today_carts.json 상품·수량으로 기록
     try:
         import purchase_ledger as PL
-        order_no = (res.get("pay") or {}).get("order")
+        # ★출처 3단: pay(NH 등 자체 판독) → wait_order_complete(신설, 전 카드 공통) → 지금 화면 재판독.
+        #   마지막 폴백이 있는 이유: 뷰티 재인증/팝업을 닫는 사이 번호가 뒤늦게 렌더되는 프레임이 있다.
+        order_no = ((res.get("pay") or {}).get("order")
+                    or (res.get("order_complete") or {}).get("order")
+                    or scan_order_no(" ".join(it["text"] for it in _ocr_texts(cap()))))
+        if not order_no:
+            print("   [order] ⚠️ 주문번호 미판독 — 대장에 빈칸으로 들어간다(결제는 정상). "
+                  "필요하면 Hmall 주문내역에서 확인할 것", flush=True)
         if combo_idx is not None:
             PL.record_combo("현대Hmall", res.get("id"), combo_idx,
                             order_no=order_no, card=res.get("card"))
