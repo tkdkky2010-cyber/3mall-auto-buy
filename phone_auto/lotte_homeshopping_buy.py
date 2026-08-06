@@ -1425,7 +1425,30 @@ def main() -> int:
         gt = ("적립✓" if g.get("completed") or g.get("already")
               else (f"적립skip({g.get('skip','')})" if g.get("skip") else f"적립?{g.get('err','')}"))
         print(f"  #{r['idx']} {r.get('id','')}: {r['status']}  [{bt} / {gt}]")
+    _reward_warn(results, combo_idx)
     return 0
+
+
+def _reward_warn(results: list[dict], combo_idx=None) -> None:
+    """★결제됐는데 뷰티/적립이 확인 안 된 계정을 끝에 크게 모아 보여준다(현대몰과 동일 규칙).
+    뷰티포인트는 **주문완료 화면에서만** 되는 now-or-never 라 놓치면 그 건은 복구 불가 —
+    그래서 '지나갔다'는 사실만이라도 반드시 눈에 띄게 남긴다.
+    NH 는 buy_one 이 핸드세이크로 일찍 return 해 대장·뷰티·적립을 전부 안 타므로 별도 안내."""
+    bad = [r for r in results if str(r.get("status", "")).startswith("DONE")
+           and not ((r.get("reward") or {}).get("completed") or (r.get("reward") or {}).get("already")
+                    or (r.get("beauty") or {}).get("completed"))]
+    nh = [r for r in results if str(r.get("status", "")).startswith("NH_HANDOFF")]
+    if not bad and not nh:
+        return
+    c = f" combo={combo_idx}" if combo_idx is not None else ""
+    print(f"\n{'!'*54}\n⚠️ 뷰티/적립 미완 — 확인할 것")
+    for r in bad:
+        print(f"   #{r['idx']} {r.get('id','')} → 뷰티는 주문완료 화면 only(복구 불가). "
+              f"구매사은 적립은 신청기간 내 재진입 가능")
+    for r in nh:
+        print(f"   #{r['idx']} {r.get('id','')} (NH) → 결제 마친 뒤 "
+              f"python3 -m phone_auto.nh_enter finish_lotte {r['idx']}{c}")
+    print("!" * 54)
 
 
 if __name__ == "__main__":

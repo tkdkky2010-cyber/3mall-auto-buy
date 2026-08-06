@@ -2015,11 +2015,11 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
                                order_no=order_no, card=res.get("card"))
     except Exception as e:
         print(f"   [ledger] 기록 실패(무시): {e}", flush=True)
-    apply_reward_now(idx, only)          # ★H.Point 적립신청 (결제 직후 자동)
+    res["reward"] = apply_reward_now(idx, only)   # ★H.Point 적립신청 (결제 직후 자동) — 결과를 요약까지 끌고 간다
     return res
 
 
-def apply_reward_now(idx: int, only: list[str] | None = None) -> None:
+def apply_reward_now(idx: int, only: list[str] | None = None) -> dict:
     """★결제 직후 H.Point 적립신청 — **코드가 자동으로 한다. 사람이 기억할 일이 아니다.**
 
     2026-08-05 사고: 폰 결제(이 모듈)는 `buy.py` 를 안 거치는데 적립은 `buy.py apply_reward` 에만
@@ -2033,18 +2033,26 @@ def apply_reward_now(idx: int, only: list[str] | None = None) -> None:
     """
     if os.environ.get("HMALL_NO_REWARD") == "1":
         print(f"[#{idx}] [적립] HMALL_NO_REWARD=1 — skip", flush=True)
-        return
+        return {"ok": False, "skip": "HMALL_NO_REWARD=1"}
     cmd = [sys.executable, str(ROOT / "buy.py"), "reward", str(idx)] + list(only or [])
     try:
         r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, timeout=600)
-        tail = (r.stdout or "").strip().splitlines()
-        print(f"[#{idx}] [적립] {tail[-1] if tail else 'no-output'}", flush=True)
-        if r.returncode != 0:
-            print(f"[#{idx}] [적립] ⚠️ rc={r.returncode} — 수동 확인 필요 "
-                  f"(python3 buy.py reward {idx})", flush=True)
     except Exception as e:
         print(f"[#{idx}] [적립] ⚠️ 호출 실패(결제는 정상): {e} — "
               f"수동: python3 buy.py reward {idx}", flush=True)
+        return {"ok": False, "err": str(e)}
+    # ★[적립] 줄을 **전부** 남긴다. 종전엔 마지막 한 줄(tail[-1])만 찍어서 prmo 2건 중 1건 결과가
+    #   통째로 사라졌다 — 그래서 '적립을 안 했다'와 '했는데 안 보인다'를 구분할 수 없었다(2026-08-06).
+    lines = [ln for ln in (r.stdout or "").splitlines() if "[적립]" in ln]
+    for ln in lines:
+        print(f"[#{idx}] {ln.strip()}", flush=True)
+    res = next((ln for ln in lines if "RESULT" in ln), "")
+    ok = "ok=True" in res or "적립단계 skip" in " ".join(lines)
+    if not ok:
+        print(f"[#{idx}] [적립] ⚠️ 미완 — 재실행: python3 buy.py reward {idx}"
+              f"{' ' + ' '.join(only) if only else ''}", flush=True)
+    return {"ok": ok, "detail": res.strip() or (lines[-1].strip() if lines else "no-output"),
+            "rc": r.returncode}
 
 
 def _do_beauty(res: dict) -> None:
@@ -2181,8 +2189,38 @@ def main() -> int:
         summary.append(r)
     print(f"\n{'='*54}\nSUMMARY", flush=True)
     for r in summary:
-        print(f"  #{r['idx']:2d} {r.get('id','?'):16s} [{r.get('card','?')}] {r.get('status')}", flush=True)
+        print(f"  #{r['idx']:2d} {r.get('id','?'):16s} [{r.get('card','?')}] {r.get('status')}"
+              f"  {_reward_tag(r)}", flush=True)
+    _reward_warn(summary, only_kw)
     return 0
+
+
+def _reward_tag(r: dict) -> str:
+    """요약 한 줄에 붙일 적립 상태. 결제 안 된 계정은 적립 대상이 아니므로 '-'."""
+    if not str(r.get("status", "")).startswith("DONE"):
+        return "적립-" if not str(r.get("status", "")).startswith("NH_HANDOFF") else "적립⚠️NH미완"
+    rw = r.get("reward") or {}
+    return "적립✓" if rw.get("ok") else f"적립⚠️{rw.get('skip') or rw.get('err') or '미확정'}"
+
+
+def _reward_warn(summary: list[dict], only: list[str] | None = None) -> None:
+    """★결제됐는데 적립이 확인 안 된 계정을 **끝에 크게** 모아 보여준다.
+    2026-08-05 에 12계정 적립이 통째로 누락됐는데 아무 신호가 없었다 → 요약에서 반드시 튀게 한다.
+    NH 는 buy_one 이 핸드세이크로 일찍 return 해 자동 적립을 안 타므로 별도 안내."""
+    bad = [r for r in summary
+           if str(r.get("status", "")).startswith("DONE") and not (r.get("reward") or {}).get("ok")]
+    nh = [r for r in summary if str(r.get("status", "")).startswith("NH_HANDOFF")]
+    if not bad and not nh:
+        print("  [적립] 전 계정 확인 완료 ✓", flush=True)
+        return
+    kw = (" " + " ".join(only)) if only else ""
+    print(f"\n{'!'*54}\n⚠️ 적립 미완 — 아래를 반드시 처리할 것", flush=True)
+    for r in bad:
+        print(f"   #{r['idx']} {r.get('id','?')} → python3 buy.py reward {r['idx']}{kw}", flush=True)
+    for r in nh:
+        print(f"   #{r['idx']} {r.get('id','?')} (NH) → 결제 마친 뒤 "
+              f"python3 -m phone_auto.nh_enter finish {r['idx']}{kw}", flush=True)
+    print("!" * 54, flush=True)
 
 
 if __name__ == "__main__":

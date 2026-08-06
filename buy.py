@@ -146,13 +146,29 @@ def cart_prmos(cart: dict) -> list[str]:
     return out
 
 
-def apply_reward(cart: dict) -> None:
+def _parse_hp(out: str) -> dict:
+    """서브프로세스 출력 → {prmo: 'new'|'already'|'fail'}. 라인 형식 `HP|prmo|success|already|error`."""
+    res = {}
+    for ln in out.splitlines():
+        if not ln.startswith("HP|"):
+            continue
+        _, prmo, succ, already, err = (ln.split("|", 4) + ["", "", "", ""])[:5]
+        res[prmo] = "already" if already == "True" else ("new" if succ == "True" else f"fail:{err}")
+    return res
+
+
+def apply_reward(cart: dict) -> dict:
     """결제 성공 후 H.Point 적립신청 — 그 상품에 10% prmo 있을 때만.
-    쿠폰만 있거나 적립이벤트 없으면(prmo 없음) skip. 결제 성공/실패 판정과 무관(best-effort)."""
+    쿠폰만 있거나 적립이벤트 없으면(prmo 없음) skip. 결제 성공/실패 판정과 무관(best-effort).
+
+    ★반환 = {"prmos": [...], "results": {prmo: 상태}, "ok": bool} — 호출측이 요약에 드러내라.
+    ★2026-08-06 수정: 종전 판정은 `'success': True' in last_out` 처럼 **출력 전체 문자열 검색**이라
+      prmo 2개 중 1개만 성공해도 ✓ 로 끝났다(나머지는 조용히 누락). 이제 **prmo 전건이 확인돼야 ok**.
+      출력도 마지막 140자만 남겨서 어느 prmo 가 됐는지 알 수 없었다 → **건별 한 줄**로 바꿨다."""
     prmos = cart_prmos(cart)
     if not prmos:
         print("  [적립] 10% prmo 없음 (쿠폰만/적립없음) — 적립단계 skip", flush=True)
-        return
+        return {"prmos": [], "results": {}, "ok": True, "skip": "prmo 없음"}
     acct = cart["account"]
     # ★9222 Chrome 창이 전부 닫혀 페이지 타깃 0개면 connect_over_cdp 가
     #   'Browser context management is not supported'로 실패(2026-07-13 실측) → 탭 1개 보장 후 연결.
@@ -177,7 +193,9 @@ def apply_reward(cart: dict) -> None:
         " run._hmall_clean(ctx,page,deep=True)\n"
         " ok=run.login(page,acc['id'],acc['pw']); print('login',ok)\n"
         f" for prmo in {prmos}:\n"
-        "  print('HP', prmo, run.apply_hpoint(page,prmo))\n"
+        # ★건별 파싱용 고정 포맷 — 종전 dict repr 는 부모가 문자열 검색으로만 판정해 절반 누락을 놓쳤다.
+        "  _r=run.apply_hpoint(page,prmo)\n"
+        "  print('HP|%s|%s|%s|%s' % (prmo,_r.get('success'),_r.get('already_done'),_r.get('error')))\n"
     )
     # ★로그인 실패(login False)일 땐 apply_hpoint의 '이미 신청 완료'가 신뢰 불가 —
     #   2026-07-13 실측: login False + already_done=True가 전부 오판이었고, 재로그인 성공 시
@@ -185,22 +203,31 @@ def apply_reward(cart: dict) -> None:
     #   good = login True AND (신규신청 or 이미신청). login False는 미검증으로 취급 → 재시도.
     import time as _t
     last_out = last_err = ""
+    got: dict = {}
     for attempt in range(1, 4):
         try:
             r = subprocess.run([BROWSER_PY, "-c", code], cwd=str(ROOT), capture_output=True, text=True, timeout=180)
             last_out, last_err = r.stdout, r.stderr
         except Exception as e:
             print(f"  [적립] ⚠️ 적립신청 호출 실패(결제는 정상): {e}", flush=True)
-            return
+            return {"prmos": prmos, "results": got, "ok": False, "err": str(e)}
         login_ok = "login True" in last_out
-        reward_ok = ("already_done': True" in last_out) or ("'success': True" in last_out)
-        if login_ok and reward_ok:
-            print(f"  [적립] ✓ prmo={prmos} {last_out.strip()[-140:]}", flush=True)
-            return
+        got = _parse_hp(last_out)
+        # ★전건 확인 — prmo 하나라도 빠지거나 실패하면 미완이다(부분성공을 ✓ 로 치던 게 누락의 원인).
+        done = login_ok and all(got.get(p, "").startswith(("new", "already")) for p in prmos)
+        for p in prmos:      # 건별로 반드시 한 줄씩 남긴다 — 뭐가 됐는지 로그로 확정
+            st = {"new": "신규신청", "already": "이미신청"}.get(got.get(p), got.get(p) or "무응답")
+            print(f"  [적립] prmo={p} → {st}", flush=True)
+        if done:
+            print(f"  [적립] RESULT ok=True {len(prmos)}/{len(prmos)} 계정#{acct}", flush=True)
+            return {"prmos": prmos, "results": got, "ok": True}
         print(f"  [적립] 시도{attempt} 미확정(login_ok={login_ok}) — 재시도", flush=True)
         _t.sleep(4)
     err_tail = " | stderr: " + last_err.strip().splitlines()[-1] if last_err.strip() else ""
-    print(f"  [적립] ⚠️확인필요(3회 실패) prmo={prmos} {last_out.strip()[-140:]}{err_tail}", flush=True)
+    ok_n = sum(1 for p in prmos if got.get(p, "").startswith(("new", "already")))
+    print(f"  [적립] RESULT ok=False {ok_n}/{len(prmos)} 계정#{acct} — ⚠️확인필요(3회 실패) "
+          f"재실행: python3 buy.py reward {acct}{err_tail}", flush=True)
+    return {"prmos": prmos, "results": got, "ok": False}
 
 
 PAYER = {"hmall": pay_hmall, "lotte": pay_lotte, "galleria": pay_galleria}
@@ -219,7 +246,12 @@ def _pay_cart(cart: dict, data: dict) -> bool:
         _save(data)                       # 성공 즉시 기록 (중복결제 방지)
         print(f"  ✓ {LABEL[mall]} #{cart['account']} 결제 완료 (기록 paid:true)", flush=True)
         if mall == "hmall":               # 현대 식품: 10% prmo 있으면 적립신청 (없으면 skip)
-            apply_reward(cart)
+            rw = apply_reward(cart)
+            cart["reward_ok"] = bool(rw.get("ok"))
+            _save(data)                   # 적립 성패도 즉시 기록 — 중단돼도 뭐가 남았는지 남는다
+            if not rw.get("ok"):
+                print(f"  ⚠️ [적립] #{cart['account']} 미완 — "
+                      f"python3 buy.py reward {cart['account']}", flush=True)
     else:
         print(f"  ✗ {LABEL[mall]} #{cart['account']} 결제 실패\n--- log ---\n{log}\n-----------", flush=True)
     return ok
@@ -266,8 +298,9 @@ def main() -> int:
         if not items:
             print(f"[적립] ⚠️ #{acct} 키워드 {kws} 에 맞는 상품 없음 — skip")
             return 1
-        apply_reward({"account": acct, "items": items})
-        return 0
+        # ★rc 를 적립 성패에 연동 — 종전엔 실패해도 항상 0 이라 호출측(apply_reward_now)이
+        #   '성공'으로 착각했다. 미완이면 rc=1 로 시끄럽게 끝낸다.
+        return 0 if apply_reward({"account": acct, "items": items}).get("ok") else 1
 
     # ★결제 전 preflight — today.json/today_carts.json 이 오늘자가 아니면 중단.
     #   (stale 이면 구매대장·적립이 **둘 다 조용히** 누락된다 — 2026-08-05 실측. 정본은
