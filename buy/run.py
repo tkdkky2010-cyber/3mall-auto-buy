@@ -243,48 +243,71 @@ def _dump_login_debug(page: Page, account_id: str, dialogs: list[str]) -> None:
     print(f"      [DBG] alerts={dialogs or '(none)'}")
 
 
-def clear_cart(page: Page) -> None:
-    try:
-        page.goto(CART_URL, wait_until="domcontentloaded")
-        page.wait_for_timeout(1500)
-        body = page.inner_text("body")
-        if "장바구니가 비어" in body or "담긴 상품이 없" in body:
-            print("    [cart] 이미 비어있음")
-            return
+# 개별상품 체크박스 = input[type=checkbox][name=backet] (2026-08-05 §10 DOM 실측).
+# 헤더/그룹 전체선택은 name 이 없어 자연히 제외된다 → 이걸로 세면 **배송 그룹이 몇 개든** 정확하다.
+_JS_CART_ROWS = """() => Array.from(document.querySelectorAll('input[type=checkbox][name=backet]'))
+    .map(cb => { const r = cb.closest('div.pdwrap');
+                 return r ? (r.innerText||'').split('\\n')[0].trim() : ''; })"""
+_JS_SELECT_ALL = """() => {
+    const cbs = Array.from(document.querySelectorAll('input[type=checkbox][name=backet]'));
+    let n = 0;
+    for (const cb of cbs) { if (!cb.checked) { cb.click(); n++; } }   // ★.checked 대입 금지(핸들러 미동작)
+    return [cbs.length, n];
+}"""
 
-        clicked = page.evaluate("""
-            () => {
-                const labels = Array.from(document.querySelectorAll('label.chklabel'));
-                const target = labels.find(l => {
-                    const span = l.querySelector('span');
-                    return span && span.textContent.trim() === '일반상품';
-                });
-                if (!target) return false;
-                const cb = target.querySelector('input[type="checkbox"]');
-                if (cb && !cb.checked) target.click();
-                return true;
-            }
-        """)
-        if not clicked:
-            print("    [cart] 일반상품 체크박스 없음")
-            return
-        page.wait_for_timeout(500)
-        delete_btn = page.locator("button.btn-linelgray").filter(has_text="선택삭제").first
-        if delete_btn.count() == 0:
-            delete_btn = page.locator("button").filter(has_text="선택삭제").first
-        if delete_btn.count() == 0:
-            print("    [cart] 선택삭제 버튼 없음")
-            return
-        delete_btn.click()
-        page.wait_for_timeout(800)
-        for txt in ("예", "확인", "삭제"):
-            confirm = page.locator("button").filter(has_text=txt).first
-            if confirm.count() > 0 and confirm.is_visible():
-                confirm.click()
-                page.wait_for_timeout(400)
-                break
-        page.wait_for_timeout(500)
-        print("    [cart] 비우기 완료")
+
+def cart_rows(page: Page) -> list[str]:
+    """카트에 실제로 담긴 상품명. 개별 체크박스 기준이라 그룹 구조에 안 흔들린다."""
+    try:
+        return [s for s in page.evaluate(_JS_CART_ROWS)]
+    except Exception:
+        return []
+
+
+def clear_cart(page: Page) -> None:
+    """장바구니 비우기 — **비었는지 확인될 때까지** 최대 3회. (사용자 지시: 담기 전 기존 카트 삭제)
+
+    ★2026-08-06 재작성. 종전 3가지 결함으로 **안 지워졌는데 '비우기 완료'** 가 찍혔다:
+      ① '일반상품' 그룹 체크박스 **하나만** 눌렀다 → 배송 그룹이 나뉘면 다른 그룹 상품이 그대로 남는다.
+         (#10 서정희pick 올리브오일 ×2 잔존 — 8/5 이월 판매중단품)
+      ② '일반상품' 라벨이 없으면 **아무것도 안 하고 return** (#12 스키니랩 ×1 잔존).
+      ③ 삭제 후 **검증이 없었다** → 남아도 완료로 보고.
+    → 개별 체크박스(name=backet)를 **전부** 클릭하고, 삭제 후 **0건 확인**될 때까지 재시도한다.
+    """
+    try:
+        for attempt in (1, 2, 3):
+            page.goto(CART_URL, wait_until="domcontentloaded")
+            page.wait_for_timeout(1500)
+            rows = cart_rows(page)
+            if not rows:
+                body = page.inner_text("body")
+                if attempt == 1 and ("장바구니가 비어" in body or "담긴 상품이 없" in body):
+                    print("    [cart] 이미 비어있음")
+                else:
+                    print(f"    [cart] 비우기 완료 (검증 0건)")
+                return
+            total, newly = page.evaluate(_JS_SELECT_ALL)
+            page.wait_for_timeout(600)
+            delete_btn = page.locator("button.btn-linelgray").filter(has_text="선택삭제").first
+            if delete_btn.count() == 0:
+                delete_btn = page.locator("button").filter(has_text="선택삭제").first
+            if delete_btn.count() == 0:
+                print(f"    [cart] ⚠️ 선택삭제 버튼 없음 — 잔여 {len(rows)}건 {rows}")
+                return
+            delete_btn.click()
+            page.wait_for_timeout(900)
+            for txt in ("예", "확인", "삭제"):
+                confirm = page.locator("button").filter(has_text=txt).first
+                if confirm.count() > 0 and confirm.is_visible():
+                    confirm.click()
+                    page.wait_for_timeout(500)
+                    break
+            print(f"    [cart] 삭제 시도{attempt} — 선택 {newly}/{total}건")
+        left = cart_rows(page)
+        if left:
+            # 조용히 넘어가면 잔여물 위에 담겨 결제/측정이 오염된다(8/2 조합 오염 사고와 같은 계열).
+            print(f"    [cart] ⚠️⚠️ 3회 시도 후에도 잔여 {len(left)}건 — {left}\n"
+                  f"           수동 삭제 필요. 이대로 담으면 결제에 섞인다.", flush=True)
     except Exception as e:
         print(f"    [cart] 비우기 실패: {e}")
 

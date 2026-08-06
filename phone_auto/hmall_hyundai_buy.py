@@ -2005,6 +2005,9 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
     res["order_complete"] = oc
     if not oc.get("ok"):
         res["status"] = f"ORDER_NOT_COMPLETE:{use_card}:{oc.get('reason')}"; return res
+    # ★계정 간 7분 간격의 **기산점**. 뒤따르는 뷰티·대장·적립은 이 대기시간 안에서 소비된다
+    #   (사용자 지시 2026-08-06: "결제 완료후 7분, 그 쉬는 시간 사이에 해당 계정 적립").
+    res["paid_at"] = time.time()
     close_home_popup()   # 주문완료 화면에도 광고 팝업이 떠 '재인증' 버튼을 가림 → 닫기 (실측 #5)
     # 뷰티포인트 재인증
     prof_cfg = json.loads(BP_PATH.read_text(encoding="utf-8"))
@@ -2214,19 +2217,46 @@ def main() -> int:
     print(f"[serial] {hw._serial()}  plan={plan}  card={card_override or '당일 자동감지'}"
           f"{'  only=' + ','.join(only_kw) if only_kw else ''}", flush=True)
     summary = []
-    for idx in plan:
+    for n, idx in enumerate(plan):
         try:
             r = buy_one(idx, card=card_override, combo_idx=combo_idx, only=only_kw)
         except Exception as e:
             r = {"idx": idx, "status": f"EXC:{e}"}
         print(f"[#{idx}] => {r.get('status')}", flush=True)
         summary.append(r)
+        if n < len(plan) - 1:
+            _account_gap(r)
     print(f"\n{'='*54}\nSUMMARY", flush=True)
     for r in summary:
         print(f"  #{r['idx']:2d} {r.get('id','?'):16s} [{r.get('card','?')}] {r.get('status')}"
               f"  {_reward_tag(r)}", flush=True)
     _reward_warn(summary, only_kw)
     return 0
+
+
+ACCOUNT_GAP_SEC = int(os.environ.get("HMALL_ACCOUNT_GAP_SEC", "420"))   # 계정 간 간격(결제완료 기산)
+
+
+def _account_gap(r: dict) -> None:
+    """다음 계정까지 **결제 완료 시점 기준 7분** 을 채운다 (사용자 지시 2026-08-06).
+
+    ★기산점이 '계정 시작'이 아니라 **결제 완료(`paid_at`)** 인 이유: 그 뒤에 오는
+      뷰티 재인증 · 구매대장 · **적립신청**은 어차피 이 쉬는 시간 안에서 끝난다
+      ("쉬는 시간 사이에 해당 계정 적립은 바로 하면 되잖아"). 그만큼을 빼고 **남은 만큼만** 잔다.
+      적립 subprocess 는 매번 쿠키 폐기 후 새로 로그인하므로 계정이 섞이지 않는다.
+    ★결제가 안 된 계정(paid_at 없음)은 간격을 둘 이유가 없어 바로 다음으로 간다.
+    `HMALL_ACCOUNT_GAP_SEC=0` 으로 끌 수 있다(테스트용)."""
+    paid_at = r.get("paid_at")
+    if not paid_at or ACCOUNT_GAP_SEC <= 0:
+        return
+    used = time.time() - paid_at
+    remain = ACCOUNT_GAP_SEC - used
+    if remain <= 0:
+        print(f"[gap] 결제완료 후 이미 {used/60:.1f}분 경과(적립 등) — 대기 없이 다음 계정", flush=True)
+        return
+    print(f"[gap] 결제완료 +{used/60:.1f}분(적립·대장 포함) → 7분 채우려 "
+          f"{remain/60:.1f}분 대기", flush=True)
+    time.sleep(remain)
 
 
 def _reward_tag(r: dict) -> str:

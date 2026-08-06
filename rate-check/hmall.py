@@ -124,26 +124,21 @@ def detect_card_offer(page) -> dict | None:
 CART_SECTION_SEL = "div.shipping-listwrap"
 
 _JS_CART_ITEMS = r"""() => {
-    // '일반상품' 체크박스를 가진 label 의 조상 = 카트 목록 컨테이너. 없으면 클래스 폴백.
-    let sec = null;
-    const lab = Array.from(document.querySelectorAll('label.chklabel'))
-        .find(l => l.querySelector('span') && l.querySelector('span').textContent.trim() === '일반상품');
-    if (lab) {
-        sec = lab;
-        for (let i = 0; i < 10 && sec.parentElement; i++) {
-            sec = sec.parentElement;
-            if (sec.querySelectorAll('input[type=checkbox]').length >= 2) break;
-        }
-    }
-    if (!sec) sec = document.querySelector('div.shipping-listwrap');
-    if (!sec) return [];
-    // 카트 섹션 안에서 **행(div.pdwrap) 단위**로 센다 — 상품명 형태에 의존하지 않는다.
-    // 행 1개 = 상품 1건 (삭제 버튼 수와 일치, 2026-08-04 DOM 실측). 상품명 = 행의 첫 줄.
-    return Array.from(sec.querySelectorAll('div.pdwrap')).map(row => {
+    // ★개별상품 체크박스(input[type=checkbox][name=backet]) 기준으로 센다 — 배송 그룹이 몇 개든 정확.
+    //   헤더/그룹 전체선택은 name 이 없어 자연히 제외된다(2026-08-05 §10 DOM 실측).
+    //   상품명 = 그 체크박스가 속한 행(div.pdwrap)의 첫 줄.
+    return Array.from(document.querySelectorAll('input[type=checkbox][name=backet]')).map(cb => {
+        const row = cb.closest('div.pdwrap');
+        if (!row) return '';
         const lines = (row.innerText || '').split('\n').map(s => s.trim()).filter(Boolean);
         return lines[0] || '';
     }).filter(Boolean);
 }"""
+# ⚠️ 종전 구현은 '일반상품' 라벨의 조상을 타고 올라가다 **체크박스 2개 이상인 첫 조상에서 멈췄다.**
+#    배송 그룹이 나뉘면 (그룹선택 1 + 품목 1 = 2) 첫 그룹에서 멈춰 **다른 그룹 품목을 통째로 놓친다.**
+#    2026-08-06 실측: 계정#10 카트에 석류젤리+올리브오일 2건이 있는데 1건으로 읽혔다.
+#    이 함수는 clear_cart 검증(_cart_is_empty)에도 쓰이므로 = **잔여물 위에 담고도 '비었다'** 가 된다
+#    (8/2 조합23 잔여물 위에 조합24 담아 시트가 오염된 사고와 같은 계열).
 
 
 def cart_items(page) -> list[str]:
