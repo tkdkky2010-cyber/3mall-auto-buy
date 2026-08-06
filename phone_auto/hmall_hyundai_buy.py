@@ -1245,91 +1245,11 @@ def samsung_cert_done() -> dict:
     return out
 
 
-def pay_samsung_payco() -> dict:
-    """[DEPRECATED — pay_samsung(일반결제)로 대체. PAYCO는 금액 크면 ARS 전화인증 요구→무인불가. 폴백/대조용 보존.]
-    삼성카드 SDK (PAYCO 경유, 라이브검증 2026-05-31 #2 주문 20260531113065) — **삼성카드 선택된 주문서에서 호출**.
-    원결제하기(OCR) → 간편결제 'PAYCO,삼성페이'(OCR) → PAYCO 박스(>)(OCR) → PAYCO 결제하기(OCR)
-    → 결제비밀번호 4x3 셔플(137601, screencap 2엔진 OCR `payco_pin6`) → ⚠️'확인'(쇼핑몰 복귀=결제확정) → hmall 주문완료.
-    ⚠️ PAYCO는 PIN 후 '주문 중이던 쇼핑몰로 이동하면 결제가 완료됩니다'의 **'확인'을 눌러야** hmall 복귀+결제 확정.
-    ⚠️ 삼성카드 PAYCO 사전등록 전제(결제수단변경 그리드 삼성카드 선택만으로 PAYCO에 잡힘). PIN 셔플은 화면당 1회(재배열 X)."""
-    out = {"step": "samsung"}
-    if not ocr_tap("결제하기", contains=True):              # 1) 원 결제하기 (hmall WebView OCR)
-        out["err"] = "원결제하기 실패"; return out
-    if not wait_text("PAYCO", timeout=12):                  # 2) 간편결제 selector (PAYCO,삼성페이)
-        out["err"] = "간편결제 selector 미도달"; return out
-    if not ocr_tap("PAYCO", contains=True):                 # 'PAYCO, 삼성페이' 선택
-        out["err"] = "PAYCO 옵션 선택 실패"; return out
-    if not wait_text("다시 선택하기", timeout=10):           # 3) 간편결제 PAYCO 박스 화면
-        out["err"] = "PAYCO 박스 화면 미도달"; return out
-    ocr_tap("PAYCO", contains=True); time.sleep(0.5)        # PAYCO 박스(>) 탭 → PAYCO 결제 진입
-    out["step"] = "payco_confirm"
-    if not wait_text("PAYCO 간편결제", timeout=12):          # 4) PAYCO 결제 확인화면 (금액·삼성카드)
-        out["err"] = "PAYCO 결제확인 미도달"; return out
-    if not ocr_tap("결제하기", contains=True):              # PAYCO 결제하기 → PIN
-        out["err"] = "PAYCO 결제하기 실패"; return out
-    if not wait_text("결제 비밀번호", timeout=10):           # 5) 결제비밀번호 화면 (4x3 셔플)
-        out["err"] = "PIN 화면 미도달"; return out
-    out["step"] = "pin"
-    try:                                                    # 4x3 셔플 137601 (screencap 2엔진 OCR)
-        FlowRunner(use_camera=False).run_action(
-            {"action": "input_pin", "preset": "payco_pin6", "value": "137601",
-             "tap_delay_sec": 0.6, "use_camera": False})
-    except Exception as e:
-        out["err"] = f"PIN 입력 실패: {e}"; return out
-    if not wait_text("결제가 완료됩니다", timeout=12):        # 6) ⚠️ '확인' 눌러야 완료 (쇼핑몰 복귀)
-        out["err"] = "PAYCO 완료확인 화면 미도달"; return out
-    if not ocr_tap("확인", contains=True):
-        out["err"] = "PAYCO 확인(완료) 탭 실패"; return out
-    out["ok"] = True
-    return out
-
-
-def pay_nh() -> dict:
-    """NH농협카드 SDK (PAYCO 경유, 라이브검증 2026-06-01 #3 주문 20260601062093, NH농협카드 일시불 + 뷰티 적립완료)
-    — **NH농협카드 선택된 주문서에서 호출**. 주문완료까지.
-    ⚠️ 농협 결제앱(NH앱)은 무선/USB 디버깅 전부 차단 → NH앱 직결 불가. 대신 PAYCO 우회(NH카드 PAYCO 사전등록).
-       → 농협카드 팝업에서 **우측상단 '다른 결제' → 우측하단 'PAYCO'** (이 팝업/PAYCO 화면은 FLAG_SECURE 아님, OCR 정상 실측).
-    경로: 원결제하기(OCR) → 농협카드 팝업 '다른 결제'(OCR) → 'PAYCO'(OCR)
-    → [삼성과 동일] PAYCO 결제확인 → 결제하기 → PIN 4x3 셔플(payco_pin6, 137601) → '확인'(쇼핑몰 복귀=결제확정).
-    ⚠️ PIN: 로컬 2엔진이 셔플키패드를 고정 1-9로 오독→실패하면 **클로드 승격**으로 해결(8/02 구조). 박스('다시 선택하기') 단계 없음."""
-    out = {"step": "nh"}
-    if not ocr_tap("결제하기", contains=True):           # 1) 원 결제하기 → 농협카드 팝업
-        out["err"] = "원결제하기 실패"; return out
-    lap("NH: 원결제하기 → 농협 팝업")
-    if not wait_text("다른 결제", timeout=12):            # 2) 농협카드 팝업 우측상단 '다른 결제'
-        out["err"] = "농협 팝업 '다른 결제' 미도달(화면 FLAG_SECURE 가능)"; return out
-    if not ocr_tap("다른 결제", contains=True):
-        out["err"] = "'다른 결제' 탭 실패"; return out
-    out["step"] = "other_pay"
-    if not wait_text("PAYCO", timeout=12):                # 3) 다른 결제 탭 우측하단 'PAYCO'
-        out["err"] = "다른결제 탭 PAYCO 미도달"; return out
-    if not ocr_tap("PAYCO", contains=True):
-        out["err"] = "PAYCO 선택 실패"; return out
-    time.sleep(0.5)
-    if wait_text("다시 선택하기", timeout=5):             # (삼성 패턴) PAYCO 박스 화면 끼면 박스 한번 더 탭
-        ocr_tap("PAYCO", contains=True); time.sleep(0.5)
-    out["step"] = "payco"
-    if not wait_text("PAYCO 간편결제", timeout=12):       # 4) PAYCO 결제확인 (금액·NH카드) — 이하 삼성과 동일
-        out["err"] = "PAYCO 결제확인 미도달"; return out
-    if not ocr_tap("결제하기", contains=True):            # PAYCO 결제하기 → PIN
-        out["err"] = "PAYCO 결제하기 실패"; return out
-    if not wait_text("결제 비밀번호", timeout=10):        # 5) 결제비밀번호 (4x3 셔플)
-        out["err"] = "PIN 화면 미도달"; return out
-    out["step"] = "pin"
-    try:                                                  # 4x3 셔플 137601 (screencap 2엔진 OCR)
-        FlowRunner(use_camera=False).run_action(
-            {"action": "input_pin", "preset": "payco_pin6", "value": "137601",
-             "tap_delay_sec": 0.6, "use_camera": False})
-    except Exception as e:
-        out["err"] = f"PIN 입력 실패: {e}"; return out
-    if not wait_text("결제가 완료됩니다", timeout=12):     # 6) ⚠️ '확인' 눌러야 완료 (쇼핑몰 복귀)
-        out["err"] = "PAYCO 완료확인 화면 미도달"; return out
-    if not ocr_tap("확인", contains=True):
-        out["err"] = "PAYCO 확인(완료) 탭 실패"; return out
-    out["ok"] = True
-    return out
-
-
+# ★PAYCO 경유 결제경로는 **삭제했다** (사용자 지시 2026-08-07 '폐기 경로 정리').
+#   구 `pay_samsung_payco`(삼성 PAYCO) · `pay_nh`(NH PAYCO) — 둘 다 **호출자 0개**였다.
+#   왜 폐기됐나: PAYCO 는 금액이 크면 **ARS 전화인증**을 요구해 무인 실행이 불가능하다.
+#   정본 = `pay_samsung` / `pay_nh_general` (둘 다 일반결제=카드번호 직접 + 비전 핸드세이크).
+#   되살릴 일 있으면 git 이력(2026-08-07 이전)에서 꺼낼 것. 디스패처엔 이미 연결이 없다.
 def _card_no_boxes() -> list[tuple[int, int]]:
     """카드번호 4칸 중심좌표(좌→우). resource-id 'cardno1~4' 우선(2026-06-25 NH 실측 anchor) —
     상단에 다른 EditText(stray)가 끼어도 정확. 없으면 EditText 를 y로 그룹핑해 '4칸 이상인 행' 폴백."""
@@ -1418,6 +1338,14 @@ def _wait_keypad(timeout: float = 6) -> bool:
 # ───── nppfs 보안키패드 고정 그리드 (에이전트=클로드 비전 정본, 2026-06-26 라이브 확정) ─────
 # 키패드 셀 위치는 고정, 숫자 라벨만 셔플. 6열 x(device px) 고정 / 2 숫자행 = 컨테이너 top + 오프셋.
 # 같은 칸 4자리는 동안 셔플 안 됨 → 칸마다 1회만 읽으면 됨. 칸 바뀌면(또는 CVC/비번칸) 재셔플.
+#
+# ⚠️★**이 블록(`KP_ROW_OFF`/`_kp_top`/`_grid_tap`)은 지금 호출자가 없다. 그래도 지우지 않는다** —
+#   폐기물이 아니라 **더 튼튼한 방식**이라서다(2026-08-07 검수). 살아 있는 NH 입력 경로
+#   (`nh_enter` → `nh_vision_input.ROW_CARD/ROW_CVC/ROW_PIN6`)는 **절대 y 상수**를 쓰는데,
+#   그건 키패드가 조금만 움직여도 엉뚱한 키를 누른다(자릿수는 맞아 검증도 통과 → 카드 잠김 위험).
+#   여기 방식은 **컨테이너 top + 오프셋**이라 화면이 밀려도 따라간다.
+#   → 다음 NH 결제 때 화면 보고 `nh_enter` 를 이쪽으로 옮기는 게 근본수정이다.
+#   (그전까지의 임시 안전장치 = `nh_enter._rows_plausible` — 가정이 어긋나면 탭 안 하고 중단.)
 KP_COLS = (173, 320, 467, 614, 761, 908)     # 6열 중심 x
 KP_ROW_OFF = (217, 362)                       # 숫자 2행 y = 컨테이너 top + 이 오프셋 (실측: 카드top893→1110/1255, CVC1005→1222/1367, 비번963→1180/1325)
 
@@ -1948,7 +1876,7 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
         if not sp.get("ok"):
             res["status"] = f"SAMSUNG_FAIL@{sp.get('step')}:{sp.get('err')}"; return res
     elif use_card == "NH":
-        np_ = pay_nh_general()          # 일반결제(카드번호 직접) — 사용자 지정 2026-06-25. (구 PAYCO=pay_nh 폴백)
+        np_ = pay_nh_general()          # 일반결제(카드번호 직접) — 사용자 지정 2026-06-25. (PAYCO 경로는 2026-08-07 삭제)
         res["pay"] = np_
         # ★NH 는 카드번호 화면에서 에이전트 비전 인계로 정지한다 = 실패 아님(정상 대기 상태).
         #   여기서 return 해야 다음 계정이 콜드런치로 이 화면을 날려버리지 않는다.

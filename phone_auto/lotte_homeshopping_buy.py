@@ -11,7 +11,7 @@ hmall pay_lotte 와 동일 → lotte_card.json flow_payment[14:22] 재사용.
        / KB=pay_lotte_kb(KB Pay 간편번호 137601, #13 G70658 검증)
        / 현대=pay_lotte_hyundai(앱카드→현대카드 앱 dump 셔플 pin6, 2026-06-12 #1 B87302 검증)**.
       그 외 카드=UNVERIFIED_CARD(라이브 필요). ⚠️현대 'PIN번호 결제'는 몰 첫결제 본인인증(SMS) 온보딩 요구 → 앱카드 경로 사용.
-      (구 PAYCO/ARS 경로 pay_lotte_payco·handle_ars_call 은 deprecated — 금액 크면 ARS 전화의존이라 무인불가.)
+      (구 PAYCO/ARS 경로 pay_lotte_payco·handle_ars_call 은 2026-08-07 삭제 — 금액 크면 ARS 전화의존이라 무인불가.)
   - E 뷰티포인트(★2026-06-03 #17 검증): **동의 먼저** — 적립신청 먼저 누르지 말고, 동의 박스를 박스 안 시작 800px swipe
       (claim_beauty_point._box_fling)로 끝까지 → '동의함' 왼쪽 라디오(cx-86) 탭 + **픽셀 채움검증** → 그 다음 적립신청 → 완료 폴링.
       ⚠️ 뷰티 멤버십 없는 계정(1~20 중 일부)은 정상 실패. F: 삼성/KB 경로엔 카드등록 안 뜸 → 보통 no-op.
@@ -808,131 +808,11 @@ def pay_loca() -> dict:
     return out
 
 
-def handle_ars_call(intro_wait: float = 10.0, interval: float = 5.0, taps: int = 6) -> dict:
-    """ARS 본인인증 전화 **자동응답** (2026-06-02 사용자 지정 방법). ⚠️통화화면 앵커는 첫 실제 ARS 라이브검증 필요.
-    흐름: 인커밍 통화 '받기' → intro_wait초(ARS 안내) 대기 → 통화중 '키패드' 열기 → '1'(승인) interval초 간격 taps회.
-    ★'1' = 매번 고정 승인버튼(셔플X). ARS 안내 타이밍을 몰라 여유롭게 반복 탭(승인 1회면 인증완료, 추가탭 무해).
-    완료 후 통화 종료(ENDCALL) → 롯데앱 복귀."""
-    out = {}
-    serial = hw._serial()
-    # 1) 인커밍 통화 대기 + 받기 ('받기/수락/통화' OCR, 없으면 KEYCODE_CALL=5)
-    answered = False
-    end = time.time() + 30
-    while time.time() < end:
-        its = _ocr_texts(cap())
-        txt = " ".join(it["text"] for it in its)
-        ans = next((it for it in its if it["text"].strip() in ("받기", "수락", "통화하기")), None)
-        if ans:
-            _adb().tap(ans["cx"], ans["cy"]); answered = True; break
-        if any(k in txt for k in ("수신", "전화 왔", "롯데", "1599", "1600", "1577")):
-            subprocess.run([hw.ADB, "-s", serial, "shell", "input", "keyevent", "5"])  # KEYCODE_CALL=받기
-            answered = True; break
-        time.sleep(1.0)
-    out["answered"] = answered
-    if not answered:
-        out["err"] = "인커밍 통화 미감지/받기 실패(라이브검증 필요)"; return out
-    # 2) 통화 연결 후 ARS 안내 — intro_wait 대기
-    time.sleep(intro_wait)
-    # 3) 통화중 '키패드' 열기 (OCR)
-    kp = next((it for it in _ocr_texts(cap())
-               for key in ("키패드", "Keypad", "다이얼패드", "keypad") if key in it["text"]), None)
-    if kp:
-        _adb().tap(kp["cx"], kp["cy"]); time.sleep(1.5)
-    out["keypad_opened"] = bool(kp)
-    # 4) '1'(승인) interval초 간격 taps회. 통화 다이얼패드 '1' OCR (없으면 좌상단 폴백 — ⚠️라이브검증).
-    for _ in range(taps):
-        one = next((it for it in _ocr_texts(cap()) if it["text"].strip() == "1"), None)
-        if one:
-            _adb().tap(one["cx"], one["cy"])
-        else:
-            _adb().tap(160, 1530)   # ⚠️ 다이얼패드 '1' 추정 폴백 — 첫 라이브 ARS 때 좌표 확정 필요
-        time.sleep(interval)
-    # 5) 통화 종료 → 롯데앱 복귀 (서버측 인증완료면 주문완료 렌더)
-    subprocess.run([hw.ADB, "-s", serial, "shell", "input", "keyevent", "6"])   # KEYCODE_ENDCALL
-    time.sleep(2.0)
-    out["ok"] = True
-    return out
-
-
-def pay_lotte_payco(card: str = "삼성") -> dict:
-    """비롯데 당일카드(삼성 등) = **PAYCO 간편결제 경유** 결제. 2026-06-02 #10 라이브 풀검증(주문 2026-06-02-F71650).
-    경로: (원)결제하기 → 삼성카드 SDK 모달 '간편결제(PAYCO,삼성페이)' → '간편 결제'(PAYCO 박스, '다시 선택하기') → PAYCO 박스
-      → PAYCO 결제확인(금액·SAMSUNGCARD) → 결제하기 → 결제비밀번호(4x3 셔플) payco_pin6 137601(hmall 재사용, 로컬2엔진 실패→클로드 승격)
-      → **ARS 본인인증(전화요청 → ⚠️사용자 통화 인증, 무인 불가)** → 롯데 주문완료.
-    ⚠️ ARS 빈도 미확정(계정당1회 가설) — 안 뜨면 바로 주문완료 폴링. ⚠️실 결제."""
-    out = {"step": "order_sheet", "card": card}
-    if screen_has("다음에도") or screen_has("사용할까요"):
-        ocr_tap("사용할게요", contains=True, retries=2)
-    # 1) (원)결제하기 — 하단 'NNN원 결제하기'
-    pay = next((it for it in _ocr_texts(cap()) if "결제하기" in it["text"] and it["cy"] > 2000), None)
-    if pay:
-        _adb().tap(pay["cx"], pay["cy"])
-    elif not ocr_tap("결제하기", contains=True):
-        out["err"] = "원결제하기 실패"; return out
-    time.sleep(3.0)
-    # 2) 삼성카드 SDK 모달 → 간편결제(PAYCO,삼성페이)
-    out["step"] = "samsung_modal"
-    if not wait_text("간편결제", timeout=12):
-        out["err"] = "삼성 SDK 간편결제 모달 미도달"; return out
-    opt = next((it for it in _ocr_texts(cap()) if "PAYCO" in it["text"] and "삼성페이" in it["text"]), None)
-    if opt:
-        _adb().tap(opt["cx"], opt["cy"])
-    elif not ocr_tap("간편결제", contains=True):
-        out["err"] = "간편결제(PAYCO) 선택 실패"; return out
-    time.sleep(3.0)
-    # 3) '간편 결제'(PAYCO 박스) — '다시 선택하기' 화면 → PAYCO 박스 탭
-    out["step"] = "payco_box"
-    if not wait_text("다시 선택하기", timeout=10):
-        out["err"] = "PAYCO 박스 화면 미도달"; return out
-    box = next((it for it in _ocr_texts(cap()) if it["text"].strip() == "PAYCO"), None) or \
-          next((it for it in _ocr_texts(cap()) if "PAYCO" in it["text"]), None)
-    if box:
-        _adb().tap(box["cx"], box["cy"]); time.sleep(3.5)
-    # 4) PAYCO 결제확인(금액·가맹점·SAMSUNGCARD) → 결제하기
-    out["step"] = "payco_confirm"
-    if not wait_text("PAYCO 간편결제", timeout=12):
-        out["err"] = "PAYCO 결제확인 미도달"; return out
-    m = re.search(r"([\d,]{4,})\s*원", _all_text())
-    out["amount"] = m.group(1) if m else None
-    print(f"   [PAYCO] {out['amount']}원 ({card}카드) 결제 진행", flush=True)
-    if not ocr_tap("결제하기", contains=True):
-        out["err"] = "PAYCO 결제하기 실패"; return out
-    # 5) 결제 비밀번호(4x3 셔플) → payco_pin6 137601
-    out["step"] = "pin"
-    if not wait_text("결제 비밀번호", timeout=12):
-        out["err"] = "PIN 화면 미도달"; return out
-    try:
-        FlowRunner(use_camera=False).run_action(
-            {"action": "input_pin", "preset": "payco_pin6", "value": "137601",
-             "tap_delay_sec": 0.6, "use_camera": False})
-    except Exception as e:
-        out["err"] = f"PIN 입력 실패: {e}"; return out
-    # 6) ARS 본인인증(있으면) 또는 바로 주문완료. ARS=빨강 'ARS 인증 전화 요청' 탭 → ⚠️사용자 통화.
-    out["step"] = "ars_or_done"
-    ars_seen = False
-    end0 = time.time() + 14
-    while time.time() < end0:
-        t = _all_text()
-        if "주문번호" in t:
-            break
-        if "ARS" in t or "본인인증" in t:
-            ars_seen = True; break
-        time.sleep(1.0)
-    if ars_seen:
-        out["ars"] = True
-        req = next((it for it in _ocr_texts(cap()) if "전화" in it["text"] and "요청" in it["text"]), None)
-        _adb().tap(req["cx"], req["cy"]) if req else _adb().tap(540, 1730)   # OCR 분할 대비 좌표 폴백
-        print("   ⚠️ ARS 전화 요청 → 자동응답(handle_ars_call: 받기→10s→키패드→'1' 반복)", flush=True)
-        out["ars_call"] = handle_ars_call()
-    # 7) 주문완료 폴링 (ARS 통화 인증 시간 고려해 길게)
-    out["step"] = "order_complete"
-    confirmed, order = _poll_order_complete(180)
-    if confirmed:
-        out["ok"] = True; out["order"] = order; return out
-    out["err"] = "주문완료 미확인(timeout — ARS 미완료/지연 가능)"
-    return out
-
-
+# ★롯데 PAYCO/ARS 경로도 **삭제했다** (사용자 지시 2026-08-07).
+#   구 `pay_lotte_payco`(PAYCO 경유) + `handle_ars_call`(ARS 자동응답) — 호출자 0개였고,
+#   ARS 는 전화 의존이라 무인 실행이 안 된다. 게다가 `handle_ars_call` 의 다이얼패드 '1' 좌표는
+#   **실측이 아닌 추정값**이라(코드에 경고가 있었다) 그대로 두면 언젠가 오탭한다.
+#   정본 = `pay_lotte_samsung_general` → 3사 공용 `pay_samsung`(카드번호 직접, ARS 회피).
 # ──────── D'. 삼성 일반결제 (카드번호 직접 — PAYCO/ARS 완전 회피) ────────
 
 # _card_secrets = hmall_hyundai_buy 에서 import (정본=hmall, 양 몰 공용). 상단 import 참조.
@@ -1331,7 +1211,7 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
         res["status"] = "AGREE_FAIL:필수동의 체크 실패(픽셀검증)"; return res
     print(f"[#{idx}] 필수동의 체크 확인됨", flush=True)
     # 카드별 결제경로 분기: 롯데=LOCA(137601) / 삼성=일반결제(카드번호 직접, PAYCO/ARS 회피).
-    #   ★PAYCO 경로(pay_lotte_payco, #10 검증)는 폐기 — ARS 전화의존이라 무인불가. 함수는 폴백/대조용 보존.
+    #   ★PAYCO 경로(구 pay_lotte_payco, #10 검증)는 **2026-08-07 삭제** — ARS 전화의존이라 무인불가.
     #   그 외 카드 = 라이브 검증 필요(false-auto 금지).
     print(f"[#{idx}] ⚠️ 결제 실행 ({use_card})", flush=True)
     if use_card == "롯데":
