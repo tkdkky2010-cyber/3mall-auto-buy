@@ -18,12 +18,19 @@
   python3 -m phone_auto.nh_enter pinfield                  # 결제비번 칸 탭(키패드 소환)
   python3 -m phone_auto.nh_enter pin6 "..." "..."
   python3 -m phone_auto.nh_enter confirm                   # '확인' 탭
-  python3 -m phone_auto.nh_enter finish 5 데이즈온          # ★주문완료 화면에서 대장+적립 마무리
+  python3 -m phone_auto.nh_enter finish 5 데이즈온          # ★현대몰: 주문완료 화면에서 대장+H.Point 적립
+  python3 -m phone_auto.nh_enter finish_lotte 5 combo=24    # ★롯데: 대장+뷰티포인트+구매사은 적립
+  python3 -m phone_auto.nh_enter fields                    # (디버그) 입력칸 resource-id/자릿수 덤프
 
 ★★`finish` 를 빼먹지 말 것. NH 는 buy_one 이 핸드세이크 지점에서 일찍 return 하므로
-   구매대장·H.Point 적립 자동단계를 **안 탄다**. 2026-08-05 에 이걸 몰라 적립 12계정이
+   구매대장·적립 자동단계를 **안 탄다**. 2026-08-05 에 이걸 몰라 H.Point 적립 12계정이
    조용히 누락됐다(에러도 안 남). 전체 순서:
-     box1 → box2 → box3 → box4 → cvc → confirm → pinfield → pin6 → confirm → **finish**
+     box1 → box2 → box3 → box4 → cvc → confirm → pinfield → pin6 → confirm → **finish(_lotte)**
+
+★몰마다 마무리가 다르다 — 섞어 쓰면 딴 몰 장부에 기록된다(foreground 앱으로 가드함):
+   · `finish`       = 현대몰 → record_food + **H.Point 적립**(건강식품 10% 등)
+   · `finish_lotte` = 롯데   → record_combo + **뷰티포인트** + **구매사은 적립금**
+     ⚠️뷰티 → 적립 순서 고정. reward 가 홈으로 이동하면 주문완료 화면을 이탈해 뷰티가 소실된다.
 
 ⚠️ 자릿수는 화면에서 검증한다(card_digits_on_screen). 틀린 키를 누르면 카드사 입력오류가
    누적돼 3회에 카드가 잠길 수 있으므로, 매핑에 없는 숫자가 있으면 탭하지 않고 중단한다.
@@ -40,6 +47,11 @@ from phone_auto.nh_vision_input import (KEY_COLS, ROW_CARD, ROW_CVC, ROW_PIN6,
                                         build_pos, screencap, tap_digits)
 
 _ROWS = {"card": ROW_CARD, "cvc": ROW_CVC, "pin6": ROW_PIN6}
+
+# CVC·결제비번 칸의 resource-id 는 **라이브 실측 전**이다(카드번호 cardno1~4 만 확정).
+# 후보를 훑어 하나도 못 맞으면 '검증 불가' 로 경고만 남긴다 — `fields` 로 실제 id 를 보고 여기에 추가할 것.
+_CVC_KEYS = ("cvc", "cvv")
+_PIN_KEYS = ("pass", "pwd", "pin")
 
 
 def _secrets() -> dict:
@@ -73,6 +85,20 @@ def _nh_field_len(substr: str = "cardno") -> dict[int, int] | None:
 
     dump 의 EditText `text` 를 우선 보고, 비어 보이면 `content-desc` 로 폴백한다."""
     import re as _re
+    fs = _edit_fields()
+    if fs is None:
+        return None
+    out: dict[int, int] = {}
+    for rid, ln in fs:
+        m = _re.search(rf"{substr}(\d)", rid)
+        if m:
+            out[int(m.group(1))] = ln
+    return out or None
+
+
+def _edit_fields() -> list[tuple[str, int]] | None:
+    """화면의 모든 EditText → [(resource-id, 입력된 글자수)]. dump 실패면 None(=검증 불가).
+    `text` 우선, 비어 보이면 `content-desc` 폴백(마스킹 `•` 도 글자수로 잡힌다)."""
     import xml.etree.ElementTree as ET
     p = "/tmp/_nh_fieldlen.xml"
     try:
@@ -80,16 +106,38 @@ def _nh_field_len(substr: str = "cardno") -> dict[int, int] | None:
         root = ET.parse(p).getroot()
     except Exception:
         return None
-    out: dict[int, int] = {}
+    out = []
     for n in root.iter():
         if "EditText" not in n.attrib.get("class", ""):
             continue
-        m = _re.search(rf"{substr}(\d)", n.attrib.get("resource-id", ""))
-        if not m:
-            continue
         val = (n.attrib.get("text") or "").strip() or (n.attrib.get("content-desc") or "").strip()
-        out[int(m.group(1))] = len(val)
+        out.append((n.attrib.get("resource-id", ""), len(val)))
     return out or None
+
+
+def _verify_len(keys: tuple, expect: int, label: str) -> bool:
+    """인덱스 없는 칸(CVC·결제비번) 자릿수 검증. box1~4 와 달리 **0자리는 실패로 보지 않는다** —
+    id 를 라이브로 확정하지 못해 '마스킹돼 안 읽히는 것'과 '탭이 다 씹힌 것'을 구분할 수 없기 때문.
+    0 < got != expect 만 확실한 씹힘이므로 그때만 중단한다(오탐 중단이 더 위험 — 결제 중간에 멈춘다)."""
+    fs = _edit_fields()
+    if fs is None:
+        print(f"  [verify] ⚠️ {label} 판독 불가(dump 실패) — 검증 없이 진행")
+        return True
+    hits = [ln for rid, ln in fs if any(k in rid.lower() for k in keys)]
+    if not hits:
+        print(f"  [verify] ⚠️ {label} 입력칸 id 미발견 — 검증 없이 진행 "
+              f"(`nh_enter fields` 로 실제 id 확인 후 nh_enter.py 의 후보에 추가할 것)")
+        return True
+    got = max(hits)
+    if got == expect:
+        print(f"  [verify] ✓ {label} {got}자리")
+        return True
+    if got == 0:
+        print(f"  [verify] ⚠️ {label} 0자리로 읽힘 — 마스킹인지 탭 씹힘인지 불명 → 진행하되 화면 직접 확인")
+        return True
+    print(f"  [verify] ✗ {label} {got}자리 (기대 {expect}) — **탭 씹힘. 중단한다.**\n"
+          f"           지우고 다시 판독·입력할 것 (틀린 채 확인하면 카드사 입력오류 누적 → 3회에 카드 잠김)")
+    return False
 
 
 def _verify_box(n: int, expect: int = 4) -> bool:
@@ -126,6 +174,44 @@ def _tap_box(n: int, force: bool = False) -> None:
     time.sleep(1.2)
 
 
+def _finish_lotte(args: list[str]) -> int:
+    """롯데 NH 마무리 — 주문완료 확인 → 구매대장 → **뷰티포인트** → **구매사은 적립금**.
+
+    롯데도 NH 는 `buy_one` 이 `NH_HANDOFF` 로 일찍 return 하므로(lotte_homeshopping_buy.py:1369)
+    DONE 이후 후처리를 통째로 안 탄다 → 여기서 같은 순서로 마무리한다.
+    ⚠️순서 고정(뷰티 → 적립): reward 가 홈으로 이동하면 주문완료 화면을 이탈해 뷰티가 소실된다(#6 사례).
+    사용: finish_lotte <계정번호> [combo=24] [goods=2923406968]"""
+    from phone_auto import lotte_homeshopping_buy as L
+    if not args or not args[0].isdigit():
+        print("[ERR] 사용: python3 -m phone_auto.nh_enter finish_lotte <계정번호> [combo=N] [goods=상품번호]")
+        return 1
+    idx = int(args[0])
+    combo = next((int(x.split("=", 1)[1]) for x in args if x.startswith("combo=")), None)
+    goods = next((x.split("=", 1)[1] for x in args if x.startswith("goods=")), None)
+    if not B._wait_app(L.PKG, timeout=2):
+        print("[finish] ✗ 롯데앱이 foreground 가 아니다 — 주문완료 화면에서 실행할 것 (기록 안 함)")
+        return 1
+    # ★주문완료를 **먼저** 확인 — 결제가 안 됐는데 기록하면 있지도 않은 구매가 장부에 남는다(§17②와 동일 규칙).
+    confirmed, order = L._poll_order_complete(20)
+    if not confirmed:
+        print("[finish] ✗ 주문완료 화면이 아니다 (완료문구·주문번호 없음) — 대장/적립 **기록하지 않고 중단**")
+        return 1
+    print(f"[finish] 주문완료 확인 — 주문번호 {order or '(미판독)'}")
+    acct_id = L._accounts()[idx - 1].get("id")
+    try:
+        sys.path.insert(0, str(B.ROOT))
+        import purchase_ledger as PL
+        PL.record_combo("롯데홈쇼핑", acct_id, combo, order_no=order, card="NH")
+    except Exception as e:
+        print(f"[finish] ⚠️ 대장 기록 실패: {e}")
+    L.dismiss_card_register()
+    bp = L.claim_beauty_point(idx)
+    print(f"[finish] 뷰티포인트 {'✓' if bp.get('completed') else '⚠️ ' + str(bp.get('skip') or bp.get('err'))}")
+    rw = L.claim_lotte_reward(goods_no=goods)
+    print(f"[finish] 구매사은 적립 {'✓' if rw.get('completed') or rw.get('already') else '⚠️ ' + str(rw.get('skip') or rw.get('err'))}")
+    return 0
+
+
 def main() -> int:
     args = sys.argv[1:]
     if not args:
@@ -152,8 +238,22 @@ def main() -> int:
         print("[box1] IME 입력 완료")
         return 0 if _verify_box(1) else 1
 
+    if cmd == "fields":
+        # 디버그 — CVC/결제비번 칸의 실제 resource-id 확인용. 값은 안 찍고 자릿수만.
+        for rid, ln in (_edit_fields() or []):
+            print(f"  {rid or '(id없음)'}  → {ln}자리")
+        return 0
+
     if cmd == "confirm":
-        ok = B.ocr_tap("확인", contains=True, retries=4)
+        # ★'확인' 완전일치를 먼저 본다. contains 로 잡으면 '확인해주세요' 같은 안내문구를 눌러
+        #   결제가 엉뚱한 데로 샌다. 완전일치 0건일 때만(OCR 이 '확 인' 으로 띄어 읽는 경우) contains 폴백.
+        cands = [it for it in B._ocr_texts(B.cap()) if it["text"].strip() == "확인"]
+        if len(cands) > 1:
+            print(f"[confirm] '확인' {len(cands)}개 — 맨 아래 것 선택")
+        ok = B.ocr_tap("확인", contains=False, pick="bottom", retries=3)
+        if not ok:
+            print("[confirm] ⚠️ '확인' 완전일치 없음 → contains 폴백(오탭 주의)")
+            ok = B.ocr_tap("확인", contains=True, pick="bottom", retries=2)
         print(f"[confirm] {'✓' if ok else '✗'}")
         return 0 if ok else 1
 
@@ -165,6 +265,12 @@ def main() -> int:
             print("[ERR] 사용: python3 -m phone_auto.nh_enter finish <계정번호> [상품키워드...]")
             return 1
         idx, kws = int(args[1]), args[2:]
+        # ★몰 가드 — 롯데 주문완료 화면에서 이걸 돌리면 현대몰 카트를 찾아 **딴 몰 장부**에 기록하고
+        #   H.Point 적립을 돌린다(뷰티포인트는 그동안 소실). 롯데면 finish_lotte 로 보낸다.
+        from phone_auto import lotte_homeshopping_buy as _L
+        if B._wait_app(_L.PKG, timeout=1):
+            print("[finish] ✗ 롯데앱이 foreground 다 — 롯데는 `finish_lotte` 를 쓸 것 (기록 안 함)")
+            return 1
         import re as _re
         its = B._ocr_texts(B.cap())
         txt = " ".join(i["text"] for i in its)
@@ -201,6 +307,9 @@ def main() -> int:
             print(f"[finish] ⚠️ 대장 기록 실패: {e}")
         B.apply_reward_now(idx, kws or None)      # ★적립 (코드가 한다)
         return 0
+
+    if cmd in ("finish_lotte", "finish-lotte"):
+        return _finish_lotte(args[1:])
 
     if cmd == "pinfield":
         # 카드 확인 후 '일반결제비밀번호(숫자 6자리)' 칸 — **탭해야 보안키패드가 뜬다.**
@@ -242,10 +351,11 @@ def main() -> int:
     if not r.get("ok"):
         return 1
     # ★탭 씹힘 검증 — 여기서 안 잡으면 틀린 번호로 '확인'까지 가서 카드사 입력오류가 쌓인다.
+    time.sleep(0.6)
     if cmd.startswith("box"):
-        time.sleep(0.6)
         return 0 if _verify_box(int(cmd[-1])) else 1
-    return 0
+    keys = _CVC_KEYS if cmd == "cvc" else _PIN_KEYS
+    return 0 if _verify_len(keys, len(value), "CVC" if cmd == "cvc" else "결제비번") else 1
 
 
 if __name__ == "__main__":
