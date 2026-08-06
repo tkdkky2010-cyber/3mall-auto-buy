@@ -102,6 +102,59 @@ def _nh_field_len(substr: str = "cardno") -> dict[int, int] | None:
     return out or None
 
 
+def _keypad_bounds() -> tuple[int, int] | None:
+    """보안키패드 컨테이너의 (top, bottom) y. dump 로 못 찾으면 None(=검증 불가 → 통과).
+
+    ★왜: 탭 y(`ROW_CARD`/`ROW_CVC`/`ROW_PIN6`)는 **2026-07-31 롯데 실측 절대좌표**다.
+      앱 업데이트·다른 몰·다른 해상도에서 키패드가 조금만 움직여도 **엉뚱한 키를 누른다**
+      (자릿수는 맞아서 `_verify_len` 도 못 잡는다 → 카드사 입력오류 누적 3회면 카드 잠김).
+      실제로 삼성 키패드는 칸마다 위치가 바뀐다(8/7 실측: 카드 962/1079 → CVC 612/727).
+      여기선 좌표를 **바꾸지 않는다**(라이브 재검증 없이 바꾸는 게 더 위험) — 가정이 화면과
+      어긋난 게 **증명될 때만** 탭하지 않고 멈춘다."""
+    import re as _re
+    import xml.etree.ElementTree as ET
+    p = "/tmp/_nh_kpbounds.xml"
+    try:
+        B._adb().dump_ui(p)
+        root = ET.parse(p).getroot()
+    except Exception:
+        return None
+    return _bounds_from_root(root)
+
+
+def _bounds_from_root(root) -> tuple[int, int] | None:
+    """dump 트리에서 키패드 컨테이너 (top, bottom) 추출 — 가장 두꺼운 후보를 고른다."""
+    import re as _re
+    best = None
+    for n in root.iter():
+        blob = f"{n.attrib.get('content-desc', '')} {n.attrib.get('resource-id', '')}".lower()
+        if "키패드" not in blob and "keypad" not in blob and "nppfs" not in blob:
+            continue
+        m = _re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", n.attrib.get("bounds", ""))
+        if not m:
+            continue
+        top, bot = int(m.group(2)), int(m.group(4))
+        if bot - top < 200:                     # 헤더 등 얇은 노드 제외 (키패드는 두껍다)
+            continue
+        if best is None or (bot - top) > (best[1] - best[0]):
+            best = (top, bot)
+    return best
+
+
+def _rows_plausible(rows: tuple[int, int], label: str) -> bool:
+    """가정한 두 행 y 가 실제 키패드 컨테이너 안에 있는지. 확인 불가면 True(기존 동작 유지)."""
+    bnd = _keypad_bounds()
+    if not bnd:
+        return True
+    if bnd[0] <= rows[0] <= bnd[1] and bnd[0] <= rows[1] <= bnd[1]:
+        return True
+    print(f"  [{label}] ✗ 키패드 위치가 상수와 다르다 — 컨테이너 y={bnd}, 가정 행 y={rows}.\n"
+          f"        **탭하지 않고 중단한다.** 이대로 누르면 엉뚱한 키가 들어가고"
+          f" (자릿수는 맞아 검증도 통과) 카드사 입력오류 3회면 카드가 잠긴다.\n"
+          f"        → 화면을 다시 판독해 nh_vision_input 의 ROW_* 를 실측값으로 갱신할 것.")
+    return False
+
+
 def _edit_fields() -> list[tuple[str, int]] | None:
     """화면의 모든 EditText → [(resource-id, 입력된 글자수)]. dump 실패면 None(=검증 불가).
     `text` 우선, 비어 보이면 `content-desc` 폴백(마스킹 `•` 도 글자수로 잡힌다)."""
@@ -380,6 +433,8 @@ def main() -> int:
         value = sec["pin6"]
         pos = build_pos(row1, row2, _ROWS["pin6"])
 
+    if not _rows_plausible(_ROWS["card" if cmd.startswith("box") else cmd], cmd):
+        return 1
     r = tap_digits(value, pos)
     # ⚠️ 값 자체는 절대 출력하지 않는다 (자릿수만).
     print(f"[{cmd}] {'✓' if r.get('ok') else '✗'} {r.get('digits', 0)}자리"
