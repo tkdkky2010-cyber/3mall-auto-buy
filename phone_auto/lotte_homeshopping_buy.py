@@ -1425,6 +1425,20 @@ def main() -> int:
         if str(r["status"]).startswith("SCREEN_LOCKED"):   # 잠긴 폰에 나머지 계정 헛돌기 금지
             print("[STOP] 폰 잠김 — 잠금해제 후 재실행 (나머지 계정 중단)", flush=True)
             break
+        # ★핸드세이크(NH·삼성)면 여기서 멈춘다 — 다음 계정 콜드런치가 **살아있는 결제화면을 날린다.**
+        if "_HANDOFF" in str(r["status"]):
+            hcard = str(r["status"]).split("_HANDOFF", 1)[0]
+            runner = "samsung_enter" if hcard == "삼성" else "nh_enter"
+            rest = [x for x in idxs if x > i]
+            c = f" combo={combo_idx}" if combo_idx is not None else ""
+            print(f"\n{'='*54}\n★ #{i} {hcard} 인계 대기 — 여기서 멈춥니다 (나머지 계정 중단)\n"
+                  f"  1) 판독:   python3 -m phone_auto.{runner} shot /tmp/kp.png\n"
+                  f"  2) 마무리: python3 -m phone_auto.{runner} finish_lotte {i}{c}\n"
+                  f"  3) 남은 계정: "
+                  + (f"python3 -u -m phone_auto.lotte_homeshopping_buy {' '.join(map(str, rest))}"
+                     f"{c}" if rest else "없음")
+                  + f"\n{'='*54}", flush=True)
+            break
     print("\n===== 요약 =====")
     for r in results:
         b = r.get("beauty", {})

@@ -2239,6 +2239,13 @@ def main() -> int:
             r = {"idx": idx, "status": f"EXC:{e}"}
         print(f"[#{idx}] => {r.get('status')}", flush=True)
         summary.append(r)
+        # ★★핸드세이크면 **루프를 멈춘다.** buy_one 이 return 해도 루프가 다음 계정으로 넘어가면
+        #   콜드런치가 **살아있는 결제화면을 날린다**(카드번호 입력 대기 중인 화면이 사라진다).
+        #   인계 러너로 그 계정을 끝낸 뒤, 아래에 찍힌 명령으로 나머지 계정을 이어서 돌린다.
+        card = _handoff_card(r)
+        if card:
+            _handoff_stop(card, idx, plan[n + 1:], card_override, only_kw)
+            break
         if n < len(plan) - 1:
             _account_gap(r)
     print(f"\n{'='*54}\nSUMMARY", flush=True)
@@ -2272,6 +2279,32 @@ def _account_gap(r: dict) -> None:
     print(f"[gap] 결제완료 +{used/60:.1f}분(적립·대장 포함) → 7분 채우려 "
           f"{remain/60:.1f}분 대기", flush=True)
     time.sleep(remain)
+
+
+_RUNNER = {"삼성": "samsung_enter", "NH": "nh_enter"}
+_HANDOFF_STEPS = {
+    "삼성": "card → cvc → next → pin6 → next → cert → certpw → finish",
+    "NH":   "box1 → box2 → box3 → box4 → cvc → confirm → pinfield → pin6 → confirm → finish",
+}
+
+
+def _handoff_stop(card: str, idx: int, rest: list[int], card_override, only) -> None:
+    """인계 지점에서 루프를 멈추며 **다음에 칠 명령을 그대로** 찍는다.
+    남은 계정을 사람이 다시 계산하게 두면 빠뜨린다 → 명령줄을 완성해서 준다."""
+    runner = _RUNNER.get(card, "nh_enter")
+    kw = (" " + " ".join(only)) if only else ""
+    print(f"\n{'='*54}\n★ #{idx} {card} 인계 대기 — 여기서 멈춥니다 (나머지 계정 중단)\n"
+          f"  1) 화면 판독:  python3 -m phone_auto.{runner} shot /tmp/kp.png\n"
+          f"  2) 입력 순서:  {_HANDOFF_STEPS.get(card, '')}\n"
+          f"  3) 마무리:     python3 -m phone_auto.{runner} finish {idx}{kw}", flush=True)
+    if rest:
+        args = " ".join(str(i) for i in rest)
+        ov = f" {card_override}" if card_override else ""
+        okw = f" only={','.join(only)}" if only else ""
+        print(f"  4) 남은 계정:  python3 -u -m phone_auto.hmall_hyundai_buy{ov} {args}{okw}", flush=True)
+    else:
+        print("  4) 남은 계정 없음 — 이 계정이 마지막", flush=True)
+    print("=" * 54, flush=True)
 
 
 def _handoff_card(r: dict) -> str | None:
