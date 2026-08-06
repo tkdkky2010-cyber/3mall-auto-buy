@@ -962,7 +962,10 @@ def pay_lotte_samsung_general() -> dict:
     롯데는 하단 'NNN원 결제하기'(cy>2000)를 눌러야 해서 그 부분만 여기서 넘긴다.
 
     검증: 2026-08-02 #16·#3·#5·#15 4계정 연속 라이브 완주(주문 I20794/I21621/I22042/I22245).
-    PAY_VISION_MODE=1 이면 카드번호 화면에서 정지 → 에이전트 수동입력(오늘 4/4 성공 경로).
+    ★2026-08-06: 삼성도 NH 처럼 **항상 비전 핸드세이크**로 바뀌었다(환경변수 없음).
+      카드번호 화면에서 `manual=True` 로 정지 → `python3 -m phone_auto.samsung_enter` 로 이어받고,
+      마무리는 `samsung_enter finish_lotte <계정> [combo=N]` (대장 + 뷰티 + 구매사은).
+      옛 `PAY_VISION_MODE=1` 게이트는 제거됐다 — 깜빡하면 로컬 OCR 경로로 조용히 떨어져 실패했다.
     """
     def _lotte_pay_tap() -> bool:
         if screen_has("다음에도") or screen_has("사용할까요"):
@@ -1367,7 +1370,12 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
     #   이어받기 = phone_auto/nh_enter.py. 완주 후 구매대장은 **수동 기록**해야 한다
     #   (아래 자동 기록 블록을 안 타므로 — record_combo 로 조합/주문번호 남길 것).
     if pay.get("manual"):
-        res["status"] = "NH_HANDOFF(카드번호 화면 — 에이전트 비전 입력 대기)"; return res
+        # ★NH·삼성 공통 — 카드번호 화면에서 비전 인계로 정지(실패 아님). 이어받기 러너가 다르다:
+        #   NH=phone_auto/nh_enter / 삼성=phone_auto/samsung_enter. 마무리는 finish_lotte 로 동일.
+        runner = "samsung_enter" if use_card == "삼성" else "nh_enter"
+        res["status"] = (f"{use_card}_HANDOFF(카드번호 화면 — 에이전트 비전 입력 대기, "
+                         f"이어받기: python3 -m phone_auto.{runner})")
+        return res
     if not pay.get("ok"):
         res["status"] = f"PAY_FAIL@{pay.get('step')}:{pay.get('err')}"; return res
     res["status"] = f"DONE(주문 {pay.get('order')})"
@@ -1437,17 +1445,20 @@ def _reward_warn(results: list[dict], combo_idx=None) -> None:
     bad = [r for r in results if str(r.get("status", "")).startswith("DONE")
            and not ((r.get("reward") or {}).get("completed") or (r.get("reward") or {}).get("already")
                     or (r.get("beauty") or {}).get("completed"))]
-    nh = [r for r in results if str(r.get("status", "")).startswith("NH_HANDOFF")]
-    if not bad and not nh:
+    # ★NH·삼성 등 **모든 카드의 핸드세이크**를 잡는다(NH 만 보면 삼성 인계가 조용히 빠진다).
+    hand = [(r, str(r["status"]).split("_HANDOFF", 1)[0])
+            for r in results if "_HANDOFF" in str(r.get("status", ""))]
+    if not bad and not hand:
         return
     c = f" combo={combo_idx}" if combo_idx is not None else ""
+    runner = {"삼성": "samsung_enter"}
     print(f"\n{'!'*54}\n⚠️ 뷰티/적립 미완 — 확인할 것")
     for r in bad:
         print(f"   #{r['idx']} {r.get('id','')} → 뷰티는 주문완료 화면 only(복구 불가). "
               f"구매사은 적립은 신청기간 내 재진입 가능")
-    for r in nh:
-        print(f"   #{r['idx']} {r.get('id','')} (NH) → 결제 마친 뒤 "
-              f"python3 -m phone_auto.nh_enter finish_lotte {r['idx']}{c}")
+    for r, card in hand:
+        print(f"   #{r['idx']} {r.get('id','')} ({card}) → 결제 마친 뒤 "
+              f"python3 -m phone_auto.{runner.get(card, 'nh_enter')} finish_lotte {r['idx']}{c}")
     print("!" * 54)
 
 

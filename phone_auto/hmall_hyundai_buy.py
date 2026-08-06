@@ -1205,53 +1205,31 @@ def pay_samsung(pay_tap=None) -> dict:
     out["step"] = "card_cvc"
     if not wait_text("카드번호", timeout=12):
         out["err"] = "카드번호 화면 미도달"; return out
-    # ★PAY_VISION_MODE: 카드번호 화면 도달 → 정지, 에이전트가 화면 보고 직접 입력
-    if os.environ.get("PAY_VISION_MODE", "").strip() in ("1", "true", "yes"):
-        out["step"] = "vision_handoff"
-        out["err"] = "VISION_HANDOFF: 카드번호 화면 도달 — 에이전트 수동입력 대기 (스크립트 정지)"
-        print("\n[VISION_HANDOFF] 카드번호 화면 도달. 스크립트 정지 — 에이전트가 직접 입력합니다.", flush=True)
-        return out
-    fld = next((it for it in _ocr_texts(cap()) if "없이" in it["text"]), None) \
-        or next((it for it in _ocr_texts(cap()) if "카드번호" in it["text"]), None)
-    if not fld:
-        out["err"] = "카드번호 필드 미발견"; return out
-    _adb().tap(fld["cx"], fld["cy"]); time.sleep(1.5)
-    r = _tap_shuffle(card_no, delay=0.5)          # ★0.5초 (0.35=오입력 / 1.0=느림, 8/02 실측)
-    if not r.get("ok"):
-        out["err"] = f"카드번호 입력 실패: {r.get('err')}"; return out
-    time.sleep(1.5)
-    got = card_digits_on_screen()                  # ★자릿수 검증 (#5: 15자리 중 9자리만 들어감)
-    if got and got < len(card_no):
-        out["err"] = f"카드번호 미완성 입력 {got}/{len(card_no)}자리 — 탭 유실"; return out
-    cf = next((it for it in _ocr_texts(cap()) if "CVC" in it["text"].upper()), None)
-    if not cf:
-        out["err"] = "CVC 필드 미발견"; return out
-    _adb().tap(cf["cx"], cf["cy"]); time.sleep(1.5)
-    r = _tap_shuffle(cvc, delay=0.5)
-    if not r.get("ok"):
-        out["err"] = f"CVC 입력 실패: {r.get('err')}"; return out
-    time.sleep(1.5)
-    if not next_button_enabled():                  # ★활성 검증 — 비활성=입력 틀림. 탭해봐야 헛수고
-        out["err"] = "'다음' 비활성 — 카드번호/CVC 입력값 오류(탭 유실 의심)"; return out
-    if not ocr_tap("다음", contains=True, retries=4):
-        out["err"] = "카드/CVC '다음' 실패"; return out
-    time.sleep(2.5)
-    # 5) 일반결제 비밀번호(pin6) → 다음
-    out["step"] = "pin6"
-    if not wait_text("6자리", timeout=12) and not screen_has("비밀번호"):
-        out["err"] = "비밀번호 화면 미도달"; return out
-    pf = next((it for it in _ocr_texts(cap()) if "6자리" in it["text"] or "숫자" in it["text"]), None)
-    if pf:
-        _adb().tap(pf["cx"], pf["cy"]); time.sleep(1.5)
-    r = _tap_shuffle(pin6, delay=0.8)
-    if not r.get("ok"):
-        out["err"] = f"결제비번 입력 실패: {r.get('err')}"; return out
-    time.sleep(1.0)
-    if not ocr_tap("다음", contains=True, retries=4):
-        out["err"] = "결제비번 '다음' 실패"; return out
-    time.sleep(2.5)
+    # ★★삼성 = **항상 에이전트 비전 핸드세이크** (사용자 지시 2026-08-06, 3사 공용 정본).
+    #   근거: 셔플 키패드는 로컬 2엔진(vision+easyocr) 매핑이 자주 실패한다
+    #        (8/6 실측: 10자리 중 5·1·2개만 매핑 → 9계정 연속 `'다음' 비활성`).
+    #        로컬이 실패하면 `_ocr_claude` **파일 핸드셰이크**로 승격하는데, 이건 스크립트가
+    #        45초 동안 내 응답을 기다리는 구조라 **스크립트를 백그라운드로 돌리면 무조건 타임아웃**이고
+    #        (8/5 §11 에 NH 로 똑같이 겪고 적어놨다) 한 번 타임아웃하면 그 프로세스에선 클로드가 꺼져
+    #        나머지 계정까지 전부 같은 자리에서 죽는다.
+    #   ⚠️ 옛 게이트 `PAY_VISION_MODE=1` 은 **제거했다** — 플래그를 깜빡하면 조용히 옛 로컬 OCR 경로로
+    #      떨어지는 게 8/6 실패의 직접 원인이었다(NH 도 8/5 에 같은 이유로 게이트를 없앴다).
+    #      **기본값이 곧 핸드세이크다. 되살리지 말 것.**
+    #   이어받기: `python3 -m phone_auto.samsung_enter` (카드번호 → CVC → 다음 → 비번6 → 인증서 → 인증서비번).
+    #            값(카드번호/CVC/비번)은 그 스크립트가 secrets 에서 직접 읽고, 에이전트는 **키패드 좌표만** 준다.
+    out["step"] = "card_screen_ready"
+    out["manual"] = True
+    print("[삼성] ★카드번호 화면 도달 — 에이전트 비전 인계 대기 "
+          "(samsung_enter: card → cvc → next → pin6 → next → cert → certpw)", flush=True)
+    return out
+
+
+def samsung_cert_step() -> dict:
+    """삼성 일반결제 **비번6 이후** 인증서 구간 — `samsung_enter cert` 가 호출한다.
+    금융인증서 아래 '모니모 앱' → 김건엽 인증서 카드 → (인증서 비번은 호출측이 핸드세이크로 입력).
+    ★`pay_samsung` 에서 잘라낸 코드 그대로 — 2026-08-02 롯데 4계정 라이브 검증된 시퀀스다."""
+    out = {"step": "cert_select"}
     # 6) 금융인증서 아래 '모니모 앱' (⚠️공동인증서 모니모/설치하기 아님 — 헤더 아래 최근접)
-    out["step"] = "cert_select"
     if not wait_text("인증서", timeout=12):
         out["err"] = "인증서 선택 미도달"; return out
     its = _ocr_texts(cap())
@@ -1273,12 +1251,17 @@ def pay_samsung(pay_tap=None) -> dict:
     if not wait_text("비밀번호", timeout=10):
         out["err"] = "인증서 비번 화면 미도달"; return out
     time.sleep(1.0)
-    r = _tap_shuffle(cert_pw6, delay=0.8)
-    if not r.get("ok"):
-        out["err"] = f"인증서 비번 입력 실패: {r.get('err')}"; return out
-    time.sleep(2.0)
-    # 8) '인증 성공' OK → hmall 복귀(주문완료는 buy_one wait_order_complete 가 폴링)
-    out["step"] = "cert_done"
+    # ★인증서 비번도 셔플 키패드 → 여기서 멈추고 `samsung_enter certpw` 로 인계한다.
+    out["step"] = "certpw_screen_ready"
+    out["manual"] = True
+    out["ok"] = True
+    print("[삼성] 인증서 비번 화면 도달 — `samsung_enter certpw` 로 인계", flush=True)
+    return out
+
+
+def samsung_cert_done() -> dict:
+    """인증서 비번 입력 후 '인증 성공' OK → 몰 복귀. (주문완료는 buy_one/finish 가 폴링)"""
+    out = {"step": "cert_done"}
     if wait_text("성공", timeout=20):
         if not ocr_tap("OK", contains=True, retries=2):
             ocr_tap("확인", contains=True, retries=2)
@@ -1983,6 +1966,11 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
     elif use_card == "삼성":
         sp = pay_samsung()
         res["pay"] = sp
+        # ★삼성도 NH 와 동일 — 카드번호 화면에서 비전 인계로 정지한다 = 실패 아님(정상 대기).
+        #   여기서 return 해야 다음 계정 콜드런치가 살아있는 결제화면을 날리지 않는다.
+        if sp.get("manual"):
+            # ★접두어는 **카드명 그대로**(`삼성_HANDOFF`) — 요약이 이 토큰으로 러너를 고른다.
+            res["status"] = f"{use_card}_HANDOFF(카드번호 화면 — 에이전트 비전 입력 대기)"; return res
         if not sp.get("ok"):
             res["status"] = f"SAMSUNG_FAIL@{sp.get('step')}:{sp.get('err')}"; return res
     elif use_card == "NH":
@@ -2259,10 +2247,17 @@ def _account_gap(r: dict) -> None:
     time.sleep(remain)
 
 
+def _handoff_card(r: dict) -> str | None:
+    """`NH_HANDOFF` / `SAMSUNG_HANDOFF` … → 카드명. 핸드세이크 카드가 늘어도 자동으로 잡힌다."""
+    st = str(r.get("status", ""))
+    return st.split("_HANDOFF", 1)[0] if "_HANDOFF" in st else None
+
+
 def _reward_tag(r: dict) -> str:
     """요약 한 줄에 붙일 적립 상태. 결제 안 된 계정은 적립 대상이 아니므로 '-'."""
     if not str(r.get("status", "")).startswith("DONE"):
-        return "적립-" if not str(r.get("status", "")).startswith("NH_HANDOFF") else "적립⚠️NH미완"
+        c = _handoff_card(r)
+        return f"적립⚠️{c}미완" if c else "적립-"
     rw = r.get("reward") or {}
     return "적립✓" if rw.get("ok") else f"적립⚠️{rw.get('skip') or rw.get('err') or '미확정'}"
 
@@ -2273,17 +2268,20 @@ def _reward_warn(summary: list[dict], only: list[str] | None = None) -> None:
     NH 는 buy_one 이 핸드세이크로 일찍 return 해 자동 적립을 안 타므로 별도 안내."""
     bad = [r for r in summary
            if str(r.get("status", "")).startswith("DONE") and not (r.get("reward") or {}).get("ok")]
-    nh = [r for r in summary if str(r.get("status", "")).startswith("NH_HANDOFF")]
-    if not bad and not nh:
+    # ★카드별 핸드세이크 전부 — NH 만 보던 탓에 삼성 인계 계정이 '전 계정 확인 완료 ✓' 로
+    #   조용히 넘어갔다(2026-08-06). 러너 이름도 카드에 맞춰 안내한다.
+    hand = [(r, _handoff_card(r)) for r in summary if _handoff_card(r)]
+    if not bad and not hand:
         print("  [적립] 전 계정 확인 완료 ✓", flush=True)
         return
     kw = (" " + " ".join(only)) if only else ""
+    runner = {"삼성": "samsung_enter"}
     print(f"\n{'!'*54}\n⚠️ 적립 미완 — 아래를 반드시 처리할 것", flush=True)
     for r in bad:
         print(f"   #{r['idx']} {r.get('id','?')} → python3 buy.py reward {r['idx']}{kw}", flush=True)
-    for r in nh:
-        print(f"   #{r['idx']} {r.get('id','?')} (NH) → 결제 마친 뒤 "
-              f"python3 -m phone_auto.nh_enter finish {r['idx']}{kw}", flush=True)
+    for r, card in hand:
+        print(f"   #{r['idx']} {r.get('id','?')} ({card}) → 결제 마친 뒤 "
+              f"python3 -m phone_auto.{runner.get(card, 'nh_enter')} finish {r['idx']}{kw}", flush=True)
     print("!" * 54, flush=True)
 
 
