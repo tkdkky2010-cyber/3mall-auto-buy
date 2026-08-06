@@ -1,5 +1,5 @@
 {
-  "date": "2026-08-05",
+  "date": "2026-08-06",
   "account_used": "tkdkky2002",
   "products": [
     {
@@ -102,20 +102,14 @@
         "member_price": 125910,
         "card_slides": [
           {
-            "alt": "cardCd03",
-            "text": "KB국민 7% 즉시할인 111,242원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 111,242원",
             "percent": 7,
             "price": 111242
           },
           {
-            "alt": "cardCd01",
-            "text": "비씨 5% 즉시할인 113,635원",
-            "percent": 5,
-            "price": 113635
-          },
-          {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 113,635원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 113,635원",
             "percent": 5,
             "price": 113635
           }
@@ -124,19 +118,12 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 115910,
         "paybacks": {
-          "KB국민카드": {
+          "삼성카드": {
             "immediate_price": 111242,
             "payback_pct": 1.0,
             "after_payback": 110130,
             "reward_pt": 10000,
             "final_cost": 100130
-          },
-          "비씨카드": {
-            "immediate_price": 113635,
-            "payback_pct": 1.5,
-            "after_payback": 111930,
-            "reward_pt": 10000,
-            "final_cost": 101930
           }
         },
         "optimal_tier": {
@@ -326,30 +313,24 @@
         "member_price": 262400,
         "card_slides": [
           {
-            "alt": "cardCd01",
-            "text": "비씨 5% 즉시할인 249,280원",
+            "alt": "",
+            "text": "5% 즉시할인",
             "percent": 5,
-            "price": 249280
+            "price": 249280,
+            "discount_type": "즉시할인"
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 249,280원",
-            "percent": 5,
-            "price": 249280
+            "alt": "현대홈쇼핑 현대카드 Ed2",
+            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
+            "percent": 7,
+            "price": null,
+            "discount_type": "청구할인"
           }
         ],
-        "kakao_price": 262400,
-        "kakao_reward_pt": 26240,
-        "kakao_final_cost": 236160,
-        "paybacks": {
-          "비씨카드": {
-            "immediate_price": 249280,
-            "payback_pct": 1.5,
-            "after_payback": 245541,
-            "reward_pt": 24928,
-            "final_cost": 220613
-          }
-        },
+        "kakao_price": 249280,
+        "kakao_reward_pt": 24928,
+        "kakao_final_cost": 206902,
+        "paybacks": {},
         "optimal_tier": {
           "qty": 1,
           "tier_min": 50000,
@@ -369,173 +350,16 @@
       "id": "16",
       "name": "루솔",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2225275921",
-      "ten_percent": true,
-      "phrase": "여름방학 즐기기 10%적립",
-      "events": [
-        {
-          "prmo": "P202607292410",
-          "name": "여름방학 즐기기 10%적립",
-          "event_end": "8.05 23:59",
-          "tiers": [
-            {
-              "min_won": 30000,
-              "min_unit": "원",
-              "reward_pt": 3000
-            },
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 150000,
-              "min_unit": "원",
-              "reward_pt": 15000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            },
-            {
-              "min_won": 1000000,
-              "min_unit": "원",
-              "reward_pt": 100000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 30000,
-          "min_unit": "원",
-          "reward_pt": 3000
-        },
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 150000,
-          "min_unit": "원",
-          "reward_pt": 15000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        },
-        {
-          "min_won": 1000000,
-          "min_unit": "원",
-          "reward_pt": 100000
-        }
-      ],
-      "max_reward": "100,000P",
-      "event_end": "8.05 23:59",
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 1,
-        "list_price": 51500,
-        "member_price": 46350,
-        "card_slides": [
-          {
-            "alt": "토스페이 최대 13,000원 혜택",
-            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
-            "percent": null,
-            "price": 13000
-          },
-          {
-            "alt": "네이버페이 최대 2천원 혜택",
-            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
-            "percent": null,
-            "price": null
-          }
-        ],
-        "kakao_price": 46350,
-        "kakao_reward_pt": 3000,
-        "kakao_final_cost": 43350,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 30000,
-          "tier_reward": 3000,
-          "nominal_pct": 10.0,
-          "actual_total": 46350,
-          "actual_reward": 3000,
-          "effective_pct": 6.472491909385113
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 46350,
-        "options": [
-          {
-            "idx": 1,
-            "name": "[루솔] 진한 배도라지즙 선물박스(60포) 배즙",
-            "list_price": 51500
-          },
-          {
-            "idx": 2,
-            "name": "[루솔] 진한 배도라지즙 선물박스(80포) 배즙",
-            "list_price": 71000
-          },
-          {
-            "idx": 3,
-            "name": "[루솔] 진한 배도라지즙 선물박스(100포) 배즙",
-            "list_price": 87000
-          },
-          {
-            "idx": 4,
-            "name": "[루솔] 진한 배도라지즙 선물박스(120포) 배즙",
-            "list_price": 103000
-          }
-        ]
-      }
+      "simple_ranges": []
     },
     {
       "id": "17",
@@ -644,30 +468,24 @@
         "member_price": 95840,
         "card_slides": [
           {
-            "alt": "cardCd01",
-            "text": "비씨 5% 즉시할인 91,048원",
+            "alt": "",
+            "text": "5% 즉시할인",
             "percent": 5,
-            "price": 91048
+            "price": 91048,
+            "discount_type": "즉시할인"
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 91,048원",
-            "percent": 5,
-            "price": 91048
+            "alt": "현대홈쇼핑 현대카드 Ed2",
+            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
+            "percent": 7,
+            "price": null,
+            "discount_type": "청구할인"
           }
         ],
-        "kakao_price": 95840,
-        "kakao_reward_pt": 14584,
-        "kakao_final_cost": 81256,
-        "paybacks": {
-          "비씨카드": {
-            "immediate_price": 91048,
-            "payback_pct": 1.5,
-            "after_payback": 89682,
-            "reward_pt": 14105,
-            "final_cost": 75577
-          }
-        },
+        "kakao_price": 91048,
+        "kakao_reward_pt": 14105,
+        "kakao_final_cost": 70570,
+        "paybacks": {},
         "optimal_tier": {
           "qty": 2,
           "tier_min": 50000,
@@ -783,20 +601,14 @@
         "member_price": 66340,
         "card_slides": [
           {
-            "alt": "cardCd03",
-            "text": "KB국민 7% 즉시할인 61,696원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 61,696원",
             "percent": 7,
             "price": 61696
           },
           {
-            "alt": "cardCd01",
-            "text": "비씨 5% 즉시할인 63,023원",
-            "percent": 5,
-            "price": 63023
-          },
-          {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 63,023원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 63,023원",
             "percent": 5,
             "price": 63023
           }
@@ -805,19 +617,12 @@
         "kakao_reward_pt": 5000,
         "kakao_final_cost": 61340,
         "paybacks": {
-          "KB국민카드": {
+          "삼성카드": {
             "immediate_price": 61696,
             "payback_pct": 1.0,
             "after_payback": 61079,
             "reward_pt": 5000,
             "final_cost": 56079
-          },
-          "비씨카드": {
-            "immediate_price": 63023,
-            "payback_pct": 1.5,
-            "after_payback": 62078,
-            "reward_pt": 5000,
-            "final_cost": 57078
           }
         },
         "optimal_tier": {
@@ -884,20 +689,14 @@
         "member_price": 55120,
         "card_slides": [
           {
-            "alt": "cardCd03",
-            "text": "KB국민 7% 즉시할인 51,262원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 51,262원",
             "percent": 7,
             "price": 51262
           },
           {
-            "alt": "cardCd01",
-            "text": "비씨 5% 즉시할인 52,364원",
-            "percent": 5,
-            "price": 52364
-          },
-          {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 52,364원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 52,364원",
             "percent": 5,
             "price": 52364
           }
@@ -906,19 +705,12 @@
         "kakao_reward_pt": 5512,
         "kakao_final_cost": 49608,
         "paybacks": {
-          "KB국민카드": {
+          "삼성카드": {
             "immediate_price": 51262,
             "payback_pct": 1.0,
             "after_payback": 50749,
             "reward_pt": 5126,
             "final_cost": 45623
-          },
-          "비씨카드": {
-            "immediate_price": 52364,
-            "payback_pct": 1.5,
-            "after_payback": 51579,
-            "reward_pt": 5236,
-            "final_cost": 46343
           }
         },
         "optimal_tier": {
@@ -1049,20 +841,14 @@
         "member_price": 62910,
         "card_slides": [
           {
-            "alt": "cardCd03",
-            "text": "KB국민 7% 즉시할인 58,507원",
+            "alt": "cardCd02",
+            "text": "삼성 7% 즉시할인 58,507원",
             "percent": 7,
             "price": 58507
           },
           {
-            "alt": "cardCd01",
-            "text": "비씨 5% 즉시할인 59,765원",
-            "percent": 5,
-            "price": 59765
-          },
-          {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 59,765원",
+            "alt": "cardCd04",
+            "text": "현대 5% 즉시할인 59,765원",
             "percent": 5,
             "price": 59765
           }
@@ -1071,19 +857,12 @@
         "kakao_reward_pt": 5000,
         "kakao_final_cost": 57910,
         "paybacks": {
-          "KB국민카드": {
+          "삼성카드": {
             "immediate_price": 58507,
             "payback_pct": 1.0,
             "after_payback": 57922,
             "reward_pt": 5000,
             "final_cost": 52922
-          },
-          "비씨카드": {
-            "immediate_price": 59765,
-            "payback_pct": 1.5,
-            "after_payback": 58869,
-            "reward_pt": 5000,
-            "final_cost": 53869
           }
         },
         "optimal_tier": {
@@ -1219,30 +998,24 @@
         "member_price": 198400,
         "card_slides": [
           {
-            "alt": "cardCd01",
-            "text": "비씨 5% 즉시할인 188,480원",
+            "alt": "",
+            "text": "5% 즉시할인",
             "percent": 5,
-            "price": 188480
+            "price": 188480,
+            "discount_type": "즉시할인"
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 188,480원",
-            "percent": 5,
-            "price": 188480
+            "alt": "현대홈쇼핑 현대카드 Ed2",
+            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
+            "percent": 7,
+            "price": null,
+            "discount_type": "청구할인"
           }
         ],
-        "kakao_price": 198400,
-        "kakao_reward_pt": 29840,
-        "kakao_final_cost": 168560,
-        "paybacks": {
-          "비씨카드": {
-            "immediate_price": 188480,
-            "payback_pct": 1.5,
-            "after_payback": 185653,
-            "reward_pt": 28848,
-            "final_cost": 156805
-          }
-        },
+        "kakao_price": 188480,
+        "kakao_reward_pt": 28848,
+        "kakao_final_cost": 146438,
+        "paybacks": {},
         "optimal_tier": {
           "qty": 1,
           "tier_min": 50000,
@@ -1362,45 +1135,39 @@
       "payment": {
         "qty": 1,
         "list_price": 92000,
-        "member_price": 82800,
+        "member_price": 73600,
         "card_slides": [
           {
-            "alt": "cardCd01",
-            "text": "비씨 5% 즉시할인 78,660원",
+            "alt": "",
+            "text": "5% 즉시할인",
             "percent": 5,
-            "price": 78660
+            "price": 69920,
+            "discount_type": "즉시할인"
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 78,660원",
-            "percent": 5,
-            "price": 78660
+            "alt": "현대홈쇼핑 현대카드 Ed2",
+            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
+            "percent": 7,
+            "price": null,
+            "discount_type": "청구할인"
           }
         ],
-        "kakao_price": 82800,
-        "kakao_reward_pt": 13280,
-        "kakao_final_cost": 69520,
-        "paybacks": {
-          "비씨카드": {
-            "immediate_price": 78660,
-            "payback_pct": 1.5,
-            "after_payback": 77480,
-            "reward_pt": 12866,
-            "final_cost": 64614
-          }
-        },
+        "kakao_price": 69920,
+        "kakao_reward_pt": 11992,
+        "kakao_final_cost": 53034,
+        "paybacks": {},
         "optimal_tier": {
           "qty": 1,
           "tier_min": 50000,
           "tier_reward": 5000,
           "nominal_pct": 10.0,
-          "actual_total": 82800,
+          "actual_total": 73600,
           "actual_reward": 5000,
-          "effective_pct": 6.038647342995169
+          "effective_pct": 6.7934782608695645
         },
         "effective_ten_percent": true,
         "error": null,
-        "benefit_unit_price": 82800,
+        "benefit_unit_price": 73600,
         "options": []
       }
     },
@@ -1466,7 +1233,6 @@
   "ten_percent_ids": [
     "1",
     "11",
-    "16",
     "17",
     "22",
     "25",
