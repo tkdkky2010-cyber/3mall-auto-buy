@@ -18,9 +18,15 @@
   python3 -m phone_auto.nh_enter pinfield                  # 결제비번 칸 탭(키패드 소환)
   python3 -m phone_auto.nh_enter pin6 "..." "..."
   python3 -m phone_auto.nh_enter confirm                   # '확인' 탭
-  python3 -m phone_auto.nh_enter finish 5 데이즈온          # ★현대몰: 주문완료 화면에서 대장+H.Point 적립
+  python3 -m phone_auto.nh_enter finish 5 데이즈온          # ★현대몰 식품: 대장(record_food)+H.Point 적립
+  python3 -m phone_auto.nh_enter finish 5 combo=24         # ★현대몰 설화수: 대장(record_combo)
   python3 -m phone_auto.nh_enter finish_lotte 5 combo=24    # ★롯데: 대장+뷰티포인트+구매사은 적립
   python3 -m phone_auto.nh_enter fields                    # (디버그) 입력칸 resource-id/자릿수 덤프
+
+★공통 옵션 (2026-08-07 추가 — 안 넣으면 대장이 조용히 틀리게 적힌다):
+  · `card=삼성`  … 기본값은 NH. **삼성으로 결제했으면 반드시 넘긴다**(samsung_enter 가 자동 주입).
+  · `combo=24`  … 설화수(조합 단위). 없으면 식품으로 보고 today_carts.json 을 뒤진다.
+  · `order=2026…` … 주문완료 화면을 이미 벗어났을 때만. 화면 검증을 건너뛰므로 로그에 크게 남는다.
 
 ★★`finish` 를 빼먹지 말 것. NH 는 buy_one 이 핸드세이크 지점에서 일찍 return 하므로
    구매대장·적립 자동단계를 **안 탄다**. 2026-08-05 에 이걸 몰라 H.Point 적립 12계정이
@@ -180,14 +186,17 @@ def _finish_lotte(args: list[str]) -> int:
     롯데도 NH 는 `buy_one` 이 `NH_HANDOFF` 로 일찍 return 하므로(lotte_homeshopping_buy.py:1369)
     DONE 이후 후처리를 통째로 안 탄다 → 여기서 같은 순서로 마무리한다.
     ⚠️순서 고정(뷰티 → 적립): reward 가 홈으로 이동하면 주문완료 화면을 이탈해 뷰티가 소실된다(#6 사례).
-    사용: finish_lotte <계정번호> [combo=24] [goods=2923406968]"""
+    사용: finish_lotte <계정번호> [combo=24] [goods=2923406968] [card=삼성]"""
     from phone_auto import lotte_homeshopping_buy as L
     if not args or not args[0].isdigit():
-        print("[ERR] 사용: python3 -m phone_auto.nh_enter finish_lotte <계정번호> [combo=N] [goods=상품번호]")
+        print("[ERR] 사용: python3 -m phone_auto.nh_enter finish_lotte <계정번호> "
+              "[combo=N] [goods=상품번호] [card=삼성]")
         return 1
     idx = int(args[0])
     combo = next((int(x.split("=", 1)[1]) for x in args if x.startswith("combo=")), None)
     goods = next((x.split("=", 1)[1] for x in args if x.startswith("goods=")), None)
+    # ★card= : 종전 card="NH" 하드코딩 → 삼성으로 결제해도 대장엔 NH 로 적혔다(8/7 발견).
+    card = next((x.split("=", 1)[1] for x in args if x.startswith("card=")), "NH")
     if not B._wait_app(L.PKG, timeout=2):
         print("[finish] ✗ 롯데앱이 foreground 가 아니다 — 주문완료 화면에서 실행할 것 (기록 안 함)")
         return 1
@@ -201,7 +210,7 @@ def _finish_lotte(args: list[str]) -> int:
     try:
         sys.path.insert(0, str(B.ROOT))
         import purchase_ledger as PL
-        PL.record_combo("롯데홈쇼핑", acct_id, combo, order_no=order, card="NH")
+        PL.record_combo("롯데홈쇼핑", acct_id, combo, order_no=order, card=card)
     except Exception as e:
         print(f"[finish] ⚠️ 대장 기록 실패: {e}")
     L.dismiss_card_register()
@@ -262,9 +271,20 @@ def main() -> int:
         #   NH 는 buy_one 이 핸드세이크 지점에서 일찍 return 하므로 대장/적립 자동단계를 **안 탄다.**
         #   그래서 여기서 반드시 마무리해야 한다. (2026-08-05: 이걸 안 해서 적립 12계정 누락)
         if len(args) < 2 or not args[1].isdigit():
-            print("[ERR] 사용: python3 -m phone_auto.nh_enter finish <계정번호> [상품키워드...]")
+            print("[ERR] 사용: python3 -m phone_auto.nh_enter finish <계정번호> [상품키워드...] "
+                  "[card=삼성] [combo=24] [order=2026...]")
             return 1
-        idx, kws = int(args[1]), args[2:]
+        idx = int(args[1])
+        opt = args[2:]
+        # ★card= : 종전엔 card="NH" 하드코딩이라 **삼성으로 결제해도 대장엔 NH** 로 적혔다(8/7 발견).
+        #   samsung_enter 가 위임할 때 card=삼성 을 자동으로 넣는다.
+        card = next((a.split("=", 1)[1] for a in opt if a.startswith("card=")), "NH")
+        # ★combo= : 현대몰 **설화수**는 식품(record_food)이 아니라 조합(record_combo)으로 적는다.
+        #   종전엔 현대몰 finish 에 이 분기가 없어 설화수를 삼성/NH 로 사면 대장이 틀어졌다.
+        combo = next((int(a.split("=", 1)[1]) for a in opt if a.startswith("combo=")), None)
+        # ★order= : 주문완료 화면을 이미 벗어난 뒤(알림 탭/자동 이동) 기록을 살리는 수동 인계용.
+        order_given = next((a.split("=", 1)[1] for a in opt if a.startswith("order=")), None)
+        kws = [a for a in opt if "=" not in a]
         # ★몰 가드 — 롯데 주문완료 화면에서 이걸 돌리면 현대몰 카트를 찾아 **딴 몰 장부**에 기록하고
         #   H.Point 적립을 돌린다(뷰티포인트는 그동안 소실). 롯데면 finish_lotte 로 보낸다.
         from phone_auto import lotte_homeshopping_buy as _L
@@ -279,30 +299,46 @@ def main() -> int:
         # ★주문완료 화면인지 **먼저** 확인 — 결제가 안 됐는데 대장·적립을 기록하면
         #   있지도 않은 구매가 장부에 남는다(더 나쁜 오류). 확인 안 되면 아무것도 하지 않는다.
         completed = bool(order_no) or ("주문이" in txt and "완료" in txt) or "주문 완료" in txt
+        if order_given:
+            # ★수동 인계 — 주문완료 화면을 이미 벗어난 경우(알림 배너 탭 등으로 상품페이지로 이동).
+            #   결제는 끝났는데 화면이 넘어갔다는 이유로 대장·적립을 통째로 못 남기면
+            #   2026-08-05 의 '조용한 누락' 과 결과가 같아진다 → 근거(주문번호)를 받아 기록한다.
+            #   ⚠️화면 검증을 건너뛰는 유일한 경로이므로 **크게 로그로 남긴다.**
+            order_no, completed = order_given, True
+            print(f"[finish] ⚠️ order= 로 주문번호를 직접 받았다({order_given}) — 화면 확인 없이 기록한다. "
+                  "실제 주문내역과 반드시 대조할 것")
         if not completed:
             print("[finish] ✗ 주문완료 화면이 아니다 (주문번호·완료문구 없음) — "
                   "대장/적립 **기록하지 않고 중단**.\n"
-                  "         결제가 실제로 끝났는지 화면을 확인하고, 끝났으면 그 화면에서 다시 실행할 것.")
+                  "         결제가 실제로 끝났는지 화면을 확인하고, 끝났으면 그 화면에서 다시 실행할 것.\n"
+                  "         (화면이 이미 넘어갔으면 `order=<주문번호>` 로 기록만 살릴 수 있다)")
             return 1
-        print(f"[finish] 주문완료 확인 — 주문번호 {order_no or '(미판독)'}")
+        print(f"[finish] 주문완료 확인 — 주문번호 {order_no or '(미판독)'} / 카드 {card}")
 
         accounts = json.loads(B.hw.ACCOUNTS_FILE.read_text(encoding="utf-8"))["accounts"]
         acct_id = accounts[idx - 1].get("id")
         # 구매대장 — 이번에 결제한 상품만(키워드 필터)
         try:
-            mf = json.loads((B.ROOT / "cart" / "today_carts.json").read_text(encoding="utf-8"))
-            cart = next((c for c in mf.get("carts", [])
-                         if c.get("mall") in ("현대", "hmall") and c.get("account") == idx), None)
             sys.path.insert(0, str(B.ROOT))
             import purchase_ledger as PL
-            n = 0
-            for it in (cart or {}).get("items", []):
-                if kws and not any(k in (it.get("name") or "") for k in kws):
-                    continue
-                PL.record_food("현대Hmall", acct_id, it.get("product"), qty=it.get("qty"),
-                               order_no=order_no, card="NH")
-                n += 1
-            print(f"[finish] 구매대장 {n}건 기록")
+            if combo is not None:
+                # 설화수 = 조합 단위 기록 (buy_one 의 combo_idx 경로와 동일)
+                PL.record_combo("현대Hmall", acct_id, combo, order_no=order_no, card=card)
+                print(f"[finish] 구매대장 조합 {combo} 기록 (카드 {card})")
+            else:
+                mf = json.loads((B.ROOT / "cart" / "today_carts.json").read_text(encoding="utf-8"))
+                cart = next((c for c in mf.get("carts", [])
+                             if c.get("mall") in ("현대", "hmall") and c.get("account") == idx), None)
+                n = 0
+                for it in (cart or {}).get("items", []):
+                    if kws and not any(k in (it.get("name") or "") for k in kws):
+                        continue
+                    PL.record_food("현대Hmall", acct_id, it.get("product"), qty=it.get("qty"),
+                                   order_no=order_no, card=card)
+                    n += 1
+                print(f"[finish] 구매대장 {n}건 기록 (카드 {card})")
+                if n == 0:
+                    print("[finish] ⚠️ 대장 0건 — today_carts.json 이 오늘자인지/키워드가 맞는지 확인할 것")
         except Exception as e:
             print(f"[finish] ⚠️ 대장 기록 실패: {e}")
         B.apply_reward_now(idx, kws or None)      # ★적립 (코드가 한다)

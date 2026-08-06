@@ -1070,50 +1070,13 @@ def _card_secrets() -> dict:
     return _CARD_SECRETS_CACHE
 
 
-KEYPAD_ROI_Y = (0.45, 0.98)   # 셔플 키패드는 화면 하단 → 상단(상태바'100'/금액/카드마스킹/라벨) stray 배제용
-KEYPAD_ROI_MID = (0.38, 0.52)  # 2026-06-10 lotte 앱업뎃 reflow: 키패드가 화면 중앙으로 올라옴(윗줄 y~1035) → 하단 ROI가 윗줄 잘라먹음.
-                               #   하단(하단키패드=hmall/구lotte) → 중앙(신 lotte) 순차 에스컬레이션 (양쪽 안전). 입력완료(y~1260) 배제됨.
-KEYPAD_ROI_TOP = (0.20, 0.42)  # 2026-06-11 lotte '일반 결제' 모달 셔플키패드(화면 상단). 모달 높이 따라 위치 가변:
-                               #   CVC 키패드 윗줄 y~816=0.34/아랫줄 0.39 / pin6(숫자6자리) 키패드 더 위 윗줄 0.267/아랫줄 0.315.
-                               #   (0.20,0.42)=두 화면 모두 10/10 실측(/tmp/_cvc_now.png,_pin6_now.png). 하단 edge 0.42=placeholder stray('숫자6자리'의 6@0.43, CVC '•••'@0.50) 배제.
-
-
-def _tap_shuffle(value: str, delay: float = 0.5, force_vote: bool = False) -> dict:
-    """셔플 숫자 키패드에 value(숫자 문자열)를 입력. 키패드는 **로드 시 1회만 셔플**(재배열 X) →
-    **1회 OCR 후 value 연속탭**(매 키 사이 delay: 카드/CVC=1.0 / 비번=0.7~0.8).
-    ★엔진 에스컬레이션: **로컬 2엔진(vision+easyocr) voting → 실패 시 클로드 승격**(2026-08-02, gcv 사망).
-    voting 이라 단일엔진 오독(8↔0) 교차검증됨. 클로드는 로컬이 0~9 완전매핑 실패했을 때만 호출된다.
-    둘 다 **키패드 ROI(하단) 제한**으로 stray digit 배제 — 2026-06-02 실측: roi 없으면 상태바'100'→0@(975,46)·
-    라벨→8@(453)·카드마스킹 숫자 오매핑돼 비번 틀림. roi 제한+partial 로 해결. 반환 {ok, via, digits, err}."""
-    out: dict = {}
-    shot = cap("/tmp/_hd_kp.png")
-    from phone_auto.ocr_keypad import vote_digits
-    need = set(value)
-    # ★엔진 사다리 복원(2026-08-02): 빠른 것부터. easyocr 는 느려서(5/30 bench 8s vs vision 0.6s)
-    #   매번 같이 돌리면 키패드마다 ~10초를 까먹고 결제 5분 세션을 잡아먹는다.
-    #   ① vision 단독(0.6s) → ② +easyocr → ③ +claude(에이전트 판독). 앞 단계에서 성공하면 뒤는 안 돈다.
-    from phone_auto.ocr_keypad import ENGINE_FAST, ENGINE_FULL
-    # ①vision(+claude 승격, 빠름) → ②easyocr 추가. force_vote 면 ②부터.
-    passes = [(ENGINE_FULL, "full")] if force_vote else \
-             [(ENGINE_FAST, "fast"), (ENGINE_FULL, "full")]
-    # ROI 에스컬레이션: 하단(hmall/구lotte) → 중앙(신 lotte 카드번호) → 상단(lotte CVC 모달). 하단 우선이라 기존 동작 무회귀.
-    rois = [("하단", KEYPAD_ROI_Y), ("중앙", KEYPAD_ROI_MID), ("상단", KEYPAD_ROI_TOP)]
-    dmap = None
-    for roi_name, roi in rois:
-        for engines, label in passes:
-            vm = vote_digits(shot, flip_h=False, roi_y_frac=roi,
-                             engines=engines, allow_partial=True) or {}
-            if need.issubset(vm):
-                dmap = vm; out["via"] = f"{label}/{roi_name}"; break
-        if dmap:
-            break
-    if not dmap:
-        out["err"] = f"키패드 매핑 실패(로컬2엔진+클로드 × 3ROI, 필요={sorted(need)})"; return out
-    for d in value:
-        x, y = dmap[d]; _adb().tap(x, y)
-        time.sleep(delay)
-    out["ok"] = True; out["digits"] = len(value)
-    return out
+# ★★셔플 키패드 **로컬 OCR 자동입력은 삭제했다** (사용자 지시 2026-08-07 "로컬 OCR 빼, 앞으로 로컬 쓸 일 없다").
+#   종전 `_tap_shuffle`(로컬 2엔진 voting → 파일 핸드셰이크 승격) + `KEYPAD_ROI_*` 3종이 여기 있었다.
+#   왜 지웠나: 로컬 매핑이 자주 깨지는데(8/6 실측 10자리 중 5·1·2개) 실패하면 파일 핸드셰이크로
+#   승격 → 백그라운드 실행에선 무조건 45초 타임아웃 → 그 프로세스의 나머지 계정까지 전멸했다.
+#   **카드번호·CVC·비번·인증서비번은 전부 에이전트 비전 핸드세이크로만 입력한다**
+#   (`samsung_enter` / `nh_enter` — 값은 스크립트가 secrets 에서 읽고 에이전트는 좌표만 준다).
+#   ⚠️ 새 카드 경로를 만들 때도 로컬 OCR 자동입력을 다시 만들지 말 것.
 
 
 
@@ -1133,17 +1096,25 @@ def card_digits_on_screen() -> int:
     return 0
 
 
-def next_button_enabled(y_hint: int = 1377) -> bool:
-    """'다음' 버튼 활성 여부 — 색으로 판정(연한 파랑=비활성 / 진한 파랑=활성).
+def next_button_enabled(y_hint: int | None = None, label: str = "다음") -> bool:
+    """진행 버튼('다음'/'결제') 활성 여부 — 색으로 판정(연한 파랑=비활성 / 진한 파랑=활성).
     ★2026-08-02 확정: 카드번호·CVC 가 정확히 들어가야 진해진다. 비활성인데 탭하면
-      아무 일도 안 일어나고 다음 화면을 기다리다 타임아웃한다(오늘 PAY_FAIL@pin6 4건의 정체).
-      → 비활성이면 '입력이 틀렸다'는 신호이므로 탭하지 말고 중단한다."""
+      아무 일도 안 일어나고 다음 화면을 기다리다 타임아웃한다(PAY_FAIL@pin6 4건의 정체).
+      → 비활성이면 '입력이 틀렸다'는 신호이므로 탭하지 말고 중단한다.
+    ★★2026-08-07 근본수정 — **좌표 하드코딩 제거**: 종전 `y_hint=1377` 은 롯데 화면 기준이라
+      **현대몰 삼성 일반결제(버튼 y≈1173)에선 항상 흰 배경을 찍어 무조건 '비활성'** 이 나왔다.
+      입력이 완벽해도 그 자리에서 결제가 막힌다(8/6 삼성 9계정 `'다음' 비활성` 이 이것이었고,
+      8/7 라이브에서 정확한 입력으로도 재현 확인). → **버튼을 OCR 로 찾아 그 자리 색을 본다.**
+    ★label: 현대몰 PIN 화면의 진행 버튼은 '다음'이 아니라 **'결제'** 다(8/7 실측).
+      `ocr_find` 는 **완전일치**라 '결제 비밀번호'·'일반결제 비밀번호' 같은 라벨엔 안 걸린다."""
     try:
         from PIL import Image
+        btn = ocr_find(label)          # 완전일치 + pick=bottom (버튼은 화면 아래쪽)
         p = cap()
         im = Image.open(p).convert("RGB")
         w, _h = im.size
-        px = [im.getpixel((x, y_hint)) for x in range(int(w * 0.35), int(w * 0.65), 10)]
+        y = y_hint or (btn["cy"] if btn else 1377)
+        px = [im.getpixel((x, y)) for x in range(int(w * 0.35), int(w * 0.65), 10)]
         # 진한 파랑(활성) ≈ (30,120,240) / 연한 파랑(비활성) ≈ (150,200,250)
         return sum(1 for r, g, b in px if b > 180 and r < 110) > len(px) // 2
     except Exception:
@@ -1158,15 +1129,20 @@ def pay_samsung(pay_tap=None) -> dict:
     **가맹점 무관 동일**하므로 몰별로 복제하지 않는다. 몰이 다른 건 '원 결제하기' 탭 하나뿐 →
     `pay_tap` 콜러블로 주입한다(미지정 시 ocr_tap('결제하기')).
 
-    ★PAY_VISION_MODE=1 이면 카드번호 화면에서 정지하고 에이전트에게 인계한다(NH_VISION_MODE 와 동일 패턴).
-      로컬 OCR 이 키패드를 못 잡는 날/화면에서 이 방식이 4/4 성공했다.
-    (구 docstring) 롯데 `pay_lotte_samsung_general` 동일 방식 포팅.
-    삼성 SDK 모달(다른결제→일반결제→카드번호15+CVC3→비번6→금융인증서>모니모>인증서비번6)은 **가맹점 무관 동일**.
+    ✅ **현대몰 라이브 검증 완료 2026-08-07** — #1 tkdkky2002, 주문 `20260807004446`,
+       `198,400원 (삼성카드 일시불)`. 캐러셀에 삼성이 없어 그리드(`_pick_card_from_grid`)로 강제선택 →
+       핸드세이크 → `samsung_enter` 로 완주. (종전 docstring 의 'hmall 라이브 미검증' 경고는 이걸로 해소.)
+
+    ★★몰에 따라 **비번 이후가 다르다** (8/7 현대몰 실측):
+      · 현대몰 : 카드15+CVC3 → '다음' → 일반결제 비번6 → **'결제'** → 곧바로 주문완료. **인증서 단계 없음.**
+      · 롯데   : … 비번6 → '다음' → 금융인증서>모니모>김건엽>인증서비번6 → '인증 성공'.
+      → `samsung_enter next` 가 화면의 '다음'/'결제' 를 알아서 고른다. 현대몰에서 cert 를 기다리지 말 것.
+
+    ★★비번 화면 카드 발급사가 **'롯데' 로 표시되는 것은 정상**(사용자 확인 2026-08-07, 롯데홈쇼핑도 동일).
+      실제 승인은 삼성카드로 잡힌다(주문완료 결제정보로 확인). 이걸 오결제로 오인해 중단하지 말 것.
+
     고정값=secrets/card_secrets.json['삼성'](김건엽 명의 1장 공용). 주문완료는 buy_one wait_order_complete 가 처리.
-    ⚠️⚠️ **포팅 후 hmall 라이브 미검증** — 첫 현대몰 삼성결제 때 end-to-end 관찰 필수(롯데 #12 검증과 동일 절차).
-    경로(2026-06-02 롯데 #12 라이브 검증된 1~8단계): (원)결제하기 → SDK모달 '다른결제'(❌간편결제/PAYCO)
-      → '일반결제'(❌SMS) → 카드번호+CVC → 다음 → 일반결제 비밀번호 → 금융인증서 아래 '모니모 앱'(⚠️공동인증서 아님)
-      → 김건엽 금융인증서 → 인증서비번 → '인증 성공' OK. ⚠️실 결제."""
+    ⚠️실 결제."""
     sec = _card_secrets().get("삼성", {})
     card_no, cvc, pin6, cert_pw6 = (sec.get("card_no"), sec.get("cvc"), sec.get("pin6"), sec.get("cert_pw6"))
     if not all([card_no, cvc, pin6, cert_pw6]):
@@ -1433,13 +1409,10 @@ def _wait_keypad(timeout: float = 6) -> bool:
     return False
 
 
-def _kp_read() -> dict:
-    """nppfs 보안키패드 현재 셔플 OCR(로컬 3엔진 voting) → {숫자: (x,y)}. ★무인 폴백용.
-    정본은 에이전트(클로드) 비전 — _grid_tap 참조. 로컬 엔진(easyocr+vision)은 nppfs 키패드 정확도 낮음(실측) → 클로드 승격 경로가 정본.
-    ROI=하단(0.45,0.98)만 — 카드 키패드(y~0.46-0.63)는 잡고 상단 금액·카드칸 숫자(y<0.40)는 제외."""
-    from phone_auto.ocr_keypad import vote_digits
-    return vote_digits(cap("/tmp/_nh_sec.png"), flip_h=False, roi_y_frac=(0.45, 0.98),
-                       engines=("easyocr", "vision", "claude"), allow_partial=True) or {}
+# ★NH nppfs 키패드의 **로컬 OCR 판독(`_kp_read`)과 그걸 쓰던 `_tap_secure_each` 는 삭제했다**
+#   (사용자 지시 2026-08-07 "로컬 OCR 빼"). 둘 다 이미 **호출자 0개**였다 —
+#   NH 입력 정본은 `nh_enter`(에이전트가 배열을 판독해 좌표를 주는 핸드세이크)다.
+#   로컬 엔진은 nppfs 키패드 정확도가 낮아(실측) 되살리면 8/6 삼성 사고가 그대로 재현된다.
 
 
 # ───── nppfs 보안키패드 고정 그리드 (에이전트=클로드 비전 정본, 2026-06-26 라이브 확정) ─────
@@ -1481,32 +1454,6 @@ def _grid_tap(value: str, layout: list, top: int = -1, delay: float = 0.6) -> di
             return {"err": f"'{ch}' 가 배열에 없음 — 재읽기 필요", "pos": pos}
         _adb().tap(*pos[ch]); time.sleep(delay)
     return {"ok": True, "digits": len(value), "top": top}
-
-
-def _tap_secure_each(value: str) -> dict:
-    """★매 키 입력마다 재셔플되는 nppfs 보안키패드 입력 — 자리마다 검증식(2026-06-25 NH카드 실측):
-       ① 현재 셔플 OCR → 숫자 위치 찾기(못 읽으면 재캡처)
-       ② 탭 → ③ 키패드가 재셔플됐는지 재OCR로 확인 = '탭이 등록됐다'는 확실한 신호
-       ④ 안 바뀌었으면(=탭 미등록) 재탭. → OCR 실수/탭 드롭 자동복구.
-    (_tap_shuffle 의 '1회 OCR 후 연속탭'은 매 키 셔플 키패드엔 부적합: 첫 자리만 맞고 나머지 깨짐.)"""
-    for i, d in enumerate(value):
-        ok = False
-        for _att in range(8):
-            snap = _kp_read()
-            if d not in snap:                 # OCR 미검출 → 같은 셔플 재캡처(렌더 중일 수 있음)
-                time.sleep(0.6); continue
-            _adb().tap(*snap[d]); time.sleep(1.2)   # 탭 후 재셔플+렌더 안정 대기
-            after = _kp_read()
-            common = [k for k in snap if k in after]
-            # ★캡처 노이즈(±몇 px) vs 실제 셀이동(키패드 셀폭 ~145px) 구분 — 50px 초과 이동만 '재셔플'로 카운트.
-            moved = sum(1 for k in common
-                        if abs(snap[k][0] - after[k][0]) + abs(snap[k][1] - after[k][1]) > 50)
-            if len(common) < 4 or moved >= 3:  # 재셔플 감지 = 탭 등록 완료
-                ok = True; break
-            # 키패드 그대로 = 탭 미등록 → 재시도
-        if not ok:
-            return {"err": f"{i + 1}번째 자리 '{d}' 입력/검증 실패"}
-    return {"ok": True, "digits": len(value)}
 
 
 def pay_nh_general() -> dict:
@@ -2244,7 +2191,7 @@ def main() -> int:
         #   인계 러너로 그 계정을 끝낸 뒤, 아래에 찍힌 명령으로 나머지 계정을 이어서 돌린다.
         card = _handoff_card(r)
         if card:
-            _handoff_stop(card, idx, plan[n + 1:], card_override, only_kw)
+            _handoff_stop(card, idx, plan[n + 1:], card_override, only_kw, combo_idx)
             break
         if n < len(plan) - 1:
             _account_gap(r)
@@ -2283,16 +2230,20 @@ def _account_gap(r: dict) -> None:
 
 _RUNNER = {"삼성": "samsung_enter", "NH": "nh_enter"}
 _HANDOFF_STEPS = {
-    "삼성": "card → cvc → next → pin6 → next → cert → certpw → finish",
+    # ★현대몰 삼성은 **인증서 단계가 없다** (2026-08-07 라이브 실측, 주문 20260807004446):
+    #   pin6 뒤 버튼이 '결제'고 그걸 누르면 바로 주문완료다. cert/certpw 는 롯데 전용.
+    "삼성": "card → cvc → next → pin6 → next('결제') → finish   (현대몰은 인증서 없음)",
     "NH":   "box1 → box2 → box3 → box4 → cvc → confirm → pinfield → pin6 → confirm → finish",
 }
 
 
-def _handoff_stop(card: str, idx: int, rest: list[int], card_override, only) -> None:
+def _handoff_stop(card: str, idx: int, rest: list[int], card_override, only, combo_idx=None) -> None:
     """인계 지점에서 루프를 멈추며 **다음에 칠 명령을 그대로** 찍는다.
-    남은 계정을 사람이 다시 계산하게 두면 빠뜨린다 → 명령줄을 완성해서 준다."""
+    남은 계정을 사람이 다시 계산하게 두면 빠뜨린다 → 명령줄을 완성해서 준다.
+    ★combo_idx(설화수)면 `combo=N` 을, 아니면 상품 키워드를 붙인다 — finish 가 그걸로
+      record_combo / record_food 를 가른다. 안 붙이면 설화수가 식품으로 기록된다(8/7 수정)."""
     runner = _RUNNER.get(card, "nh_enter")
-    kw = (" " + " ".join(only)) if only else ""
+    kw = f" combo={combo_idx}" if combo_idx is not None else ((" " + " ".join(only)) if only else "")
     print(f"\n{'='*54}\n★ #{idx} {card} 인계 대기 — 여기서 멈춥니다 (나머지 계정 중단)\n"
           f"  1) 화면 판독:  python3 -m phone_auto.{runner} shot /tmp/kp.png\n"
           f"  2) 입력 순서:  {_HANDOFF_STEPS.get(card, '')}\n"
@@ -2301,7 +2252,8 @@ def _handoff_stop(card: str, idx: int, rest: list[int], card_override, only) -> 
         args = " ".join(str(i) for i in rest)
         ov = f" {card_override}" if card_override else ""
         okw = f" only={','.join(only)}" if only else ""
-        print(f"  4) 남은 계정:  python3 -u -m phone_auto.hmall_hyundai_buy{ov} {args}{okw}", flush=True)
+        cb = f" combo={combo_idx}" if combo_idx is not None else ""
+        print(f"  4) 남은 계정:  python3 -u -m phone_auto.hmall_hyundai_buy{ov} {args}{okw}{cb}", flush=True)
     else:
         print("  4) 남은 계정 없음 — 이 계정이 마지막", flush=True)
     print("=" * 54, flush=True)

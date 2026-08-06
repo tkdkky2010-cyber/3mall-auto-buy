@@ -20,13 +20,25 @@
   python3 -m phone_auto.samsung_enter shot /tmp/kp.png     # 전체화면 캡처(판독용)
   python3 -m phone_auto.samsung_enter card "<좌표10개>"     # 카드번호 15자리 (칸 탭 + 입력 + 자릿수 검증)
   python3 -m phone_auto.samsung_enter cvc  "<좌표10개>"     # CVC 3자리  ※재셔플 대비 새로 판독할 것
-  python3 -m phone_auto.samsung_enter next                 # '다음' (활성 검증 후 탭)
+  python3 -m phone_auto.samsung_enter next                 # 진행 버튼 (활성 검증 후 탭)
   python3 -m phone_auto.samsung_enter pin6 "<좌표10개>"     # 일반결제 비밀번호 6자리
-  python3 -m phone_auto.samsung_enter next
-  python3 -m phone_auto.samsung_enter cert                 # 금융인증서 > 모니모 > 인증서 카드
-  python3 -m phone_auto.samsung_enter certpw "<좌표10개>"   # 인증서 비밀번호 6자리 → '인증 성공' OK
+  python3 -m phone_auto.samsung_enter next                 # ★현대몰은 여기가 '결제'(=승인) / 롯데는 '다음'
+  python3 -m phone_auto.samsung_enter cert                 # (롯데만) 금융인증서 > 모니모 > 인증서 카드
+  python3 -m phone_auto.samsung_enter certpw "<좌표10개>"   # (롯데만) 인증서 비번 6자리 → '인증 성공' OK
   python3 -m phone_auto.samsung_enter finish 11 석류        # ★현대몰: 주문완료 → 대장 + H.Point 적립
+  python3 -m phone_auto.samsung_enter finish 11 combo=24    # ★현대몰 설화수는 combo= 로 (조합 기록)
   python3 -m phone_auto.samsung_enter finish_lotte 5 combo=24   # ★롯데: 대장 + 뷰티 + 구매사은
+
+★★몰마다 **뒷부분이 갈린다** (2026-08-07 현대몰 라이브 실측 — 주문 20260807004446):
+  · 현대몰 : card → cvc → next('다음') → pin6 → next(**'결제'**) → **바로 주문완료** → finish
+             = **인증서 단계가 없다.** cert/certpw 를 부르려고 기다리지 말 것.
+  · 롯데   : card → cvc → next('다음') → pin6 → next('다음') → cert → certpw → finish_lotte
+  `next` 가 화면에 있는 버튼('다음'/'결제')을 알아서 고르므로 명령은 같다.
+
+★★비번 화면에 카드 발급사가 **'롯데' 로 표시되는 것은 정상**이다 (사용자 확인 2026-08-07).
+  `3779-89****-**897` 아래 '롯데' 라고 떠도 **실제 승인은 삼성카드**다
+  (주문완료 결제정보 = `198,400원 (삼성카드 일시불)` 로 실측 확인). **롯데홈쇼핑에서도 똑같이 뜬다.**
+  → 이걸 보고 "카드가 잘못 들어갔다"고 판단해 중단하지 말 것.
 
 ★★`finish` 를 빼먹지 말 것 — 핸드세이크로 빠지면 `buy_one` 이 일찍 return 해서
    구매대장·적립 자동단계를 **안 탄다**(NH 에서 8/5 에 적립 12계정을 통째로 놓친 그 구조다).
@@ -126,12 +138,22 @@ def main() -> int:
     B._resolve_serial()
 
     if cmd == "next":
-        # ★활성 검증 — 비활성이면 입력이 틀린 것이므로 탭하지 않는다(탭해봐야 헛수고 + 오류 누적).
-        if not B.next_button_enabled():
-            print("[next] ✗ '다음' 비활성 — 카드번호/CVC 입력값 오류. 지우고 재입력할 것")
+        # ★진행 버튼은 **몰마다 다르다** (2026-08-07 현대몰 라이브 실측):
+        #   · 카드번호+CVC 화면 → 두 몰 모두 '다음'
+        #   · 결제비번(pin6) 화면 → 현대몰은 **'결제'**(누르면 그대로 승인), 롯데는 '다음'(→인증서)
+        #   화면에 있는 것을 찾아서 쓴다. 라벨을 하나로 박으면 한쪽 몰에서 그 자리에 멈춘다.
+        # ★완전일치로 찾는다 — contains 로 잡으면 '결제 비밀번호'·'일반결제 비밀번호' 를 눌러
+        #   결제가 엉뚱한 데로 샌다(nh_enter confirm 과 같은 교훈).
+        label = next((t for t in ("다음", "결제") if B.ocr_find(t)), None)
+        if not label:
+            print("[next] ✗ '다음'/'결제' 버튼 미발견 — 화면 확인 필요")
             return 1
-        ok = B.ocr_tap("다음", contains=True, retries=4)
-        print(f"[next] {'✓' if ok else '✗'}")
+        # ★활성 검증 — 비활성이면 입력이 틀린 것이므로 탭하지 않는다(탭해봐야 헛수고 + 오류 누적).
+        if not B.next_button_enabled(label=label):
+            print(f"[next] ✗ '{label}' 비활성 — 카드번호/CVC/비번 입력값 오류. 지우고 재입력할 것")
+            return 1
+        ok = B.ocr_tap(label, contains=False, pick="bottom", retries=4)
+        print(f"[next] {'✓' if ok else '✗'} ('{label}')")
         time.sleep(2.5)
         return 0 if ok else 1
 
@@ -142,8 +164,13 @@ def main() -> int:
 
     if cmd in ("finish", "finish_lotte", "finish-lotte"):
         # 마무리(대장·적립)는 몰 단위라 NH 러너와 완전히 동일 → 중복 구현하지 않고 재사용한다.
+        # ★★단 **카드명을 반드시 넘긴다** — nh_enter 의 기본값이 'NH' 라, 안 넘기면
+        #   삼성으로 결제해놓고 **구매대장엔 NH 로 적힌다**(2026-08-07 발견, 그전엔 아무 신호도 없었다).
         from phone_auto import nh_enter
-        sys.argv = ["nh_enter", cmd, *args[1:]]
+        rest = list(args[1:])
+        if not any(a.startswith("card=") for a in rest):
+            rest.append("card=삼성")
+        sys.argv = ["nh_enter", cmd, *rest]
         return nh_enter.main()
 
     if cmd not in _FIELDS:

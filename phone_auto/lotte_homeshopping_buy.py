@@ -45,7 +45,7 @@ from phone_auto import hmall_webview as hw
 from phone_auto.hmall_hyundai_buy import (
     cap, _adb, ocr_find, ocr_tap, wait_text, screen_has, _resolve_serial, _wait_app, wake_screen,
     CARD_ALIASES, CARD_GRID_NAME,
-    _card_secrets, _tap_shuffle,        # 삼성 일반결제 공용 헬퍼 (hmall=정본, 양 몰 공용)
+    _card_secrets,                      # 삼성 일반결제 공용 헬퍼 (hmall=정본, 양 몰 공용)
     card_digits_on_screen, next_button_enabled,   # 2026-08-02 공통 검증 헬퍼
     pay_samsung as _pay_samsung_shared,  # ★삼성 일반결제 = 3사 공용 정본 (몰별 복제 금지)
     pay_nh_general,                     # ★NH 일반결제 = 3사 공용 정본 (몰 무관, 항상 비전 핸드세이크)
@@ -935,23 +935,9 @@ def pay_lotte_payco(card: str = "삼성") -> dict:
 
 # ──────── D'. 삼성 일반결제 (카드번호 직접 — PAYCO/ARS 완전 회피) ────────
 
-# _card_secrets / _tap_shuffle / KEYPAD_ROI_Y = hmall_hyundai_buy 에서 import (정본=hmall, 양 몰 공용). 상단 import 참조.
-# (셔플키패드 로컬2엔진→클로드승격 roi 로직·card_secrets 로더는 hmall pay_samsung 과 공유 — 한 곳만 고치면 됨.)
-
-
-def _tap_shuffle_retry(value: str, delay: float = 1.0, tries: int = 3) -> dict:
-    """_tap_shuffle + 매핑 실패 시 '재배열'로 재셔플 후 재시도. 로컬2엔진 OCR 오독·매핑실패 대응
-    (2026-07-21 #13 cert 매핑실패/#14 CVC 오독 사고). 재시도마다 force_vote(클로드 승격 포함)로 정확도↑."""
-    r: dict = {}
-    for i in range(tries):
-        r = _tap_shuffle(value, delay=delay, force_vote=(i > 0))
-        if r.get("ok"):
-            return r
-        if screen_has("재배열"):
-            ocr_tap("재배열", contains=True); time.sleep(1.2)   # 재셔플 → 새 레이아웃 재OCR
-        else:
-            time.sleep(0.8)
-    return r
+# _card_secrets = hmall_hyundai_buy 에서 import (정본=hmall, 양 몰 공용). 상단 import 참조.
+# ★로컬 OCR 셔플 입력(`_tap_shuffle_retry`)은 삭제했다 (사용자 지시 2026-08-07). 호출자는 이미 0개였고,
+#   삼성 결제는 `pay_samsung`(3사 공용) → `samsung_enter` 비전 핸드세이크로만 입력한다. 되살리지 말 것.
 
 
 def pay_lotte_samsung_general() -> dict:
@@ -1375,6 +1361,19 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
         runner = "samsung_enter" if use_card == "삼성" else "nh_enter"
         res["status"] = (f"{use_card}_HANDOFF(카드번호 화면 — 에이전트 비전 입력 대기, "
                          f"이어받기: python3 -m phone_auto.{runner})")
+        # ★다음에 칠 명령을 **완성해서** 찍는다(현대몰 _handoff_stop 과 같은 이유 — 사람이 다시
+        #   조립하게 두면 card=/combo= 를 빠뜨려 대장이 NH·식품으로 잘못 적힌다).
+        steps = ("card → cvc → next → pin6 → next('다음') → cert → certpw"
+                 if use_card == "삼성" else
+                 "box1 → box2 → box3 → box4 → cvc → confirm → pinfield → pin6 → confirm")
+        cb = f" combo={combo_idx}" if combo_idx is not None else ""
+        print(f"\n{'='*54}\n★ #{idx} {use_card} 인계 대기 — 여기서 멈춥니다\n"
+              f"  1) 화면 판독:  python3 -m phone_auto.{runner} shot /tmp/kp.png\n"
+              f"  2) 입력 순서:  {steps}\n"
+              f"  3) 마무리:     python3 -m phone_auto.{runner} finish_lotte {idx}{cb} "
+              f"card={use_card}\n"
+              f"     (뷰티포인트는 주문완료 화면에서만 된다 — 화면 벗어나기 전에 실행할 것)\n"
+              f"{'='*54}", flush=True)
         return res
     if not pay.get("ok"):
         res["status"] = f"PAY_FAIL@{pay.get('step')}:{pay.get('err')}"; return res
