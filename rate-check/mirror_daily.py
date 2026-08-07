@@ -47,6 +47,9 @@ def _read_grid(sh, tab: str) -> tuple[list[list[str]], list[list[dict]]]:
     return vals, bgs
 
 
+WHITE_BG = {"red": 1.0, "green": 1.0, "blue": 1.0}
+
+
 def _white(bg: dict) -> bool:
     """흰색/무색이면 굳이 칠하지 않는다(요청 크기 축소)."""
     return all(abs(bg.get(k, 1) - 1) < 0.01 for k in ("red", "green", "blue")) or not bg
@@ -74,8 +77,16 @@ def mirror(kind: str, now: datetime | None = None) -> bool:
 
 
 def _paint(dst, bgs: list[list[dict]]) -> None:
-    """배경색만 별도 batchUpdate. 흰색은 건너뛴다(요청 수 축소)."""
-    reqs = []
+    """배경색만 별도 batchUpdate. 흰색은 건너뛴다(요청 수 축소).
+
+    ★먼저 목적지 전체 배경을 흰색으로 되돌린다 — `dst.clear()` 는 **값만** 지우고 서식은 남기는데,
+      흰색 칸을 건너뛰는 이 함수는 남은 색을 덮지 못한다. 색칠 대상이 줄어든 날 목적지에 예전 색이
+      그대로 남는다 (2026-08-07: 조합번호 25개 → 9개로 줄였는데 미러엔 25개가 계속 보였다).
+    """
+    reqs = [{"repeatCell": {
+        "range": {"sheetId": dst.id},                      # 인덱스 생략 = 시트 전체
+        "cell": {"userEnteredFormat": {"backgroundColor": WHITE_BG}},
+        "fields": "userEnteredFormat.backgroundColor"}}]
     for ri, row in enumerate(bgs):
         for ci, bg in enumerate(row):
             if _white(bg):
@@ -85,11 +96,9 @@ def _paint(dst, bgs: list[list[dict]]) -> None:
                           "startColumnIndex": ci, "endColumnIndex": ci + 1},
                 "cell": {"userEnteredFormat": {"backgroundColor": bg}},
                 "fields": "userEnteredFormat.backgroundColor"}})
-    if not reqs:
-        return
     try:
         dst.spreadsheet.batch_update({"requests": reqs})
-        print(f"  [mirror] 배경색 {len(reqs)}칸 복사", flush=True)
+        print(f"  [mirror] 배경색 초기화 후 {len(reqs) - 1}칸 복사", flush=True)
     except Exception as e:
         print(f"  [mirror] ⚠️ 배경색 복사 실패(값은 정상): {e}", flush=True)
 

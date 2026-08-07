@@ -350,7 +350,28 @@ ws.update(values=chart_m, range_name=f"M1:M{chart_end}", value_input_option='USE
 print(f"M1:M{chart_end} (롯데 비교 차트 컬럼) 입력")
 
 # 조건부 서식: K2:M{N+1} 행별 최저값 셀 → 연두색 배경 (3사 중 가장 좋은 deal 강조)
-# 이미 같은 규칙이 있으면 중복 추가 — Sheets는 허용. 깨끗하게 하려면 미리 제거 가능.
+# ★같은 탭에 step1 을 재실행하면 규칙이 계속 쌓인다(2026-08-07: '8.7' 에 동일 규칙 2개).
+#   → 우리 수식과 같은 규칙을 먼저 지우고 추가한다. 색칠만 하고 지우지 않는 것과 같은 계열 결함.
+_CF_FORMULA = "=AND(ISNUMBER(K2),K2=MIN($K2:$M2))"
+try:
+    _meta = sh.fetch_sheet_metadata({"includeGridData": False})
+    _dels = []
+    for _s in _meta["sheets"]:
+        if _s["properties"]["sheetId"] != ws.id:
+            continue
+        for _i, _r in enumerate(_s.get("conditionalFormats", [])):
+            _vals = _r.get("booleanRule", {}).get("condition", {}).get("values", [])
+            if any(v.get("userEnteredValue") == _CF_FORMULA for v in _vals):
+                _dels.append(_i)
+    # 인덱스가 밀리지 않게 뒤에서부터 삭제
+    for _i in sorted(_dels, reverse=True):
+        sh.batch_update({"requests": [{
+            "deleteConditionalFormatRule": {"sheetId": ws.id, "index": _i}}]})
+    if _dels:
+        print(f"기존 동일 조건부서식 {len(_dels)}개 제거")
+except Exception as e:
+    print(f"⚠️ 기존 조건부서식 조회/제거 실패(무시): {e}")
+
 try:
     sh.batch_update({
         "requests": [{
@@ -366,7 +387,7 @@ try:
                     "booleanRule": {
                         "condition": {
                             "type": "CUSTOM_FORMULA",
-                            "values": [{"userEnteredValue": "=AND(ISNUMBER(K2),K2=MIN($K2:$M2))"}],
+                            "values": [{"userEnteredValue": _CF_FORMULA}],
                         },
                         "format": {
                             "backgroundColor": {"red": 0.72, "green": 0.92, "blue": 0.72},
