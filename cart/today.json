@@ -1,5 +1,5 @@
 {
-  "date": "2026-08-06",
+  "date": "2026-08-07",
   "account_used": "tkdkky2002",
   "products": [
     {
@@ -98,34 +98,13 @@
       "simple_ranges": [],
       "payment": {
         "qty": 1,
-        "list_price": 139900,
-        "member_price": 125910,
-        "card_slides": [
-          {
-            "alt": "cardCd02",
-            "text": "삼성 7% 즉시할인 111,242원",
-            "percent": 7,
-            "price": 111242
-          },
-          {
-            "alt": "cardCd04",
-            "text": "현대 5% 즉시할인 113,635원",
-            "percent": 5,
-            "price": 113635
-          }
-        ],
-        "kakao_price": 125910,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 115910,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 111242,
-            "payback_pct": 1.0,
-            "after_payback": 110130,
-            "reward_pt": 10000,
-            "final_cost": 100130
-          }
-        },
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
         "optimal_tier": {
           "qty": 1,
           "tier_min": 50000,
@@ -136,7 +115,7 @@
           "effective_pct": 7.942180922881422
         },
         "effective_ten_percent": true,
-        "error": null,
+        "error": "바로구매 실패",
         "benefit_unit_price": 125910,
         "options": [
           {
@@ -279,72 +258,16 @@
       "id": "11",
       "name": "라메종드미엘 프랑스 라벤더 천연꿀 8병",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2246845189&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
-      "events": [
-        {
-          "prmo": "P202608043368",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.06 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.06 23:59",
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 328000,
-        "member_price": 262400,
-        "card_slides": [
-          {
-            "alt": "",
-            "text": "5% 즉시할인",
-            "percent": 5,
-            "price": 249280,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 249280,
-        "kakao_reward_pt": 24928,
-        "kakao_final_cost": 206902,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 262400,
-          "actual_reward": 5000,
-          "effective_pct": 1.9054878048780488
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 262400,
-        "options": []
-      }
+      "simple_ranges": []
     },
     {
       "id": "16",
@@ -366,19 +289,8 @@
       "name": "데이즈온 원데이 알파 18개",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2247036059&sectId=3059445",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 데이즈온 10%적립",
+      "phrase": "데이즈온 10%적립",
       "events": [
-        {
-          "prmo": "P202608043368",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.06 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        },
         {
           "prmo": "P202607292371",
           "name": "데이즈온 10%적립",
@@ -451,17 +363,11 @@
         }
       ],
       "max_reward": "100,000P",
-      "event_end": "8.06 23:59 / 8.09 23:59",
+      "event_end": "8.09 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
+      "simple_ranges": [],
       "payment": {
         "qty": 2,
         "list_price": 119800,
@@ -483,8 +389,8 @@
           }
         ],
         "kakao_price": 91048,
-        "kakao_reward_pt": 14105,
-        "kakao_final_cost": 70570,
+        "kakao_reward_pt": 5000,
+        "kakao_final_cost": 79675,
         "paybacks": {},
         "optimal_tier": {
           "qty": 2,
@@ -597,34 +503,13 @@
       "simple_ranges": [],
       "payment": {
         "qty": 1,
-        "list_price": 73710,
-        "member_price": 66340,
-        "card_slides": [
-          {
-            "alt": "cardCd02",
-            "text": "삼성 7% 즉시할인 61,696원",
-            "percent": 7,
-            "price": 61696
-          },
-          {
-            "alt": "cardCd04",
-            "text": "현대 5% 즉시할인 63,023원",
-            "percent": 5,
-            "price": 63023
-          }
-        ],
-        "kakao_price": 66340,
-        "kakao_reward_pt": 5000,
-        "kakao_final_cost": 61340,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 61696,
-            "payback_pct": 1.0,
-            "after_payback": 61079,
-            "reward_pt": 5000,
-            "final_cost": 56079
-          }
-        },
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
         "optimal_tier": {
           "qty": 1,
           "tier_min": 50000,
@@ -635,7 +520,7 @@
           "effective_pct": 7.5369309617123905
         },
         "effective_ten_percent": true,
-        "error": null,
+        "error": "바로구매 실패",
         "benefit_unit_price": 66340,
         "options": [
           {
@@ -655,78 +540,16 @@
       "id": "25",
       "name": "유기농 석류젤리 9박(90개)",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
-      "events": [
-        {
-          "prmo": "P202608043368",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.06 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.06 23:59",
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 68900,
-        "member_price": 55120,
-        "card_slides": [
-          {
-            "alt": "cardCd02",
-            "text": "삼성 7% 즉시할인 51,262원",
-            "percent": 7,
-            "price": 51262
-          },
-          {
-            "alt": "cardCd04",
-            "text": "현대 5% 즉시할인 52,364원",
-            "percent": 5,
-            "price": 52364
-          }
-        ],
-        "kakao_price": 55120,
-        "kakao_reward_pt": 5512,
-        "kakao_final_cost": 49608,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 51262,
-            "payback_pct": 1.0,
-            "after_payback": 50749,
-            "reward_pt": 5126,
-            "final_cost": 45623
-          }
-        },
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 55120,
-          "actual_reward": 5000,
-          "effective_pct": 9.071117561683598
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 55120,
-        "options": []
-      }
+      "simple_ranges": []
     },
     {
       "id": "28",
@@ -837,34 +660,13 @@
       "simple_ranges": [],
       "payment": {
         "qty": 1,
-        "list_price": 69900,
-        "member_price": 62910,
-        "card_slides": [
-          {
-            "alt": "cardCd02",
-            "text": "삼성 7% 즉시할인 58,507원",
-            "percent": 7,
-            "price": 58507
-          },
-          {
-            "alt": "cardCd04",
-            "text": "현대 5% 즉시할인 59,765원",
-            "percent": 5,
-            "price": 59765
-          }
-        ],
-        "kakao_price": 62910,
-        "kakao_reward_pt": 5000,
-        "kakao_final_cost": 57910,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 58507,
-            "payback_pct": 1.0,
-            "after_payback": 57922,
-            "reward_pt": 5000,
-            "final_cost": 52922
-          }
-        },
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
         "optimal_tier": {
           "qty": 1,
           "tier_min": 50000,
@@ -875,7 +677,7 @@
           "effective_pct": 7.947862025115245
         },
         "effective_ten_percent": true,
-        "error": null,
+        "error": "바로구매 실패",
         "benefit_unit_price": 62910,
         "options": [
           {
@@ -896,19 +698,8 @@
       "name": "데이즈온 파라다이스 버닝 9박스",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2250397383&sectId=3060687",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 데이즈온 10%적립",
+      "phrase": "데이즈온 10%적립",
       "events": [
-        {
-          "prmo": "P202608043368",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.06 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        },
         {
           "prmo": "P202607292371",
           "name": "데이즈온 10%적립",
@@ -981,17 +772,11 @@
         }
       ],
       "max_reward": "100,000P",
-      "event_end": "8.06 23:59 / 8.09 23:59",
+      "event_end": "8.09 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
+      "simple_ranges": [],
       "payment": {
         "qty": 1,
         "list_price": 248000,
@@ -1013,8 +798,8 @@
           }
         ],
         "kakao_price": 188480,
-        "kakao_reward_pt": 28848,
-        "kakao_final_cost": 146438,
+        "kakao_reward_pt": 10000,
+        "kakao_final_cost": 165286,
         "paybacks": {},
         "optimal_tier": {
           "qty": 1,
@@ -1036,19 +821,8 @@
       "name": "데이즈온 프리바이오틱스 에프오에스 트리플",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2247305088",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 데이즈온 10%적립",
+      "phrase": "데이즈온 10%적립",
       "events": [
-        {
-          "prmo": "P202608043368",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.06 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        },
         {
           "prmo": "P202607292371",
           "name": "데이즈온 10%적립",
@@ -1121,17 +895,11 @@
         }
       ],
       "max_reward": "100,000P",
-      "event_end": "8.06 23:59 / 8.09 23:59",
+      "event_end": "8.09 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
+      "simple_ranges": [],
       "payment": {
         "qty": 1,
         "list_price": 92000,
@@ -1153,8 +921,8 @@
           }
         ],
         "kakao_price": 69920,
-        "kakao_reward_pt": 11992,
-        "kakao_final_cost": 53034,
+        "kakao_reward_pt": 5000,
+        "kakao_final_cost": 60026,
         "paybacks": {},
         "optimal_tier": {
           "qty": 1,
@@ -1232,10 +1000,8 @@
   ],
   "ten_percent_ids": [
     "1",
-    "11",
     "17",
     "22",
-    "25",
     "33",
     "34",
     "35"

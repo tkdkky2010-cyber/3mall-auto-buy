@@ -37,37 +37,40 @@ import _common as C
 CHANNEL_DEFAULT_N = {"galleria": 36, "hmall": 36, "lotte": 7}
 
 # 주로 사는 조합번호 — 결과물 낼 때 조합번호 셀에 색칠(사용자 지시 2026-07-29). idx만 색칠.
-# ★2026-08-02: 하드코딩 {3,5,12,13,14} 는 stale 이었다(오늘 플랜 3·8·12·22·24·25·27 과 무관한
-#   번호가 칠해짐) → **오늘 카트플랜에 실제로 뽑힌 조합**을 색칠한다. 아래는 폴백/수동 override 용.
-HIGHLIGHT_COMBOS_FALLBACK = {3, 5, 12, 13, 14}
-# 플랜에 안 뽑혀도 항상 같이 색칠하는 조합 (사용자 지시 2026-08-05).
-HIGHLIGHT_COMBOS_ALWAYS = {14}
+# ★사용자가 지정하는 고정 세트다. **그날 카트플랜 결과가 아니다.**
+#   2026-08-02 에 클로드가 지시 없이 "하드코딩이 stale" 이라며 플랜 조합으로 바꿔놨고,
+#   채널이 갤러리아(N=36)로 바뀐 8/7 에 25개가 전부 칠해져 터졌다 → 2026-08-07 사용자 지시로 원복.
+#   **자동 계산으로 다시 바꾸지 말 것** (경위: READ_FIRST.md 상단).
+HIGHLIGHT_COMBOS = {3, 5, 12, 13, 14, 23, 24, 25, 27}   # 사용자 지시 2026-08-07
 HIGHLIGHT_BG = {"red": 1.0, "green": 0.9, "blue": 0.6}   # 연노랑 (롯데 연두 조건부서식과 구분)
+CLEAR_BG = {"red": 1.0, "green": 1.0, "blue": 1.0}       # 세트에서 빠진 번호 되돌리기
 
 
 def highlight_combo_numbers(ws, combos: set[int]) -> None:
     """조합번호(combos) 셀만 색칠 — 갤러리아/Hmall/롯데 섹션 A열 + 비교차트 J열.
-    갤러리아는 GWP 품목수로 위치가 가변 → '조합번호' 헤더를 A열에서 동적 탐색."""
+    갤러리아는 GWP 품목수로 위치가 가변 → '조합번호' 헤더를 A열에서 동적 탐색.
+    combos 밖의 번호는 흰색으로 되돌린다 — 안 그러면 세트가 줄어도 전에 칠한 색이 남는다."""
     try:
         colA = ws.col_values(1)
         gal_hdr = next((i for i, v in enumerate(colA[:C.HMALL_HEADER_ROW], 1)
                         if str(v).strip() == "조합번호"), None)
-        cells = []   # (row_1based, col_1based)
-        for n in combos:
+        cells = []   # (row_1based, col_1based, bg)
+        for n in range(1, len(C.COMBOS) + 1):
+            bg = HIGHLIGHT_BG if n in combos else CLEAR_BG
             if gal_hdr:
-                cells.append((gal_hdr + n, 1))                     # 갤러리아 A
-            cells.append((C.HMALL_COMBO_START_ROW + n - 1, 1))     # Hmall A
-            cells.append((C.LOTTE_COMBO_START_ROW + n - 1, 1))     # 롯데 A
-            cells.append((n + 1, 10))                              # 차트 J (J2=조합1)
+                cells.append((gal_hdr + n, 1, bg))                     # 갤러리아 A
+            cells.append((C.HMALL_COMBO_START_ROW + n - 1, 1, bg))     # Hmall A
+            cells.append((C.LOTTE_COMBO_START_ROW + n - 1, 1, bg))     # 롯데 A
+            cells.append((n + 1, 10, bg))                              # 차트 J (J2=조합1)
         sid = ws.id
         reqs = [{
             "repeatCell": {
                 "range": {"sheetId": sid, "startRowIndex": r - 1, "endRowIndex": r,
                           "startColumnIndex": c - 1, "endColumnIndex": c},
-                "cell": {"userEnteredFormat": {"backgroundColor": HIGHLIGHT_BG}},
+                "cell": {"userEnteredFormat": {"backgroundColor": bg}},
                 "fields": "userEnteredFormat.backgroundColor",
             }
-        } for r, c in cells]
+        } for r, c, bg in cells]
         ws.spreadsheet.batch_update({"requests": reqs})
         print(f"→ 조합번호 색칠: {sorted(combos)} (갤러리아/Hmall/롯데 A열 + 차트 J열)")
     except Exception as e:
@@ -389,8 +392,8 @@ def main(argv=None) -> int:
     )
     print(f"\n→ 시트 입력: {rng}")
 
-    # 오늘 플랜에 뽑힌 조합번호 + 항상 칠하는 조합 색칠 (플랜이 비면 폴백 상수)
-    highlight_combo_numbers(ws, (set(cart) or HIGHLIGHT_COMBOS_FALLBACK) | HIGHLIGHT_COMBOS_ALWAYS)
+    # 주로 사는 조합번호 색칠 (고정 세트 — 플랜과 무관, 위 HIGHLIGHT_COMBOS 주석 참조)
+    highlight_combo_numbers(ws, HIGHLIGHT_COMBOS)
     return 0
 
 
