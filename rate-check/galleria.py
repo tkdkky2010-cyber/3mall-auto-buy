@@ -201,7 +201,11 @@ def parse_add_gifts(blocks: list[str]) -> tuple[list[C.Sample], list[str]]:
     seen_keys: set[tuple] = set()
     consumed = [False] * len(raw_items)
 
-    for kw_set, (name, price, scode) in SET_COMBINE_RULES:
+    for kw_set, (name, _rule_price, scode) in SET_COMBINE_RULES:
+        # ★단가는 재고현황 시트(SoT)가 무조건 이긴다 — 규칙의 숫자는 시트에 s코드가 없을 때만 쓰는 폴백.
+        #   (2026-08-11 사고: 시트 s07=6,000 인데 규칙의 4,900 이 그대로 쓰여 g·h 추증가치가
+        #    1,100원씩 낮게 계산됐다. 이 경로는 lookup_sample 을 안 거쳐 시트 우선 로직이 통째로 빠졌었다.)
+        price = C.sample_prices_from_sheet().get(scode, _rule_price) if scode else _rule_price
         # 각 키워드를 포함하는 raw 인덱스 찾기
         matched_idx = []
         for kw in kw_set:

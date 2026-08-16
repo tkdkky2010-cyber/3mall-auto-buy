@@ -251,6 +251,17 @@ def login(page: Page, account_id: str, account_pw: str) -> bool:
         login_btn.click()
         page.wait_for_load_state("domcontentloaded", timeout=15000)
         page.wait_for_timeout(1500)
+        # ★위 1500ms 뒤에도 헤더 네비가 안 그려질 수 있다 → '로그아웃' 이 뜰 때까지만 더 기다린다.
+        #   고정 대기 후 1회 읽기는 로그인 성공을 실패로 오판한다(buy/run.py poll_until 주석 참조).
+        _w = 0
+        while _w < 8000:
+            try:
+                if "로그아웃" in page.inner_text("body"):
+                    return True
+            except Exception:
+                pass
+            page.wait_for_timeout(200)
+            _w += 200
         body = page.inner_text("body")
         return "로그아웃" in body
     except Exception as e:

@@ -105,6 +105,31 @@ CARD_CD_TO_PHONE_FLOW = {
 TODAY_BRAND_OVERRIDE = os.environ.get("TODAY_BRAND", "").strip()
 
 
+def poll_until(check, timeout_ms: int = 8000, poll_ms: int = 200) -> bool:
+    """check() 가 참을 돌려줄 때까지 폴링. 성공 True / 시간초과 False.
+
+    ★**기존 고정 대기를 줄이지 않는다 — 그 뒤에 덧붙여 쓴다.** 목적은 '더 빨리'가 아니라
+      '느리게 그려질 때 놓치지 않기'다. 이 몰들은 뼈대(HTML)를 먼저 주고 헤더 네비·카트 목록·
+      옵션 레이어를 **나중에 JS로 채운다**. 그래서 `readyState==='complete'` 나 고정 대기 뒤
+      **1회 읽기**로 판정하면, 아직 안 그려진 것을 '없다'로 오판한다.
+
+    실제 사고:
+      - 로그인 성공인데 헤더가 늦어 '로그아웃' 미발견 → 실패 판정 → #4·#6 스킵(2026-08-11).
+        재시도는 이미 로그인 상태라 로그인 폼을 못 찾아 또 실패하는 2차 피해까지 났다.
+      - 카트에 상품이 있는데 목록이 늦어 0건으로 읽힘 → '이미 비어있음' → 잔여물 위에 담김.
+    """
+    waited = 0
+    while waited < timeout_ms:
+        try:
+            if check():
+                return True
+        except Exception:
+            pass
+        time.sleep(poll_ms / 1000)
+        waited += poll_ms
+    return False
+
+
 def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -153,6 +178,12 @@ def logout_if_needed(page: Page) -> None:
     try:
         page.goto("https://www.hmall.com/md/dpl/index", wait_until="domcontentloaded")
         page.wait_for_timeout(800)
+        # ★헤더 네비(로그인/로그아웃)가 그려질 때까지 기다린 뒤 판정한다. 성급히 읽고 '이미 로그아웃'
+        #   으로 오판하면 **로그아웃을 건너뛰어 이전 계정 세션으로 담기·조회가 돈다**
+        #   (2026-08-11: 주문조회에서 #1·#2 가 같은 계정을 두 번 읽었다).
+        #   둘 다 못 찾으면 아래로 진행 = 로그아웃 시도 쪽(안전한 방향).
+        poll_until(lambda: any(k in page.inner_text("body") for k in ("로그아웃", "로그인")),
+                   timeout_ms=8000)
         if "로그아웃" not in page.inner_text("body"):
             return
         page.evaluate("""
@@ -193,6 +224,11 @@ def login(page: Page, account_id: str, account_pw: str) -> bool:
         login_btn.click()
         page.wait_for_load_state("domcontentloaded", timeout=15000)
         page.wait_for_timeout(1500)
+        # ★위 1500ms 뒤에도 헤더 네비가 아직 안 그려질 수 있다 → 판정 근거가 뜰 때까지만 더 기다린다.
+        #   (없앤 대기 없음. 이 폴링은 '결론이 날 때까지'만 돌고, 결론이 나면 즉시 빠진다.)
+        poll_until(lambda: any(k in page.inner_text("body") for k in
+                               ("로그아웃", "비밀번호 변경", "다른 로그인 수단", "로그인에 실패")),
+                   timeout_ms=8000)
         body = page.inner_text("body")
         if "로그아웃" in body:
             return True
@@ -278,6 +314,12 @@ def clear_cart(page: Page) -> None:
         for attempt in (1, 2, 3):
             page.goto(CART_URL, wait_until="domcontentloaded")
             page.wait_for_timeout(1500)
+            # ★카트 목록은 body 가 찬 **뒤에** JS 로 그려진다. 1500ms 뒤 1회 읽기로 0건이 나오면
+            #   '이미 비어있음' 으로 오판하고 **잔여물 위에 담겨 측정·결제가 오염**된다.
+            #   → 상품행이 보이거나 '비었다' 문구가 뜰 때까지(둘 중 먼저) 기다린 뒤 읽는다.
+            poll_until(lambda: bool(cart_rows(page)) or any(
+                k in page.inner_text("body") for k in ("장바구니가 비어", "담긴 상품이 없")),
+                timeout_ms=6000)
             rows = cart_rows(page)
             if not rows:
                 body = page.inner_text("body")
