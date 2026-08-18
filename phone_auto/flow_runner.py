@@ -96,10 +96,20 @@ def _ocr_texts_winrt(img_path: str) -> list[dict]:
     """Windows 내장 OCR (Apple Vision 대응물). `pip install winsdk` 필요.
     ⚠️ 한국어 인식은 **OS 언어팩**에 달렸다 — 없으면 영어만 잡혀 한글 버튼을 못 찾는다."""
     import asyncio
-    from winsdk.windows.globalization import Language
-    from winsdk.windows.graphics.imaging import BitmapDecoder
-    from winsdk.windows.media.ocr import OcrEngine
-    from winsdk.windows.storage import FileAccessMode, StorageFile
+    # ★배포판이 둘로 갈린다 — 어느 쪽이 깔려 있어도 되게 둘 다 시도한다.
+    #   ① winsdk        (`pip install winsdk`)            → winsdk.windows.*
+    #   ② winrt 분할판  (`pip install winrt-Windows.Media.Ocr winrt-Windows.Graphics.Imaging
+    #                     winrt-Windows.Storage winrt-Windows.Globalization`) → winrt.windows.*
+    try:
+        from winsdk.windows.globalization import Language
+        from winsdk.windows.graphics.imaging import BitmapDecoder
+        from winsdk.windows.media.ocr import OcrEngine
+        from winsdk.windows.storage import FileAccessMode, StorageFile
+    except ImportError:
+        from winrt.windows.globalization import Language
+        from winrt.windows.graphics.imaging import BitmapDecoder
+        from winrt.windows.media.ocr import OcrEngine
+        from winrt.windows.storage import FileAccessMode, StorageFile
 
     async def _run() -> list[dict]:
         f = await StorageFile.get_file_from_path_async(str(Path(img_path).resolve()))
@@ -147,6 +157,34 @@ def _ocr_texts_easyocr(img_path: str) -> list[dict]:
 
 _NONMAC_ENGINE = None      # None=미시도 / "easyocr"=winrt 실패 확정
 _EASYOCR_FULL = None
+
+
+def ocr_selftest(img_path: str | None = None) -> int:
+    """윈도우 이식 점검 — `python -m phone_auto.flow_runner ocrcheck [이미지]`.
+    어떤 엔진이 잡히는지 + **한국어 OCR 언어팩이 깔렸는지**를 한 번에 확인한다.
+    (언어팩이 없으면 영어만 인식돼 한글 버튼을 못 찾는다 = 폰 결제가 조용히 실패한다.)"""
+    import platform
+    print(f"[ocrcheck] OS={platform.system()} {platform.release()}")
+    try:
+        import Vision  # noqa: F401
+        print("  엔진: macOS Apple Vision (정본)")
+    except ImportError:
+        try:
+            try:
+                from winsdk.windows.media.ocr import OcrEngine
+            except ImportError:
+                from winrt.windows.media.ocr import OcrEngine
+            langs = [l.language_tag for l in OcrEngine.available_recognizer_languages]
+            print(f"  엔진: Windows.Media.Ocr — 설치된 OCR 언어 {langs}")
+            if not any(t.lower().startswith("ko") for t in langs):
+                print("  ⚠️ **한국어 OCR 언어팩 없음** — 설정>시간 및 언어>언어 및 지역에서 "
+                      "'한국어' 추가 후 옵션 기능의 '광학 문자 인식(OCR)' 설치할 것")
+        except ImportError as e:
+            print(f"  ⚠️ winsdk/winrt 없음({e}) → easyocr 폴백(느림). `pip install winsdk`")
+    if img_path:
+        items = _ocr_texts(img_path)
+        print(f"  판독 {len(items)}개: {[i['text'][:16] for i in items[:6]]}")
+    return 0
 
 
 def _ocr_texts_vision(img_path: str) -> list[dict]:
@@ -1522,6 +1560,8 @@ def _main():
     args = sys.argv[1:]
     if not args or args[0] in ("-h", "--help"):
         print(__doc__); return
+    if args[0] == "ocrcheck":          # 윈도우 이식 점검 — 엔진/한국어 언어팩 확인
+        raise SystemExit(ocr_selftest(args[1] if len(args) > 1 else None))
     coords_name = args[0]      # e.g. "hyundai_card", "bc_paybook_isp"
     flow_key = args[1] if len(args) > 1 else "flow_payment"
     data = load_coords(f"apps/{coords_name}")
