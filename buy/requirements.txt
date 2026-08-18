@@ -19,7 +19,16 @@ pytesseract>=0.3.10       # 보조 OCR (tesseract 바이너리 별도 설치 필
 opencv-python>=4.9        # 이미지 전처리
 numpy>=1.26
 
+# ── 윈도우 전용 — ★메인 OCR (2026-08-18 추가) ──
+# flow_runner._ocr_texts 의 윈도우 정본 = Windows.Media.Ocr (Apple Vision 대응물, 회당 0.1~0.3s).
+# 이게 없으면 easyocr 로 떨어지는데 회당 ~8s(13배) 라 결제 세션을 잡아먹어 실질적으로 못 쓴다.
+#   ⚠️ Python 3.12 까지만 — winsdk wheel 이 cp312 가 마지막이다(1.0.0b10, 2023-08).
+#      3.13+ 는 소스빌드로 넘어가 실패한다 → 윈도우는 Python 3.12 로 고정할 것.
+#   ⚠️ 한국어 인식은 OS 언어팩에 달렸다. 확인: python -m phone_auto.flow_runner ocrcheck
+#      배포판이 갈라진 환경이면 분할 패키지로 대체 가능(코드가 양쪽 다 시도한다):
+#      pip install winrt-Windows.Media.Ocr winrt-Windows.Graphics.Imaging winrt-Windows.Storage winrt-Windows.Globalization
+winsdk>=1.0.0b10 ; sys_platform == "win32"
+
 # ── macOS 전용 (윈도우에선 설치하지 말 것 — pip 가 실패한다) ──
-# 폰 화면 텍스트 OCR = Apple Vision Framework. 윈도우엔 대응물이 없다.
+# 폰 화면 텍스트 OCR 정본 = Apple Vision Framework.
 #   pip install pyobjc-framework-Vision pyobjc-framework-Quartz
-# 윈도우에서 폰 결제를 돌리려면 flow_runner._ocr_texts 에 easyocr/클로드 사다리가 먼저 필요하다.

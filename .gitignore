@@ -52,6 +52,9 @@ __pycache__/
 _tmp/
 .playwright-mcp/
 
+# Claude Code 로컬 권한 설정 (기기별로 다름 — 커밋하면 다른 PC 설정을 덮어쓴다)
+.claude/settings.local.json
+
 # 세션 임시/민감 산출물 (결제 스크린샷·진단 스크립트·실행 로그) — 절대 커밋 금지
 scratchpad/
 logs/
