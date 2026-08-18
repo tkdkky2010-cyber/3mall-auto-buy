@@ -66,6 +66,22 @@ NAV_MY = (755, 2225)                  # 하단 네비 '마이' (1080x2400, OCR �
 NAV_HOME = (108, 2225)                # 하단 네비 '홈'
 
 
+# ── 주문서(결제화면) 구간 전용 대기 ────────────────────────────────────────
+# 카드앱 PIN 구간은 건드리지 않는다(오탭=카드 잠김). 여기 대상은 주소·쿠폰·포인트·
+# 카드선택·동의 같은 **몰 주문서** 단계뿐이다.
+# 왜: 이 sleep 들은 화면이 이미 떠 있어도 무조건 자던 고정 대기라, 계정당 롯데 ~48초 /
+#     현대몰 ~23초를 그냥 흘려보냈다(2026-08-19 사용자 지시로 축소).
+#     대부분 뒤에 ocr_tap/wait_text/_scroll_to 같은 **자체 재시도 폴링**이 이어져
+#     중복이었다. 폴링이 없는 자리를 위해 하한 0.2s 는 남긴다.
+# ⚠️ 되돌리려면 ORDER_SLEEP_SCALE=1.0 (환경변수) — 코드 수정 불필요.
+_ORDER_SLEEP_SCALE = float(os.environ.get("ORDER_SLEEP_SCALE", "0.4"))
+
+
+def nap(sec: float) -> None:
+    """주문서 구간 고정 대기 — ORDER_SLEEP_SCALE 배율 적용(하한 0.2s)."""
+    time.sleep(max(0.2, sec * _ORDER_SLEEP_SCALE))
+
+
 def _accounts() -> list[dict]:
     return json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8"))["accounts"]
 
@@ -360,9 +376,9 @@ def goto_cart_select_all() -> dict:
     # ★마이 경유 → 우상단 장바구니 아이콘 (2026-06-08 변경).
     #   홈은 데일리 프로모 takeover(예: 스와로브스키 기획전)로 진입 불안정 → '마이'는 상단바 안정.
     #   장바구니 아이콘은 마이/홈/기획전 모두 동일 (1002,148) (dump 실측). 옛 (960,150) 은 stale → 빗나감(CART_FAIL).
-    _adb().tap(*NAV_MY); time.sleep(2.0)
+    _adb().tap(*NAV_MY); nap(2.0)
     dismiss_popups(2)
-    _adb().tap(1002, 148); time.sleep(2.5)   # 카트 아이콘 (마이 상단바, 2026-06-08 dump 실측)
+    _adb().tap(1002, 148); nap(2.5)   # 카트 아이콘 (마이 상단바, 2026-06-08 dump 실측)
     if not (wait_text("주문하기", timeout=8) or screen_has("장바구니")):
         out["err"] = "장바구니 미도달"; return out
     # 전체선택: 헤더 "일반 (a/b)" 좌측 체크박스 (~70,cy). ⚠️체크박스는 토글 → 이미 전체선택(a==b>0)이면
@@ -373,12 +389,12 @@ def goto_cart_select_all() -> dict:
     for _ in range(3):
         g = _gen()
         if not g:
-            _adb().tap(70, 303); time.sleep(1.0); continue   # 헤더 못 읽으면 기본좌표 1회
+            _adb().tap(70, 303); nap(1.0); continue   # 헤더 못 읽으면 기본좌표 1회
         m = re.search(r"\((\d+)\s*/\s*(\d+)\)", g["text"])
         out["selected"] = g["text"]
         if m and m.group(1) == m.group(2) and m.group(1) != "0":
             break                                            # 이미 전체선택 → 통과(탭 X)
-        _adb().tap(70, g["cy"]); time.sleep(1.2)
+        _adb().tap(70, g["cy"]); nap(1.2)
     # 주문하기 (1회 탭 — 결제하기 등장으로 전환검증)
     if not ocr_tap("주문하기", contains=True, retries=4):
         out["err"] = "주문하기 탭 실패"; return out
@@ -434,7 +450,7 @@ def _scroll_to(text: str, contains: bool = True, max_scroll: int = 8, down: bool
             _adb().swipe(540, 1700, 540, 800, 400)
         else:
             _adb().swipe(540, 800, 540, 1700, 400)
-        time.sleep(0.8)
+        nap(0.8)
     return None
 
 
@@ -445,17 +461,17 @@ def set_discount_coupons() -> dict:
     sec = _scroll_to("할인쿠폰")
     if not sec:
         out["err"] = "할인쿠폰 섹션 미발견"; return out
-    _adb().tap(sec["cx"], sec["cy"]); time.sleep(1.0)        # 섹션 라디오 활성
+    _adb().tap(sec["cx"], sec["cy"]); nap(1.0)        # 섹션 라디오 활성
     chg = _coupon_change_btn(sec)
     if not chg:
         out["err"] = "할인쿠폰 변경 버튼 미발견"; return out
-    _adb().tap(chg["cx"], chg["cy"]); time.sleep(1.8)        # 모달 '할인선택' 진입
+    _adb().tap(chg["cx"], chg["cy"]); nap(1.8)        # 모달 '할인선택' 진입
     # 상품별 dropdown 반복: 각 상품 '쿠폰을 선택해 주세요' chevron(~985) → 하위모달 '10% 할인' 탭(자동적용+복귀)
     for _ in range(8):
         ph = next((it for it in _ocr_texts(cap()) if "선택해" in it["text"] and "주세요" in it["text"]), None)
         if not ph:
             break
-        _adb().tap(985, ph["cy"]); time.sleep(1.5)           # dropdown 열기
+        _adb().tap(985, ph["cy"]); nap(1.5)           # dropdown 열기
         # ★비활성(회색) 쿠폰 제외 — 같은 쿠폰을 다른 제품이 이미 점유하면 회색 처리됨(밝기로 판별).
         shot = cap(); gimg = Image.open(shot).convert("L")
         cands = [it for it in _submodal_items(shot)
@@ -463,10 +479,10 @@ def set_discount_coupons() -> dict:
         if not cands:
             ocr_tap("닫기", retries=1); break
         opt = min(cands, key=lambda it: it["cy"])            # 활성 중 가장 위
-        _adb().tap(opt["cx"], opt["cy"]); time.sleep(1.3)
+        _adb().tap(opt["cx"], opt["cy"]); nap(1.3)
         out["applied"] += 1
     ocr_tap("선택완료", retries=2) or ocr_tap("적용", retries=1) or ocr_tap("확인", retries=1)
-    time.sleep(1.5)
+    nap(1.5)
     out["ok"] = True
     return out
 
@@ -477,18 +493,18 @@ def set_plus_coupons() -> dict:
     sec = _scroll_to("플러스쿠폰")
     if not sec:
         out["skip"] = "플러스쿠폰 섹션 없음"; out["ok"] = True; return out
-    _adb().tap(sec["cx"], sec["cy"]); time.sleep(1.0)
+    _adb().tap(sec["cx"], sec["cy"]); nap(1.0)
     chg = _coupon_change_btn(sec)
     if not chg:
         out["skip"] = "플러스쿠폰 변경 없음(받은 쿠폰 X)"; out["ok"] = True; return out
-    _adb().tap(chg["cx"], chg["cy"]); time.sleep(1.8)
+    _adb().tap(chg["cx"], chg["cy"]); nap(1.8)
     # 상품별 dropdown: chevron → 하위모달 옵션 '[백화점]...쿠폰 N%' 중 최고% 탭.
     # ⚠️옵션 텍스트엔 '할인' 없음('...쿠폰 N%') → '쿠폰'+'%' 로 매칭(옛 '할인' 필터 버그 수정).
     for _ in range(8):
         ph = next((it for it in _ocr_texts(cap()) if "선택해" in it["text"] and "주세요" in it["text"]), None)
         if not ph:
             break
-        _adb().tap(985, ph["cy"]); time.sleep(1.5)
+        _adb().tap(985, ph["cy"]); nap(1.5)
         # ★비활성(회색) 쿠폰 제외 후 활성 중 최고% 선택 (2026-06-02 #11: 같은 14%가 비활성+활성 2장일 때
         #   OCR 텍스트가 동일해 비활성 14%를 탭→적용실패→제품 미적용→'선택완료'서 '할인혜택 초기화' 팝업).
         shot = cap(); gimg = Image.open(shot).convert("L")
@@ -501,10 +517,10 @@ def set_plus_coupons() -> dict:
             ocr_tap("닫기", retries=1); break
         pcts.sort(key=lambda x: (-x[0], x[1]["cy"]))      # 활성 중 최고% → 같은%면 최상단
         best = pcts[0]
-        _adb().tap(best[1]["cx"], best[1]["cy"]); time.sleep(1.3)
+        _adb().tap(best[1]["cx"], best[1]["cy"]); nap(1.3)
         out["applied"] += 1; out["pcts"].append(best[0])
     ocr_tap("선택완료", retries=2) or ocr_tap("적용", retries=1) or ocr_tap("확인", retries=1)
-    time.sleep(1.5)
+    nap(1.5)
     out["ok"] = True
     return out
 
@@ -518,14 +534,14 @@ def use_all_points() -> dict:
     for _ in range(8):
         if any("전액사용" in it["text"].replace(" ", "") for it in _ocr_texts(cap())):
             break
-        _adb().swipe(540, 1500, 540, 800, 450); time.sleep(0.8)
+        _adb().swipe(540, 1500, 540, 800, 450); nap(0.8)
     # 보이는 '전액사용' 모두 탭 (위→아래). 탭 후 '적용취소'가 되어 다음 루프엔 남은 것(L.POINT)만 매칭.
     for _ in range(5):
         btns = [it for it in _ocr_texts(cap()) if "전액사용" in it["text"].replace(" ", "")]
         if not btns:
             break
         btns.sort(key=lambda it: it["cy"])
-        _adb().tap(btns[0]["cx"], btns[0]["cy"]); time.sleep(1.2)
+        _adb().tap(btns[0]["cx"], btns[0]["cy"]); nap(1.2)
         out["used"] += 1
         # ★잔액 0 계정 — '사용할 수 있는 보유금액이 없습니다' 알럿이 떠서 화면을 덮는다.
         #   안 닫으면 다음 루프의 OCR 에 '전액사용' 이 안 보여 조용히 break 하고, 알럿이 남은 채로
@@ -534,7 +550,7 @@ def use_all_points() -> dict:
         if screen_has("보유금액"):
             ocr_tap("확인", retries=2)
             out["alert"] = out.get("alert", 0) + 1
-            time.sleep(0.8)
+            nap(0.8)
     out["ok"] = True
     return out
 
@@ -548,7 +564,7 @@ def set_cash_receipt() -> dict:
         out["skip"] = "현금영수증 섹션 없음(L.POINT 0)"; out["ok"] = True; return out
     if not ocr_tap("지출증빙", contains=True, retries=3):
         out["skip"] = "지출증빙 비활성"; out["ok"] = True; return out
-    time.sleep(1.5)
+    nap(1.5)
     # ★칸1 포커스 = 키패드 등장까지 보장 (6/2 #10: 단일 탭으론 포커스 실패 → entered=False + '입력해주세요' 팝업).
     #   '사업자 등록번호' 라벨 아래 빈칸 3개(테두리만, OCR 미검출). 후보 오프셋 재시도 + 팝업이 오히려 포커스 유발.
     def _keypad_up() -> bool:
@@ -563,19 +579,19 @@ def set_cash_receipt() -> dict:
         lab = ocr_find("사업자", contains=True) or ocr_find("등록번호", contains=True)
         if not lab:
             out["err"] = "사업자 등록번호 라벨 사라짐"; return out
-        _adb().tap(lab["cx"] - 14, lab["cy"] + dy); time.sleep(1.2)   # 칸1 포커스 (탭 시 자동스크롤)
+        _adb().tap(lab["cx"] - 14, lab["cy"] + dy); nap(1.2)   # 칸1 포커스 (탭 시 자동스크롤)
         if screen_has("입력해주세요"):        # 빈칸 확인 팝업 → '확인'(이게 필드 포커스+키패드 띄움)
-            ocr_tap("확인", retries=2); time.sleep(1.0)
+            ocr_tap("확인", retries=2); nap(1.0)
         if _keypad_up():
             focused = True; break
     if not focused:
         out["err"] = "사업자번호 칸 포커스 실패(키패드 미등장)"; return out
     # ★칸1=3자리→자동 advance→칸2=2자리→자동 advance→칸3=5자리. 시스템 키패드라 adb input text 통함.
     for part in BIZ_NO:                       # ("507","18","15504")
-        _input_text(part); time.sleep(0.6)
+        _input_text(part); nap(0.6)
     # 키보드 닫기 (BACK) + 입력 검증
     serial = hw._serial()
-    subprocess.run([hw.ADB, "-s", serial, "shell", "input", "keyevent", "4"]); time.sleep(1.0)
+    subprocess.run([hw.ADB, "-s", serial, "shell", "input", "keyevent", "4"]); nap(1.0)
     t = _all_text()
     out["entered"] = all(p in t for p in BIZ_NO)
     out["ok"] = True
@@ -591,28 +607,28 @@ def set_address() -> dict:
     for _ in range(6):
         if screen_has(ADDR_KEY) or screen_has("배송정보") or screen_has("배송지"):
             break
-        _adb().swipe(540, 700, 540, 1700, 400); time.sleep(0.6)
+        _adb().swipe(540, 700, 540, 1700, 400); nap(0.6)
     # 접힌 상태서 선택된 주소가 이미 203호면 변경 불필요
     if screen_has(ADDR_KEY):
         out["skip"] = f"기본배송지 이미 '{ADDR_KEY}'"; out["ok"] = True; return out
     # 배송정보 펼치기 (우측 chevron) → 주소 '변경 >' 노출 (#6 검증: 접힘 상태선 변경버튼 숨김)
     bi = _find("배송정보", contains=True)
     if bi:
-        _adb().tap(1000, bi["cy"]); time.sleep(1.5)
+        _adb().tap(1000, bi["cy"]); nap(1.5)
     # 주소 '변경 >' (배송방법/픽업 제외, 우측 최대 cx)
     chgs = [it for it in _ocr_texts(cap()) if "변경" in it["text"]
             and "배송방법" not in it["text"] and "픽업" not in it["text"]]
     if not chgs:
         out["err"] = "주소 변경 버튼 미발견"; return out
     chg = max(chgs, key=lambda it: it["cx"])
-    _adb().tap(chg["cx"], chg["cy"]); time.sleep(2.0)
+    _adb().tap(chg["cx"], chg["cy"]); nap(2.0)
     # 주소목록서 '203호' 포함 주소 탭 (탭=자동선택+복귀, 별도 확인버튼 없음)
     tgt = _scroll_to(ADDR_KEY, max_scroll=6)
     if not tgt:
         out["err"] = f"'{ADDR_KEY}' 주소 미발견"; return out
-    _adb().tap(tgt["cx"], tgt["cy"]); time.sleep(2.0)
+    _adb().tap(tgt["cx"], tgt["cy"]); nap(2.0)
     ocr_tap("선택", retries=1) or ocr_tap("확인", retries=1) or ocr_tap("적용", retries=1)
-    time.sleep(1.5)
+    nap(1.5)
     out["changed"] = screen_has(ADDR_KEY)
     out["ok"] = True
     return out
@@ -643,9 +659,9 @@ def detect_card_lotte() -> dict:
         r = _scan()
         if r:
             return r
-        _adb().swipe(540, 1700, 540, 800, 400); time.sleep(0.7)
+        _adb().swipe(540, 1700, 540, 800, 400); nap(0.7)
     for _ in range(9):                                          # ↑ 못 찾으면 위로 스캔
-        _adb().swipe(540, 800, 540, 1700, 400); time.sleep(0.7)
+        _adb().swipe(540, 800, 540, 1700, 400); nap(0.7)
         r = _scan()
         if r:
             return r
@@ -672,34 +688,34 @@ def select_card_lotte(day: str | None = None) -> dict:
         db = ocr_find("다른 결제수단", contains=True)
         if db:
             break
-        _adb().swipe(540, 1700, 540, 800, 400); time.sleep(0.6)
+        _adb().swipe(540, 1700, 540, 800, 400); nap(0.6)
     if not db:
         for _ in range(8):                                 # 못 찾으면 위로
-            _adb().swipe(540, 800, 540, 1700, 400); time.sleep(0.6)
+            _adb().swipe(540, 800, 540, 1700, 400); nap(0.6)
             db = ocr_find("다른 결제수단", contains=True)
             if db:
                 break
     if not db:
         out["err"] = "'다른 결제수단' 미발견"; return out
-    _adb().tap(db["cx"], db["cy"]); time.sleep(1.5)         # 라디오 선택(그리드 활성, 라디오라 멱등)
+    _adb().tap(db["cx"], db["cy"]); nap(1.5)         # 라디오 선택(그리드 활성, 라디오라 멱등)
     # 2) '신용카드' 그리드 버튼 → '카드 선택'/'할부 선택' 드롭다운 노출
     # ★신용카드 버튼이 그리드 아래로 밀릴 수 있음(2026-07-08 계정1 실패) → 스크롤하며 찾아 탭.
     #   contains=False(정확일치) = 배너 '롯데카드(신용카드/L.PAY) N% 할인' 오매칭 방지(ocr_tap 기본과 동일).
     sc = _scroll_to("신용카드", contains=False, max_scroll=6)
     if not sc:
         out["err"] = "'신용카드' 버튼 탭 실패(스크롤 후 미발견)"; return out
-    _adb().tap(sc["cx"], sc["cy"]); time.sleep(0.5)
-    time.sleep(1.5)
+    _adb().tap(sc["cx"], sc["cy"]); nap(0.5)
+    nap(1.5)
     # 3) '카드 선택' 드롭다운(행 우측 chevron x≈987) → 카드목록 팝업.
     #    ★exact 매칭 필수 — contains 면 안내문 '...비씨카드 선택 시...'의 '카드 선택' 부분문자열을 오매칭(2026-06-02 #11 버그).
     lab = _scroll_to("카드 선택", contains=False, max_scroll=4)
     if not lab:
         out["err"] = "'카드 선택' 드롭다운 미발견"; return out
-    _adb().tap(987, lab["cy"]); time.sleep(1.8)
+    _adb().tap(987, lab["cy"]); nap(1.8)
     # 4) 카드목록 팝업서 당일카드 탭 (OCR 라디오 글리프 '_'/'•' 접두 대비 contains 매칭)
     if not ocr_tap(target, contains=True, retries=4):
         out["err"] = f"카드목록 '{target}' 선택 실패"; return out
-    time.sleep(2.0)
+    nap(2.0)
     out["via"] = "다른결제수단>신용카드>카드선택"; out["ok"] = True
     return out
 
@@ -727,7 +743,7 @@ def agree_required() -> bool:
     """필수 동의 체크박스 체크. ★좌표 하드코딩 대신 **픽셀 박스검출 + 체크검증 + 재시도**
     (옛 cx-210 오프셋이 박스 빗나가 미체크→'동의하셔야 구매' 팝업으로 결제막힘, 2026-06-02 #12).
     체크 확인될 때까지 최대 5회 탭(이미 체크면 탭 안 함=토글오프 방지). ⚠️동의는 결제수단 아래 → 안 보이면 스크롤."""
-    time.sleep(1.0)
+    nap(1.0)
     def _ag():
         return next((it for it in _ocr_texts(cap())
                      if "동의" in it["text"] and ("필수" in it["text"] or "전체" in it["text"])), None)
@@ -736,14 +752,14 @@ def agree_required() -> bool:
         ag = _ag()
         if ag:
             break
-        _adb().swipe(540, 1500, 540, 800, 450); time.sleep(0.8)
+        _adb().swipe(540, 1500, 540, 800, 450); nap(0.8)
     if not ag:
         return False
     for _ in range(5):
         bx, checked = _agree_box(ag["cy"])
         if checked:
             return True
-        _adb().tap(bx, ag["cy"]); time.sleep(1.0)
+        _adb().tap(bx, ag["cy"]); nap(1.0)
         ag = _ag() or ag                     # 리플로우 대비 cy 재확보
     return _agree_box(ag["cy"])[1]
 

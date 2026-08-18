@@ -57,17 +57,26 @@ GALLERIA_PRODUCTS = {
     "n": {"name": "탄력크림EX75",       "goods_no": "2502913437"},
 }
 
-# 롯데 상품 정보 (hsmaster/config/sulwhasoo-ids.json 기준, 월 1회 갱신)
-LOTTE_PRODUCTS = {
-    "b": {"name": "윤조3종",            "goods_no": "2923416935"},
-    "c": {"name": "자음2종",            "goods_no": "2923389602"},
-    "d": {"name": "본윤2종",            "goods_no": "2008758498"},
-    "e": {"name": "탄력3종",            "goods_no": "2923406968"},
-    "f": {"name": "윤조에센스90",        "goods_no": "2091578259"},
-    "g": {"name": "자음생2종",          "goods_no": "2719761525"},
-    "h": {"name": "자음생크림리치세트", "goods_no": "2719761746"},
-    "n": {"name": "탄력크림EX75",       "goods_no": "2923418727"},
+# 롯데 상품 정보 — ★goods_no 는 hsmaster/config/sulwhasoo-ids.json (SoT) 에서 읽는다.
+#   종전엔 이 자리에 번호를 하드코딩하고 "월 1회 갱신" 주석만 달아뒀는데, 실제로 갱신이 안 돼
+#   config 와 어긋났다: 2026-08-17 사용자가 롯데 g 를 (i몰단독)자음생2종(2834421446)으로 바꿨는데
+#   config 만 고치면 담기는 여기 박힌 구 번호(2719761525=(공통)자음생2종)를 그대로 썼다.
+#   (galleria SET_COMBINE_RULES 의 s07 단가 사고와 같은 유형 — 사본이 조용히 낡는다.)
+#   이름(짧은 표기)은 로그·매칭용이라 여기 유지하고, **번호만** SoT 에서 가져온다.
+_LOTTE_SHORT_NAMES = {
+    "b": "윤조3종", "c": "자음2종", "d": "본윤2종", "e": "탄력3종",
+    "f": "윤조에센스90", "g": "자음생2종", "h": "자음생크림리치세트", "n": "탄력크림EX75",
 }
+_IDS_FILE = PROJECT_ROOT / "hsmaster" / "config" / "sulwhasoo-ids.json"
+_LOTTE_IDS = json.loads(_IDS_FILE.read_text(encoding="utf-8"))["ids"]
+LOTTE_PRODUCTS = {
+    code: {"name": short, "goods_no": str(_LOTTE_IDS[code]["lotte"])}
+    for code, short in _LOTTE_SHORT_NAMES.items()
+    if code in _LOTTE_IDS and _LOTTE_IDS[code].get("lotte")
+}
+_missing = [c for c in _LOTTE_SHORT_NAMES if c not in LOTTE_PRODUCTS]
+if _missing:   # 조용히 빠지면 담기에서 그 상품만 누락된다 → 크게 알린다
+    print(f"[WARN] sulwhasoo-ids.json 에 롯데 goods_no 없음: {_missing}")
 
 # 조합 = rate-check/_common.py 의 COMBOS 단일 소스 (TOP 20).
 # rate-check 의 list[0..N-1] 을 dict{1..N} 으로 변환 (combo_no 1-based 사용).

@@ -67,6 +67,22 @@ BP_PATH = ROOT / "secrets" / "beauty_point.json"
 BP_LEDGER = ROOT / "secrets" / "beauty_point_ledger.json"   # 뷰티포인트 누적 추적 (세션 릴레이, 목표 180,000P)
 
 
+# ── 주문서(결제화면) 구간 전용 대기 ────────────────────────────────────────
+# 카드앱 PIN 구간은 건드리지 않는다(오탭=카드 잠김). 여기 대상은 주소·쿠폰·포인트·
+# 카드선택·동의 같은 **몰 주문서** 단계뿐이다.
+# 왜: 이 sleep 들은 화면이 이미 떠 있어도 무조건 자던 고정 대기라, 계정당 롯데 ~48초 /
+#     현대몰 ~23초를 그냥 흘려보냈다(2026-08-19 사용자 지시로 축소).
+#     대부분 뒤에 ocr_tap/wait_text/_scroll_to 같은 **자체 재시도 폴링**이 이어져
+#     중복이었다. 폴링이 없는 자리를 위해 하한 0.2s 는 남긴다.
+# ⚠️ 되돌리려면 ORDER_SLEEP_SCALE=1.0 (환경변수) — 코드 수정 불필요.
+_ORDER_SLEEP_SCALE = float(os.environ.get("ORDER_SLEEP_SCALE", "0.4"))
+
+
+def nap(sec: float) -> None:
+    """주문서 구간 고정 대기 — ORDER_SLEEP_SCALE 배율 적용(하한 0.2s)."""
+    time.sleep(max(0.2, sec * _ORDER_SLEEP_SCALE))
+
+
 def _ledger_append(idx: int, acct_id: str | None, profile_key: str | None) -> None:
     """뷰티 재인증 성공 1건 기록 — 다음 세션이 누적치를 이어받는 SoT.
     amount/points는 실측 어려워 건수 기반(요약 시 조합가로 보강). 실패해도 결제엔 영향 없음."""
@@ -432,20 +448,20 @@ def cdp_select_only(keywords: list[str], timeout: float = 25) -> tuple[bool, str
     while time.time() < end:
         c = attach_visible_url("basktList")
         if c is None:
-            time.sleep(0.8); continue
+            nap(0.8); continue
         try:
             c.ev(_SEL_ONLY_JS % (kw_js, "true"), timeout=10)      # 선택/해제 클릭
-            time.sleep(1.2)                                        # 핸들러(합계 갱신) 반영 대기
+            nap(1.2)                                        # 핸들러(합계 갱신) 반영 대기
             raw = c.ev(_SEL_ONLY_JS % (kw_js, "false"), timeout=10)  # 상태 재확인(클릭 없이)
         except Exception as e:
             last = f"CDP 실패: {e}"
-            time.sleep(0.8); continue
+            nap(0.8); continue
         finally:
             c.close()
         try:
             d = json.loads(raw)
         except Exception:
-            time.sleep(0.8); continue
+            nap(0.8); continue
         items = d.get("items", [])
         bad = [i for i in items if i["now"] != i["want"]]
         picked = [i for i in items if i["now"]]
@@ -455,7 +471,7 @@ def cdp_select_only(keywords: list[str], timeout: float = 25) -> tuple[bool, str
                 print(f"[cart] {'✓ 선택' if i['now'] else '· 제외'}: {i['t']}", flush=True)
             return True, last
         print(f"[cart] 선택 불일치 {len(bad)}건 / 선택 {len(picked)}건 → 재시도", flush=True)
-        time.sleep(1.0)
+        nap(1.0)
     return False, last
 
 
@@ -578,33 +594,33 @@ def enter_identity_auth() -> dict:
         out["err"] = f"identity 데이터/자모 미정의: name={name!r}"; return out
     adb = _adb()
     # 이름 필드 focus → 한글 키보드 전환
-    adb.tap(*ID_NAME_FIELD); time.sleep(0.6)
+    adb.tap(*ID_NAME_FIELD); nap(0.6)
     globe_n = 0
     for _ in range(5):                       # 글로브 언어순환(EN→中文→…→한국어). 더 많아도 커버.
         if _kbd_is_korean():
             break
-        adb.tap(*GLOBE); time.sleep(0.7); globe_n += 1
+        adb.tap(*GLOBE); nap(0.7); globe_n += 1
     if not _kbd_is_korean():
         out["err"] = "키보드 한글전환 실패"; return out
     lap(f"본인인증 이름필드+한글키보드 (글로브 {globe_n}회)")
     for j in seq:
-        adb.tap(*JAMO_XY[j]); time.sleep(0.15)
-    time.sleep(0.25)
+        adb.tap(*JAMO_XY[j]); nap(0.15)
+    nap(0.25)
     # 생년월일 + 성별 (input text). 한글키보드→숫자키패드 전환 타이밍 finicky → 1.2s 유지 + 재시도.
     birth_attempts = 0
     for attempt in range(3):
         birth_attempts += 1
-        adb.tap(*ID_BIRTH_FIELD); time.sleep(1.2)   # 키패드 전환(이 지점만 넉넉히)
-        subprocess.run(["adb", "shell", "input", "text", birth6]); time.sleep(0.4)
-        adb.tap(*ID_KEYPAD_NEXT); time.sleep(0.5)   # 키패드 '다음' = 성별칸 (직접탭은 포커스 실패)
-        subprocess.run(["adb", "shell", "input", "text", gender]); time.sleep(0.4)
+        adb.tap(*ID_BIRTH_FIELD); nap(1.2)   # 키패드 전환(이 지점만 넉넉히)
+        subprocess.run(["adb", "shell", "input", "text", birth6]); nap(0.4)
+        adb.tap(*ID_KEYPAD_NEXT); nap(0.5)   # 키패드 '다음' = 성별칸 (직접탭은 포커스 실패)
+        subprocess.run(["adb", "shell", "input", "text", gender]); nap(0.4)
         if _verify_identity_dump(name, birth6, gender):
             break
         print(f"   [identity] 생년월일/성별 미반영 — 재시도 {attempt + 1}", flush=True)
     else:
         out["err"] = "dump 검증 실패(생년월일/성별 미입력) — 확인 안 누름"; return out
     lap(f"본인인증 이름자모+생년월일+성별 (생년월일 {birth_attempts}회 시도)")
-    adb.tap(*ID_CONFIRM); time.sleep(2.5)   # 인증 처리
+    adb.tap(*ID_CONFIRM); nap(2.5)   # 인증 처리
     lap("본인인증 확인 + 2.5s 처리대기")
     out["ok"] = True
     return out
@@ -710,18 +726,18 @@ def _pick_card_from_grid(grid_name: str = "현대카드") -> bool:
             print(f"[grid] opener='{'결제수단변경' if chg else '신용카드 선택'}' 탭 "
                   f"@({op['cx']},{op['cy']})", flush=True)
             # 대기 2.5s — 1.8s 로는 바텀시트가 안 떠서 아래 재탭 분기로 빠졌다(2026-08-05 수동 실측).
-            _adb().tap(op["cx"], op["cy"]); time.sleep(2.5)
+            _adb().tap(op["cx"], op["cy"]); nap(2.5)
             opened = True
             break
         pay_tab = next((it for it in its if "페이" in it["text"] and "Pay" in it["text"]), None)
         card_tab = next((it for it in its if it["text"].strip() == "카드"), None)
         if pay_tab and card_tab:
             print("[grid] opener=탭형(페이→카드)", flush=True)
-            _adb().tap(pay_tab["cx"], pay_tab["cy"]); time.sleep(1.5)
-            _adb().tap(card_tab["cx"], card_tab["cy"]); time.sleep(1.5)
+            _adb().tap(pay_tab["cx"], pay_tab["cy"]); nap(1.5)
+            _adb().tap(card_tab["cx"], card_tab["cy"]); nap(1.5)
             opened = True
             break
-        _adb().swipe(540, 1700, 540, 900, 400); time.sleep(0.8)   # 결제수단 보이게 스크롤 다운
+        _adb().swipe(540, 1700, 540, 900, 400); nap(0.8)   # 결제수단 보이게 스크롤 다운
     if not opened:
         print("[grid] ✗ opener 미발견(결제수단 섹션 못 찾음)", flush=True)
         return False
@@ -736,7 +752,7 @@ def _pick_card_from_grid(grid_name: str = "현대카드") -> bool:
             sc = next((it for it in its2 if "신용카드 선택" in it["text"]), None)
             if sc:
                 print(f"[grid] '신용카드 선택' 한 단계 더 탭 @({sc['cx']},{sc['cy']})", flush=True)
-                _adb().tap(sc["cx"], sc["cy"]); time.sleep(2.5)
+                _adb().tap(sc["cx"], sc["cy"]); nap(2.5)
     # '카드 선택' 그리드는 카드 많아 길 수 있음 → grid_name 안 보이면 그리드 영역 스크롤하며 탐색
     # _fuzzy_has: '비씨카드(페이북)' 접미사(startswith 상위집합) + '혀대카드' 류 OCR 오독 대응(#17).
     hd = None
@@ -745,12 +761,12 @@ def _pick_card_from_grid(grid_name: str = "현대카드") -> bool:
         if hd:
             break
         print(f"[grid] '{grid_name}' 미발견 #{i+1} → 그리드 스크롤", flush=True)
-        _adb().swipe(540, 1750, 540, 1050, 400); time.sleep(0.8)   # 그리드 스크롤 다운
+        _adb().swipe(540, 1750, 540, 1050, 400); nap(0.8)   # 그리드 스크롤 다운
     if not hd:
         print(f"[grid] ✗ '{grid_name}' 최종 미발견 — 선택 실패", flush=True)
         return False
     print(f"[grid] ✓ '{grid_name}' 탭 @({hd['cx']},{hd['cy']})", flush=True)
-    _adb().tap(hd["cx"], hd["cy"]); time.sleep(2.0)
+    _adb().tap(hd["cx"], hd["cy"]); nap(2.0)
     return True
 
 
