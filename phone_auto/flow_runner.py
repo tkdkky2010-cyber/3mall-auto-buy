@@ -58,7 +58,99 @@ def _ocr_digits(img_path: str, y_min: int = 1600, y_max: int = 2200) -> dict[str
 
 
 def _ocr_texts(img_path: str) -> list[dict]:
-    """전체 텍스트 OCR. [{'text','cx','cy','w','h'}, ...]"""
+    """전체 텍스트 OCR. [{'text','cx','cy','w','h'}, ...] — **OS 별로 엔진이 다르다.**
+
+    ★2026-08-18 신설(윈도우 이식). 종전엔 `import Vision`(Apple 전용) 단독이라
+      **윈도우에선 첫 `ocr_tap` 에서 죽었다** = 폰 결제 전체 불가.
+    ★왜 핸드세이크로 못 때우나: 핸드세이크는 **셔플 키패드 전용**(계정당 3~4회)이다.
+      화면 탐색 OCR 은 호출지점이 208곳이고 `wait_text` 는 폴링이라(1회 호출 = 최대 수십 폴)
+      계정당 수십~수백 번 불린다. 45초 왕복 핸드세이크로는 물리적으로 불가능하다.
+      → **화면 탐색은 로컬 엔진이 필수**, 그래서 OS 별 엔진 분기가 답이다.
+
+    우선순위: macOS Vision(정본, 실측 0.6s) → Windows.Media.Ocr(OS 내장, Vision 대응물)
+              → easyocr(최후수단. 실측 ~8s 로 13배 느려 결제 세션을 잡아먹는다 — 상시 사용 금지).
+    ⚠️ **윈도우 경로는 라이브 미검증**(작성 환경이 맥). 윈도우 첫 실행 때 반드시 관찰할 것.
+    """
+    try:
+        import Vision  # noqa: F401  (맥이면 여기서 통과 → 기존 경로 그대로)
+    except ImportError:
+        return _ocr_texts_nonmac(img_path)
+    return _ocr_texts_vision(img_path)
+
+
+def _ocr_texts_nonmac(img_path: str) -> list[dict]:
+    """맥이 아닐 때 — Windows.Media.Ocr 우선, 실패하면 easyocr(느림) 폴백."""
+    global _NONMAC_ENGINE
+    if _NONMAC_ENGINE != "easyocr":
+        try:
+            return _ocr_texts_winrt(img_path)
+        except Exception as e:
+            if _NONMAC_ENGINE is None:      # 첫 실패만 크게 알린다(매 호출 도배 금지)
+                print(f"[ocr] ⚠️ Windows.Media.Ocr 사용 불가({e}) → easyocr 폴백. "
+                      f"**느리다(~8s/회)** — `pip install winsdk` + 한국어 언어팩 설치 권장", flush=True)
+            _NONMAC_ENGINE = "easyocr"
+    return _ocr_texts_easyocr(img_path)
+
+
+def _ocr_texts_winrt(img_path: str) -> list[dict]:
+    """Windows 내장 OCR (Apple Vision 대응물). `pip install winsdk` 필요.
+    ⚠️ 한국어 인식은 **OS 언어팩**에 달렸다 — 없으면 영어만 잡혀 한글 버튼을 못 찾는다."""
+    import asyncio
+    from winsdk.windows.globalization import Language
+    from winsdk.windows.graphics.imaging import BitmapDecoder
+    from winsdk.windows.media.ocr import OcrEngine
+    from winsdk.windows.storage import FileAccessMode, StorageFile
+
+    async def _run() -> list[dict]:
+        f = await StorageFile.get_file_from_path_async(str(Path(img_path).resolve()))
+        stream = await f.open_async(FileAccessMode.READ)
+        bmp = await (await BitmapDecoder.create_async(stream)).get_software_bitmap_async()
+        eng = OcrEngine.try_create_from_language(Language("ko")) or \
+            OcrEngine.try_create_from_user_profile_languages()
+        if eng is None:
+            raise RuntimeError("OcrEngine 생성 실패 — 한국어 언어팩 미설치 가능")
+        res = await eng.recognize_async(bmp)
+        out = []
+        for line in res.lines:                      # 줄 단위 = Vision 의 observation 과 같은 입도
+            words = list(line.words)
+            if not words:
+                continue
+            x0 = min(w.bounding_rect.x for w in words)
+            y0 = min(w.bounding_rect.y for w in words)
+            x1 = max(w.bounding_rect.x + w.bounding_rect.width for w in words)
+            y1 = max(w.bounding_rect.y + w.bounding_rect.height for w in words)
+            t = (line.text or "").strip()
+            if t:
+                out.append({"text": t, "cx": int((x0 + x1) / 2), "cy": int((y0 + y1) / 2),
+                            "w": int(x1 - x0), "h": int(y1 - y0)})
+        return out
+
+    return asyncio.run(_run())
+
+
+def _ocr_texts_easyocr(img_path: str) -> list[dict]:
+    """최후수단. 한국어 포함 Reader 는 keypad 용(영어 전용)과 **별개 인스턴스**로 둔다."""
+    global _EASYOCR_FULL
+    if _EASYOCR_FULL is None:
+        import easyocr
+        _EASYOCR_FULL = easyocr.Reader(["ko", "en"], gpu=False, verbose=False)
+    out = []
+    for bbox, text, _conf in _EASYOCR_FULL.readtext(img_path):
+        t = (text or "").strip()
+        if not t:
+            continue
+        (x0, y0), (x1, y1) = bbox[0], bbox[2]
+        out.append({"text": t, "cx": int((x0 + x1) / 2), "cy": int((y0 + y1) / 2),
+                    "w": int(abs(x1 - x0)), "h": int(abs(y1 - y0))})
+    return out
+
+
+_NONMAC_ENGINE = None      # None=미시도 / "easyocr"=winrt 실패 확정
+_EASYOCR_FULL = None
+
+
+def _ocr_texts_vision(img_path: str) -> list[dict]:
+    """macOS Apple Vision — **정본. 기존 코드 그대로, 손대지 말 것.**"""
     import Vision, Quartz
     from Foundation import NSURL
     url = NSURL.fileURLWithPath_(img_path)
