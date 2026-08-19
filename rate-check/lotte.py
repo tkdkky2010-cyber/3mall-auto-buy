@@ -23,6 +23,7 @@ from _common import (
     LOTTE_HEADER_ROW, LOTTE_COMBO_END_ROW, CHART_RANGE,
     matched_chromedriver_service,
     id_candidates as C_id_candidates,
+    use_content_tab,
 )
 
 import os as _os
@@ -35,6 +36,8 @@ opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{_LOTTE_PORT}")
 _svc = matched_chromedriver_service(_LOTTE_PORT)  # 버전 mismatch 회피
 driver = webdriver.Chrome(options=opts, service=_svc) if _svc else webdriver.Chrome(options=opts)
 print(f"CDP attach: 127.0.0.1:{_LOTTE_PORT}")
+# ★Gemini webview 를 잡으면 driver.get 이 안 먹어 전 상품이 빈 값으로 읽힌다 (2026-08-19 실사고)
+use_content_tab(driver)
 # ★캐시 비활성화 — 장기 실행 CFT 의 stale 페이지 방지 (갤러리아 쿠폰 사고 2026-07-16, 동일 리스크)
 try:
     driver.execute_cdp_cmd("Network.setCacheDisabled", {"cacheDisabled": True})

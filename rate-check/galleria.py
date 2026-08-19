@@ -53,6 +53,8 @@ def attach_chrome() -> webdriver.Chrome:
         d.execute_cdp_cmd("Network.setCacheDisabled", {"cacheDisabled": True})
     except Exception as e:
         print(f"  [WARN] 캐시 비활성화 실패 ({e}) — stale 값 주의")
+    # ★Gemini webview 를 잡으면 driver.get 이 안 먹어 전 상품이 빈 값으로 읽힌다 (2026-08-19 실사고)
+    C.use_content_tab(d)
     return d
 
 

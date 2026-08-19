@@ -649,6 +649,48 @@ def load_ids() -> dict:
 
 
 # ============================================================
+# CDP attach 후 **콘텐츠 탭 선택** (2026-08-19 신설)
+# ============================================================
+def use_content_tab(driver, *, verbose: bool = True) -> bool:
+    """CDP attach 직후 selenium 이 잡은 핸들이 콘텐츠 탭이 아니면 http(s) 탭으로 바꾼다.
+
+    ★2026-08-19 실사고: CFT 프로필이 구글 로그인돼 있으면 Chrome 내장 **Gemini 패널**이
+      CDP 타겟으로 뜨고(`gemini.google.com/glic`, `chrome://glic/`), selenium 이 attach 할 때
+      **그 webview 를 기본 핸들로 잡는다.** 그러면 `driver.get()` 을 해도 그 창은 안 움직여
+      **모든 페이지 판독이 Gemini 화면을 읽는다.**
+      실제 피해: step1 롯데가 8개 상품 전부 `쿠폰 None` / `카드 lines=[]` 로 읽어
+      공급률이 0.48 → 0.66 으로 잘못 기록됐다(시트 덮어씀). 에러가 안 나고 **빈 값으로
+      조용히 통과**해서 숫자를 안 보면 모른다.
+    ⚠️ 아침 실행은 정상이었다 — Gemini 패널이 뜨기 전이었을 뿐. **재현이 간헐적이다.**
+    """
+    try:
+        handles = driver.window_handles
+    except Exception:
+        return False
+    if len(handles) <= 1:
+        return True
+    try:
+        cur = driver.current_url or ""
+    except Exception:
+        cur = ""
+    if cur.startswith("http") and "gemini.google" not in cur:
+        return True
+    for h in handles:
+        try:
+            driver.switch_to.window(h)
+            u = driver.current_url or ""
+        except Exception:
+            continue
+        if u.startswith("http") and "gemini.google" not in u:
+            if verbose:
+                print(f"  [INFO] CDP 기본 핸들이 콘텐츠 탭이 아니어서 전환 ({cur[:40]!r} → {u[:40]!r})")
+            return True
+    if verbose:
+        print(f"  [WARN] 콘텐츠 탭을 못 찾음 (핸들 {len(handles)}개) — 판독이 빈 값으로 나올 수 있다")
+    return False
+
+
+# ============================================================
 # 상품번호 후보 (2026-08-19 신설)
 # ============================================================
 # ★왜: `n`(탄력크림EX 75ml) 은 **상품번호가 수시로 바뀐다**(사용자 지시 2026-08-19).
