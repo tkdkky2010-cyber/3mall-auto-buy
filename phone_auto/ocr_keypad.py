@@ -354,10 +354,24 @@ def _ocr_macos_vision(img_path: str) -> list[tuple[str, int, int, float]]:
 #   (선례: phone_auto/nh_vision_input.py — 로컬 OCR 전멸한 NH 방패 키패드를 이 방식으로 뚫고
 #    롯데 #9 결제 성공, 주문 2026-07-31-G83859)
 CLAUDE_OCR_DIR = PROJECT_ROOT / "phone_auto" / "_tmp" / "claude_ocr"
-CLAUDE_OCR_TIMEOUT = float(os.environ.get("CLAUDE_OCR_TIMEOUT", "45"))
+
+# ★★ 결제 후 키패드(카드번호·PIN·카드비번)는 **에이전트 핸드셰이크가 1순위**다.
+#    (사용자 지시 2026-08-19: "홈쇼핑 창 결제하기 이후 모든 카드번호 및 pin 번호 입력하는 부분의
+#     ocr 은 핸드세이크로 바꿔" / "현대카드 무조건 앞으로 핸드세이크로 처리해 — 현대몰 설화수,
+#     현대몰 식품, 롯데몰 설화수 모두" / "nh카드 그렇게 하고 있잖아")
+#    켜는 방법 = `CLAUDE_OCR_ONLY=1` (아래 vote_digits 최상단에서 engines=("claude",) 로 고정).
+#    왜: 로컬 사다리는 실패해도 **어차피 클로드로 승격**되면서 그 앞에 시간을 통째로 버린다.
+#    실측 2026-08-19 #3 카드비번: 로컬 3회 시도 = **120초 낭비** 후 핸드셰이크로 성공(10/10).
+#    로컬이 9/10(숫자 '7' 만 미판독)이어도 need 에 걸리면 실패라, "거의 맞음"이 도움이 안 된다.
+CLAUDE_OCR_ONLY = os.environ.get("CLAUDE_OCR_ONLY", "").strip().lower() in ("1", "true", "yes")
+# 타임아웃: 핸드셰이크가 1순위일 땐 에이전트 왕복 시간을 줘야 한다(기본 45s 는 세션 붙은 사람이
+# 알아채기도 전에 지나간다 — 실측: 백그라운드 실행에서 45s 무응답으로 매번 폴백).
+CLAUDE_OCR_TIMEOUT = float(os.environ.get("CLAUDE_OCR_TIMEOUT", "240" if CLAUDE_OCR_ONLY else "45"))
 CLAUDE_OCR_POLL = 1.0
 # ★첫 요청이 타임아웃하면(=세션에 클로드가 안 붙어있음) 그 프로세스에선 이후 클로드를 건너뛴다.
 #   키패드마다 45초씩 까먹으면 결제 세션(~5분)이 만료된다.
+#   단 `CLAUDE_OCR_ONLY=1` 이면 **끄지 않는다** — 그건 "무조건 핸드셰이크" 를 명시적으로 켠 것이고,
+#   여기서 비활성화하면 남은 키패드가 전부 로컬로 떨어져 지시가 조용히 무력화된다.
 _claude_unavailable = False
 
 
@@ -409,9 +423,14 @@ def _ocr_claude(img_path: str) -> list[tuple[str, int, int, float]]:
             print(f"[claude-ocr] 응답 수신 — {len(out)}개 숫자", flush=True)
             return out
         _time.sleep(CLAUDE_OCR_POLL)
-    _claude_unavailable = True
-    raise RuntimeError(f"claude 판독 응답 없음 (id={rid}, {CLAUDE_OCR_TIMEOUT:.0f}s 타임아웃) "
-                       f"— 이 프로세스에선 이후 클로드 skip, 나머지 엔진으로 진행")
+    if not CLAUDE_OCR_ONLY:
+        _claude_unavailable = True          # 무인 실행 보호 — 매 키패드마다 타임아웃 먹지 않게
+        raise RuntimeError(f"claude 판독 응답 없음 (id={rid}, {CLAUDE_OCR_TIMEOUT:.0f}s 타임아웃) "
+                           f"— 이 프로세스에선 이후 클로드 skip, 나머지 엔진으로 진행")
+    # CLAUDE_OCR_ONLY=1 = "무조건 핸드셰이크" 를 명시적으로 켠 상태 → 비활성화하지 않는다.
+    raise RuntimeError(f"claude 판독 응답 없음 (id={rid}, {CLAUDE_OCR_TIMEOUT:.0f}s 타임아웃). "
+                       f"CLAUDE_OCR_ONLY=1 이라 다음 키패드에서 **다시 요청**한다 — "
+                       f"세션의 에이전트가 {CLAUDE_OCR_DIR}\\request.png 를 읽고 response.json 을 쓸 것")
 
 
 def _ocr_gcv(img_path: str) -> list[tuple[str, int, int, float]]:
@@ -560,8 +579,10 @@ def vote_digits(
     Returns {'0': (cx, cy), '1': (cx, cy), ..., '9': (cx, cy)} or None.
     """
     # ★CLAUDE_OCR_ONLY=1 → 로컬 엔진 전부 건너뛰고 에이전트 비전만 사용 (ROI 무관, UI 이동에 강함).
-    #   로컬 2엔진이 ROI 밴드 밖 키패드에서 구조적으로 실패하는 화면(롯데 일반결제 모달) 실험/운용용.
-    if os.environ.get("CLAUDE_OCR_ONLY", "").strip().lower() in ("1", "true", "yes"):
+    #   **결제 후 키패드의 표준 경로다** (사용자 지시 2026-08-19 — 파일 상단 CLAUDE_OCR_ONLY 주석 참고).
+    #   현대/롯데/KB/하나/삼성/NH 전 카드, 현대몰 식품·설화수·롯데몰 설화수 전부 이 관문을 지난다
+    #   (`vote_digits` = input_pin 이 쓰는 단일 판독 지점) → 여기서 켜면 한 번에 다 적용된다.
+    if CLAUDE_OCR_ONLY:
         engines = ("claude",)
     import cv2
     image_path = str(image_path)

@@ -51,6 +51,15 @@ def main() -> int:
         if rc != 0:
             print(f"\n❌ {label} 실패 (rc={rc})")
             return rc
+    # 6) 재고관리 시트 '당일 설화수' 탭에 미러 (사용자 지시 2026-08-06 — 날짜탭 신설 없이 덮어쓰기).
+    #    ★2026-08-19: **이 단계가 윈도우 이식본에 통째로 빠져 있었다.** step1.sh 에는 있는데
+    #      step1.py 엔 없어서, 윈도우로 돌린 날은 재고관리 시트 미러가 갱신되지 않았다.
+    #      READ_FIRST "출력물은 두 군데 — 원본만 고치고 미러를 안 보면 사용자는 깨진 쪽을 본다".
+    #    원본(공급률 시트 M.D 탭)은 이미 입력됐으므로 **미러 실패해도 step1 은 성공 처리**(맥과 동일).
+    print("\n═════════ 6/6 당일 설화수 미러 ═════════", flush=True)
+    if run(ROOT / "rate-check" / "mirror_daily.py", ["sulwhasoo"]) != 0:
+        print("⚠️ 미러 실패 — 원본(M.D 탭)은 정상. 수동: python rate-check/mirror_daily.py sulwhasoo")
+
     print(f"\n✅ Step 1 완료 — 3사 공급률 + 재고관리(n버전) + 카트플랜(O열) 모두 입력됨 — "
           f"{datetime.now():%H:%M:%S}")
     return 0

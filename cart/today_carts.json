@@ -1,135 +1,216 @@
 {
-  "date": "2026-08-06",
+  "_comment": "2026-08-19 담기 결과(계정 1~19 전부 22번x2 + 34번x2). 결제 대상은 사용자 지시대로 1~10번만 기재 — buy.py 무인자 실행이 기재된 미결제 카트를 전부 결제하므로 11~19는 일부러 넣지 않았다.",
+  "date": "2026-08-19",
   "carts": [
+    {
+      "mall": "현대",
+      "account": 1,
+      "items": [
+        {
+          "product": 22,
+          "name": "올바른건강식품 와이 9박",
+          "qty": 2,
+          "amount": 132680
+        },
+        {
+          "product": 34,
+          "name": "데이즈온 파라다이스 버닝 9박스",
+          "qty": 2,
+          "amount": 396800
+        }
+      ],
+      "amount": 529480,
+      "paid": true,
+      "reward_ok": true
+    },
+    {
+      "mall": "현대",
+      "account": 2,
+      "items": [
+        {
+          "product": 22,
+          "name": "올바른건강식품 와이 9박",
+          "qty": 2,
+          "amount": 132680
+        },
+        {
+          "product": 34,
+          "name": "데이즈온 파라다이스 버닝 9박스",
+          "qty": 2,
+          "amount": 396800
+        }
+      ],
+      "amount": 529480,
+      "paid": true,
+      "reward_ok": true
+    },
+    {
+      "mall": "현대",
+      "account": 3,
+      "items": [
+        {
+          "product": 22,
+          "name": "올바른건강식품 와이 9박",
+          "qty": 2,
+          "amount": 132680
+        },
+        {
+          "product": 34,
+          "name": "데이즈온 파라다이스 버닝 9박스",
+          "qty": 2,
+          "amount": 396800
+        }
+      ],
+      "amount": 529480,
+      "paid": true,
+      "reward_ok": true
+    },
+    {
+      "mall": "현대",
+      "account": 4,
+      "items": [
+        {
+          "product": 22,
+          "name": "올바른건강식품 와이 9박",
+          "qty": 2,
+          "amount": 132680
+        },
+        {
+          "product": 34,
+          "name": "데이즈온 파라다이스 버닝 9박스",
+          "qty": 2,
+          "amount": 396800
+        }
+      ],
+      "amount": 529480,
+      "paid": true,
+      "reward_ok": true
+    },
+    {
+      "mall": "현대",
+      "account": 5,
+      "items": [
+        {
+          "product": 22,
+          "name": "올바른건강식품 와이 9박",
+          "qty": 2,
+          "amount": 132680
+        },
+        {
+          "product": 34,
+          "name": "데이즈온 파라다이스 버닝 9박스",
+          "qty": 2,
+          "amount": 396800
+        }
+      ],
+      "amount": 529480,
+      "paid": true,
+      "reward_ok": true
+    },
+    {
+      "mall": "현대",
+      "account": 6,
+      "items": [
+        {
+          "product": 22,
+          "name": "올바른건강식품 와이 9박",
+          "qty": 2,
+          "amount": 132680
+        },
+        {
+          "product": 34,
+          "name": "데이즈온 파라다이스 버닝 9박스",
+          "qty": 2,
+          "amount": 396800
+        }
+      ],
+      "amount": 529480,
+      "paid": true,
+      "reward_ok": true
+    },
+    {
+      "mall": "현대",
+      "account": 7,
+      "items": [
+        {
+          "product": 22,
+          "name": "올바른건강식품 와이 9박",
+          "qty": 2,
+          "amount": 132680
+        },
+        {
+          "product": 34,
+          "name": "데이즈온 파라다이스 버닝 9박스",
+          "qty": 2,
+          "amount": 396800
+        }
+      ],
+      "amount": 529480,
+      "paid": true,
+      "reward_ok": true
+    },
+    {
+      "mall": "현대",
+      "account": 8,
+      "items": [
+        {
+          "product": 22,
+          "name": "올바른건강식품 와이 9박",
+          "qty": 2,
+          "amount": 132680
+        },
+        {
+          "product": 34,
+          "name": "데이즈온 파라다이스 버닝 9박스",
+          "qty": 2,
+          "amount": 396800
+        }
+      ],
+      "amount": 529480,
+      "paid": true,
+      "reward_ok": true
+    },
+    {
+      "mall": "현대",
+      "account": 9,
+      "items": [
+        {
+          "product": 22,
+          "name": "올바른건강식품 와이 9박",
+          "qty": 2,
+          "amount": 132680
+        },
+        {
+          "product": 34,
+          "name": "데이즈온 파라다이스 버닝 9박스",
+          "qty": 2,
+          "amount": 396800
+        }
+      ],
+      "amount": 529480,
+      "paid": true,
+      "reward_ok": true
+    },
     {
       "mall": "현대",
       "account": 10,
       "items": [
         {
-          "product": 25,
-          "name": "유기농 석류젤리 9박(90개)",
+          "product": 22,
+          "name": "올바른건강식품 와이 9박",
           "qty": 2,
-          "amount": 110240
-        }
-      ],
-      "amount": 110240
-    },
-    {
-      "mall": "현대",
-      "account": 11,
-      "items": [
+          "amount": 132680
+        },
         {
-          "product": 25,
-          "name": "유기농 석류젤리 9박(90개)",
+          "product": 34,
+          "name": "데이즈온 파라다이스 버닝 9박스",
           "qty": 2,
-          "amount": 110240
+          "amount": 396800
         }
       ],
-      "amount": 110240
-    },
-    {
-      "mall": "현대",
-      "account": 12,
-      "items": [
-        {
-          "product": 25,
-          "name": "유기농 석류젤리 9박(90개)",
-          "qty": 2,
-          "amount": 110240
-        }
-      ],
-      "amount": 110240
-    },
-    {
-      "mall": "현대",
-      "account": 13,
-      "items": [
-        {
-          "product": 25,
-          "name": "유기농 석류젤리 9박(90개)",
-          "qty": 2,
-          "amount": 110240
-        }
-      ],
-      "amount": 110240
-    },
-    {
-      "mall": "현대",
-      "account": 14,
-      "items": [
-        {
-          "product": 25,
-          "name": "유기농 석류젤리 9박(90개)",
-          "qty": 2,
-          "amount": 110240
-        }
-      ],
-      "amount": 110240
-    },
-    {
-      "mall": "현대",
-      "account": 15,
-      "items": [
-        {
-          "product": 25,
-          "name": "유기농 석류젤리 9박(90개)",
-          "qty": 2,
-          "amount": 110240
-        }
-      ],
-      "amount": 110240
-    },
-    {
-      "mall": "현대",
-      "account": 16,
-      "items": [
-        {
-          "product": 25,
-          "name": "유기농 석류젤리 9박(90개)",
-          "qty": 2,
-          "amount": 110240
-        }
-      ],
-      "amount": 110240
-    },
-    {
-      "mall": "현대",
-      "account": 17,
-      "items": [
-        {
-          "product": 25,
-          "name": "유기농 석류젤리 9박(90개)",
-          "qty": 2,
-          "amount": 110240
-        }
-      ],
-      "amount": 110240
-    },
-    {
-      "mall": "현대",
-      "account": 18,
-      "items": [
-        {
-          "product": 25,
-          "name": "유기농 석류젤리 9박(90개)",
-          "qty": 2,
-          "amount": 110240
-        }
-      ],
-      "amount": 110240
-    },
-    {
-      "mall": "현대",
-      "account": 19,
-      "items": [
-        {
-          "product": 25,
-          "name": "유기농 석류젤리 9박(90개)",
-          "qty": 2,
-          "amount": 110240
-        }
-      ],
-      "amount": 110240
+      "amount": 529480,
+      "paid": true,
+      "reward_ok": true
     }
   ]
 }

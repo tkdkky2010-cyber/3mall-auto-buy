@@ -44,7 +44,11 @@ HOME_TAB = (108, 2176)
 MYPAGE_TAB = (756, 2176)
 GEAR = (1008, 314)
 LOGOUT_BTN = (940, 343)
-HMALL_LOGIN_LINK = (540, 1310)
+#  ⚠️최후수단 좌표 — 1순위는 `_CHOOSER_LINK_JS` CDP 클릭이다(좌표 무관).
+#  2026-08-19 실측: 이 버튼은 y≈1454 다. 2026-07-07 주석에 "y1310→1454" 라고 적어놓고
+#  **상수를 안 고쳐서** 1310(버튼 위 빈 공간)을 계속 탭하고 있었다 → 로그인 폼 미도달.
+#  교훈: 관측을 주석에만 적으면 코드는 안 바뀐다.
+HMALL_LOGIN_LINK = (540, 1454)
 
 
 # ──────────────────────────── adb ────────────────────────────
@@ -85,6 +89,35 @@ def _tap_text(serial: str, needle: str, wait: float = 1.5) -> bool:
     x1, y1, x2, y2 = map(int, m.groups())
     _tap(serial, ((x1 + x2) // 2, (y1 + y2) // 2), wait=wait)
     return True
+
+
+# 홈 광고 모달 닫기 버튼 텍스트 — **재등장 방지 버튼 우선**, 마지막이 단순 '닫기'.
+# ★정본 목록: OCR 판독 경로(hmall_hyundai_buy.close_home_popup)도 이걸 import 해 쓴다.
+#   목록이 두 군데로 갈라지면 한쪽만 새 팝업 문구를 배워 다른 쪽이 조용히 막힌다.
+POPUP_KEYS = ("그만 보기", "오늘 하루", "보지 않기", "닫기")
+
+
+def close_ad_popup(serial: str | None = None, max_iter: int = 4) -> int:
+    """홈 광고 모달 닫기 (uiautomator dump 기반). 닫은 개수 반환.
+
+    ★왜 logout/_open_login_form 안에서 **매번** 부르나 (2026-08-19 실사고):
+      `buy_one` 이 로그인 전에 `close_home_popup()` 으로 팝업을 닫아도, `logout()` 은 루프마다
+      `_launch()` 로 앱을 다시 앞으로 끌어온다 → **그때 또 다른 팝업이 새로 뜬다.**
+      실측: 먼저 '7일간 보지 않기' 를 닫았는데 그 뒤 '오늘의 최저가' + '오늘 그만 보기' 가 떴다.
+      팝업이 떠 있으면 마이페이지 탭이 먹지 않아 `logout 실패 (이전 계정 안 풀림)` 로 죽는다
+      (계정 #1, 윈도우 첫 폰결제 시도). 로그인 전 1회 닫기로는 부족하다.
+    """
+    serial = serial or _serial()
+    closed = 0
+    for _ in range(max_iter):
+        for key in POPUP_KEYS:
+            if _tap_text(serial, key, wait=1.5):
+                print(f"   [popup] 광고 닫기 '{key}'", flush=True)
+                closed += 1
+                break
+        else:
+            break
+    return closed
 
 
 def _launch(serial: str) -> None:
@@ -216,26 +249,63 @@ def _attach_login_form() -> CDP | None:
     return None
 
 
-def _chooser_loaded() -> bool:
-    """로그인/회원가입 chooser 가 떠있나 (CDP — '비회원 주문조회'/'아이디로 로그인' 마커).
-    chooser 는 로그아웃 상태에서 마이페이지 탭 시에만 뜨므로 = 신뢰 가능한 로그아웃+nav 판정."""
+def _chooser_cdp() -> "CDP | None":
+    """로그인/회원가입 chooser page target 에 붙어서 돌려준다 (없으면 None).
+    **호출측이 close 책임.** 판정만 필요하면 `_chooser_loaded()` 를 쓴다."""
     for p in _page_targets():
         try:
             cdp = CDP(p["webSocketDebuggerUrl"])
             cdp.send("Runtime.enable", timeout=5)
             b = cdp.ev("document.body?document.body.innerText:''", timeout=5) or ""
-            cdp.close()
             if "비회원 주문조회" in b or "아이디로 로그인" in b:
-                return True
+                return cdp
+            cdp.close()
         except Exception:
             pass
-    return False
+    return None
+
+
+def _chooser_loaded() -> bool:
+    """로그인/회원가입 chooser 가 떠있나 (CDP — '비회원 주문조회'/'아이디로 로그인' 마커).
+    chooser 는 로그아웃 상태에서 마이페이지 탭 시에만 뜨므로 = 신뢰 가능한 로그아웃+nav 판정."""
+    cdp = _chooser_cdp()
+    if cdp is None:
+        return False
+    cdp.close()
+    return True
+
+
+# chooser 의 'Hmall/H.Point 아이디로 로그인하기' 클릭 — **좌표 무관 1순위 경로**.
+# ★2026-08-19 실측: 이건 <a> 가 아니라 <button class="_19wx7e91"> 안의 <p> 다.
+#   · 클래스명이 CSS-in-JS 해시(`_1nyufc21m` 등)라 셀렉터로 못 쓴다 → **텍스트로 찾고 closest(button)** 클릭.
+#   · 이 페이지는 uiautomator dump 에 **텍스트 노드가 하나도 안 잡힌다**(node 16개, text 속성 0개)
+#     → `_tap_text` 가 원리적으로 못 찾는다. 그래서 CDP 가 1순위고 dump/좌표는 폴백이다.
+_CHOOSER_LINK_JS = (
+    "(function(){var N='\\uc544\\uc774\\ub514\\ub85c \\ub85c\\uadf8\\uc778';"          # '아이디로 로그인'
+    "var all=document.querySelectorAll('*');"
+    "for(var i=0;i<all.length;i++){var e=all[i],own='';"
+    "for(var j=0;j<e.childNodes.length;j++){if(e.childNodes[j].nodeType===3)own+=e.childNodes[j].nodeValue;}"
+    "if(own.indexOf(N)>=0){var t=(e.closest?e.closest('button,a,[role=button]'):null)||e;"
+    "t.click();return 'CLICKED:'+t.tagName;}}"
+    "return 'NOTFOUND';})()"
+)
 
 
 def _is_mypage_loggedin() -> bool:
     """마이페이지가 '로그인 상태'로 떴나 (CDP body — uiautomator dump 가 네이티브 gear 를
-    가끔 못 잡는 불안정성 회피). chooser 마커 있으면 False(로그아웃)."""
+    가끔 못 잡는 불안정성 회피). chooser 마커 있으면 False(로그아웃).
+
+    ★**마이페이지 타깃만** 읽는다 (2026-08-19 실사고).
+      종전엔 page target 을 전부 훑어 '멤버십' 같은 느슨한 마커로 판정했다. 홈
+      (`newHome/index`)에 광고 문구 **'VIP 멤버십 제공'** 이 있어서 팝업 때문에 마이페이지에
+      **못 갔는데도 True** 가 떴다 → logout() 이 홈 화면에서 톱니바퀴(1008,314)·로그아웃(940,343)
+      좌표를 맹탭하고 실패 → `logout 실패 (이전 계정 안 풀림)`.
+      READ_FIRST 「페이지에서 뭘 읽을 땐 반드시 해당 영역으로 스코프를 좁힌다」 의 재현이다.
+      마커도 마이페이지 본문에만 있는 것으로 바꿨다(2026-08-19 실측 body).
+    """
     for p in _page_targets():
+        if "/mpf/" not in (p.get("url") or ""):        # 마이페이지(selectMyPageMain 등) 만
+            continue
         try:
             cdp = CDP(p["webSocketDebuggerUrl"])
             cdp.send("Runtime.enable", timeout=5)
@@ -243,7 +313,7 @@ def _is_mypage_loggedin() -> bool:
             cdp.close()
             if "비회원 주문조회" in b or "아이디로 로그인" in b:
                 return False
-            if "로그아웃" in b or "멤버십" in b or ("주문" in b and "배송" in b):
+            if "나의 등급 및 기본 정보" in b or "주문/배송 현황" in b or "회원정보 관리" in b:
                 return True
         except Exception:
             pass
@@ -287,6 +357,7 @@ def logout(serial: str | None = None) -> bool:
     _forward(serial)
     for _ in range(3):
         _launch(serial)
+        close_ad_popup(serial)                # ★팝업이 마이페이지 탭을 막는다 (2026-08-19 실사고)
         _tap(serial, MYPAGE_TAB, wait=4)
         if _chooser_loaded():
             return True                       # 로그아웃 상태 (chooser) — 확실
@@ -305,12 +376,25 @@ def _open_login_form(serial: str) -> "CDP | None":
     """마이페이지(chooser 확인) → Hmall 로그인하기 → 폼. chooser/폼 확인하며 재시도."""
     _forward(serial)
     for _ in range(4):
+        close_ad_popup(serial)                # ★logout 과 같은 이유 — 팝업이 nav 를 먹는다
         _tap(serial, MYPAGE_TAB, wait=4)
-        if _chooser_loaded():                 # chooser 확실히 떴을 때만 링크 탭
+        chooser = _chooser_cdp()              # chooser 확실히 떴을 때만 링크 클릭
+        if chooser is not None:
             # ★소셜로그인 추가로 'Hmall/H.Point 아이디로 로그인하기' 버튼이 아래로 밀림(좌표 드리프트).
-            #   dump 로 실제 위치 찾아 탭, 실패 시에만 고정좌표 폴백. (2026-07-07 버튼 y1310→1454)
-            if not _tap_text(serial, "아이디로 로그인", wait=3):
-                _tap(serial, HMALL_LOGIN_LINK, wait=3)
+            #   ① CDP 클릭(좌표 무관, 1순위) → ② dump 탭 → ③ 고정좌표. 2026-08-19 신설:
+            #   종전엔 ②③ 뿐이었는데 이 페이지는 dump 에 텍스트가 없고 ③ 좌표가 stale(1310)이라
+            #   **둘 다 빗나가** `로그인 폼(password input) 미발견` 으로 죽었다.
+            try:
+                clicked = chooser.ev(_CHOOSER_LINK_JS, timeout=8)
+            except Exception as e:
+                clicked = f"ERR:{e}"
+            finally:
+                chooser.close()
+            print(f"   [chooser] 아이디로 로그인 클릭 → {clicked}", flush=True)
+            if not (isinstance(clicked, str) and clicked.startswith("CLICKED")):
+                if not _tap_text(serial, "아이디로 로그인", wait=3):
+                    _tap(serial, HMALL_LOGIN_LINK, wait=3)
+            time.sleep(2.0)
             for _ in range(6):                # 폼 로드 폴링
                 f = _attach_login_form()
                 if f:

@@ -245,6 +245,10 @@ def _pay_cart(cart: dict, data: dict) -> bool:
         cart["paid"] = True
         _save(data)                       # 성공 즉시 기록 (중복결제 방지)
         print(f"  ✓ {LABEL[mall]} #{cart['account']} 결제 완료 (기록 paid:true)", flush=True)
+        # ★성공해도 로그를 남긴다 (2026-08-19). 종전엔 실패할 때만 찍어서 **어느 경로로 성공했는지
+        #   확인할 방법이 없었다** — 폴백(OCR→dump)·일반결제 탭·주문번호가 전부 버려졌다.
+        #   READ_FIRST 「성공 메시지는 검증이 아니다」. 계정 9개를 실돈으로 돌리기 전에 필요한 증거다.
+        print(f"--- log(성공) ---\n{log}\n-----------------", flush=True)
         if mall == "hmall":               # 현대 식품: 10% prmo 있으면 적립신청 (없으면 skip)
             rw = apply_reward(cart)
             cart["reward_ok"] = bool(rw.get("ok"))

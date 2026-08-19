@@ -8,7 +8,8 @@
   1. cart_state — 빈 카트 = 이미 구매 → SKIP
   2. 장바구니 아이콘 직접 탭(홈 경유 X) → 보이는 카트
   3. [CDP] basktList 헤더 체크박스 = 전체선택 (n/n 검증). native flow 전에 CDP 필수
-  4. [OCR] 구매하기 → 결제하기(금액) → PIN번호 결제 → PIN dot 탭 → 키패드
+  4. [OCR] 구매하기 → **'일반 결제' 탭**(★2026-08-19 사용자 지시 "무조건 일반결제" — 앱카드 금지.
+     탭 없으면 앱카드 미등록=이미 일반결제) → 결제하기(금액) → PIN번호 결제 → PIN dot 탭 → 키패드
   5. [input_pin] hyundai_hmall_pin6=137601 (로컬 vision+easyocr → 실패 시 클로드 승격) → 확인
   6. [OCR] 최종 결제하기 → 안전결제 팝업 확인
   7. 본인인증 — 화면 변종 분기(handle_after_pay):
@@ -30,7 +31,8 @@
 
 멀티카드 (2026-05-31): buy_one = 디스패처. 공통(콜드런치→광고→로그인→카트→전체선택→구매하기→주문서)
   → detect_card(당일 카드할인 캐러셀) → select_card(캐러셀/그리드) → 카드별 SDK → 공통(주문완료+뷰티).
-  SDK: 현대=pay_hyundai(PIN→본인인증→카드비번) / 롯데=pay_lotte(OCR+롯데앱 검증흐름 재사용). CARDS_SUPPORTED만.
+  SDK: 현대=**pay_hyundai_general**(일반결제 탭→PIN→본인인증→카드비번. 앱카드 결제 금지, 2026-08-19)
+       / 롯데=pay_lotte(OCR+롯데앱 검증흐름 재사용). CARDS_SUPPORTED만.
 
 CLI:
     python3 -m phone_auto.hmall_hyundai_buy 3            # 특정 계정 (앱 콜드런치부터, 당일카드 자동감지)
@@ -150,13 +152,19 @@ CARD_GRID_NAME = {"현대": "현대카드", "롯데": "롯데카드", "하나": 
                   "삼성": "삼성카드", "NH": "NH농협카드", "BC": "비씨카드"}
 CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC", "삼성", "NH", "토스")   # +토스페이(2026-07-15, 토스앱 로그인 전제 PIN)
 
-# ★현대카드 '일반 결제' 강제 계정 (2026-07-10 사용자 지시, 계정 ID 기준 — 인덱스는 바뀔 수 있음).
-#   skykow = 현대카드 앱카드 등록 계정: 캐러셀에서 현대카드 선택 시 결제수단이 '앱카드 결제'로
-#   자동선택됨 → 앱카드는 누적금액 임계 초과 시 현대카드 인증(자동화 불가)이 떠 PAY_FAIL 반복.
-#   → 주문서 결제수단 영역 [일반 결제|앱카드 결제] 탭에서 '일반 결제' 선택 후 진행이 정본.
-#   다른 계정은 이 탭 자체가 없음(비등록) — 기존 pay_hyundai(PIN) 경로 그대로. 식품·설화수 공통(단일 진입점).
-#   Jinhwa4553(계정#12) = 2026-07-16 동일증상 확인(앱카드 자동선택 → 현대카드 인증벽 PAY_FAIL 반복) → 일반결제 추가.
-GENERAL_PAY_IDS = {"skykow", "Jinhwa4553"}
+# ★현대카드 = **무조건 일반 결제**. 앱카드 결제는 쓰지 않는다.
+#   (사용자 지시 2026-08-19: "앱카드결제하면안되잖아 무조건 일반결제야")
+#
+#   앱카드 등록 계정은 캐러셀에서 현대카드 선택 시 결제수단이 '앱카드 결제'로 **자동선택**되고,
+#   앱카드는 **누적금액 임계 초과 시 '현대카드 인증이 필요합니다'** 모달이 떠 자동화가 막힌다
+#   (`PAY_FAIL@order_page:현대 결제방식 화면 미도달`).
+#   → 주문서 결제수단 영역 [일반 결제|앱카드 결제] 에서 '일반 결제' 선택이 정본 = `pay_hyundai_general`.
+#     탭이 없는 계정은 앱카드 미등록 = 이미 일반결제 → 그 안에서 기존 pay_hyundai(PIN) 로 이어간다.
+#     식품·설화수 공통(단일 진입점).
+#
+#   ⚠️ 종전엔 `GENERAL_PAY_IDS = {"skykow"(07-10), "Jinhwa4553"(07-16)}` 로 **계정을 골라** 적용했다.
+#      임계가 계정별 누적이라 **어제 되던 계정이 오늘 막힌다** — 2026-08-19 tkdkky2002(#1)가
+#      454,080원에서 처음 걸렸다. 계정 선별도, 런타임 탭 감지도 "언젠간 막히는" 구조라 **분기를 지웠다.**
 # 토스페이(간편결제 채널) = pay_toss (2026-07-15 라이브 작성). ★토스앱(viva.republica.toss) 로그인 전제 —
 #   미로그인이면 게스트 본인확인(휴대폰번호+SMS/PASS)이 떠 자동화 불가(pay_toss가 감지해 안전정지).
 #   PIN=dump 셔플(source=dump, 137601, FLAG_SECURE). 카카오페이=타 폰 사용중이라 제외. 상세=TOSS_PAY_NOTES.md.
@@ -263,17 +271,22 @@ def wake_screen() -> dict:
 
 def close_home_popup(max_iter: int = 4) -> int:
     """홈 광고 팝업 닫기 — cold launch 시 '오늘의 최저가' 등 모달이 떠 로그인/네비를 막음.
-    '오늘 그만 보기'(당일 재등장 방지) 우선, 없으면 '닫기'. 여러 개 쌓일 수 있어 반복. 닫은 수 반환."""
+    '오늘 그만 보기'(당일 재등장 방지) 우선, 없으면 '닫기'. 여러 개 쌓일 수 있어 반복. 닫은 수 반환.
+
+    ★이건 **OCR 판독본**이다. dump 판독본은 `hmall_webview.close_ad_popup` — logout/로그인폼 nav 가
+      그쪽을 쓴다(2026-08-19: 로그인 전 1회 닫기로는 부족해서 신설). 문구 목록은 `hw.POPUP_KEYS`
+      **한 군데**에서 가져온다 — 갈라지면 한쪽만 새 팝업을 배우고 다른 쪽이 조용히 막힌다."""
     closed = 0
+    *dismiss_keys, close_key = hw.POPUP_KEYS      # 마지막('닫기')은 최후수단 — 정확일치로만 쓴다
     for _ in range(max_iter):
         its = _ocr_texts(cap())
         hit = None
-        for key in ("그만 보기", "오늘 하루", "보지 않기"):   # 당일 재등장 방지 버튼 우선
+        for key in dismiss_keys:                 # 재등장 방지 버튼 우선
             hit = next((it for it in its if key in it["text"]), None)
             if hit:
                 break
         if not hit:
-            hit = next((it for it in its if it["text"].strip() == "닫기"), None)
+            hit = next((it for it in its if it["text"].strip() == close_key), None)
         if not hit:
             break
         _adb().tap(hit["cx"], hit["cy"])
@@ -321,6 +334,33 @@ def ocr_tap(text: str, contains: bool = False, pick: str = "bottom", retries: in
         time.sleep(wait)
     print(f"   ✗ ocr_tap {text!r} 미발견 ({retries}회)", flush=True)
     return False
+
+
+def ocr_or_dump_tap(text: str, contains: bool = False, retries: int = 4, post: float = 0.2) -> bool:
+    """OCR 탭 → 실패하면 **uiautomator dump** 탭으로 재시도. True=탭 성공.
+
+    ★왜 두 판독을 겹쳐 쓰나 (2026-08-19 윈도우 라이브 실측):
+      현대 PIN 화면의 '확인' 은 **검은 버튼 + 흰 글씨**인데 `Windows.Media.Ocr` 이 못 읽는다
+      (그 화면 판독 7건에 '확인' 없음, PIL 반전 전처리도 결과 동일 = 반전 문제가 아니다).
+      그래서 `ocr_tap('확인')` 4회 전부 실패 → **PIN 6자리를 넣어둔 채** `PAY_FAIL@pin_entered`.
+      결제 직전에서 멈추니 계정마다 사람이 손으로 눌러야 했다.
+      이 화면은 **네이티브 뷰**라 dump 엔 `확인 bounds center=(540,1312)` 로 정확히 잡힌다
+      (CDP 는 WebView 타깃이 아니라 접근 불가 — 홈/카트 페이지만 노출된다).
+    ★순서를 OCR 먼저로 두는 이유: **WebView 화면은 반대로 dump 가 빈다.**
+      실측 예 — 로그인 chooser 는 node 16개에 text 속성 0개라 dump 로는 아무것도 못 찾는다.
+      두 화면 종류가 섞여 있으니 한쪽만 믿으면 조용히 못 누른다.
+    """
+    if ocr_tap(text, contains=contains, retries=retries, post=post):
+        return True
+    try:
+        FlowRunner(use_camera=False).run_action(
+            {"action": "tap_dump_text", "text": text, "exact": not contains, "timeout_sec": 6})
+        print(f"   [dump] {text!r} 탭 (OCR 미판독 폴백)", flush=True)
+        time.sleep(post)
+        return True
+    except Exception as e:
+        print(f"   ✗ {text!r} OCR·dump 둘 다 실패: {e}", flush=True)
+        return False
 
 
 def wait_text(text: str, timeout: float = 15, contains: bool = True) -> bool:
@@ -641,8 +681,10 @@ def enter_card_password() -> dict:
     if len(pw) != 4:
         out["err"] = "card_pw4 없음"; return out
     # '안전한 결제 위해 추가 인증' 팝업이 키패드를 덮어 OCR 0개 → 먼저 닫기 (실측 #5)
-    if screen_has("추가 인증") or screen_has("안전한 결제"):
-        ocr_tap("확인", retries=2); time.sleep(0.9)
+    # ★2026-08-19: 여기 검사가 `screen_has`(=OCR 전용)라 **팝업이 떠 있는데도 못 잡았다.**
+    #   그 결과 키패드가 덮인 채 판독해 뒤 배경 글자만 3개 잡혔다(need 4개 중 부족 → 실패).
+    #   `_dismiss_extra_auth_popup` = OCR+dump 병합 판독 정본으로 교체.
+    _dismiss_extra_auth_popup()
     # 카드비밀번호 탭 명시 선택(휴대폰 탭 기본선택 대비) → 입력란 등장 → 입력란 탭 → 키패드
     _adb().tap(*ID_CARDPW_TAB); time.sleep(0.8)
     _adb().tap(*ID_CARDPW_FIELD); time.sleep(1.3)
@@ -655,7 +697,12 @@ def enter_card_password() -> dict:
         out["err"] = f"카드비번 input_pin 실패: {e}"; return out
     lap("카드비번 PW4 input_pin (vote+탭4) 완료")
     time.sleep(0.8)
-    ocr_tap("확인", post=0.3, retries=2)
+    # ★이 '확인' 도 **검은 버튼 + 흰 글씨** → Windows OCR 미판독 (2026-08-19 #3 실측).
+    #   종전엔 `ocr_tap` 전용 + **결과를 안 보고 ok=True** 를 돌려줬다 → 4자리를 넣어놓고 제출을
+    #   못 한 채 '성공' 으로 보고, 호출측이 주문완료를 25s 기다렸다 `AFTER_AUTH_UNKNOWN` 으로 끝났다.
+    #   READ_FIRST 「성공 메시지는 검증이 아니다」. dump 폴백 + 결과 반영 둘 다 필요하다.
+    if not ocr_or_dump_tap("확인", post=0.3, retries=2):
+        out["err"] = "카드비번 '확인' 제출 실패 (OCR·dump 둘 다 미발견)"; return out
     out["ok"] = True
     return out
 
@@ -675,6 +722,28 @@ def _fuzzy_has(text: str, name: str) -> bool:
     return False
 
 
+def _dump_texts(serial: str | None = None) -> list[dict]:
+    """uiautomator dump 의 text 노드를 **OCR 항목과 같은 형식**({text,cx,cy}) 으로 돌려준다.
+
+    ★OCR 과 겹쳐 읽기 위한 것 (2026-08-19 실측). 현대몰 주문서에서 Windows OCR 은 글자를 깨먹는다:
+        '口토사OI그' · '丁 0 曰' · '그L广 1 L TTOI — 1 LQ'
+      그리고 **토스트 '현대 5% 즉시할인이 적용되었어요.' 는 아예 못 읽는다.**
+      같은 순간 dump 는 '결제수단'·'일반 결제'·'앱카드 결제'·'현대카드'·토스트를 전부 깨끗하게 준다.
+      반대로 **dump 가 비는 화면도 있다**(로그인 chooser = node 16개·text 0개) → 그래서 합쳐 쓴다.
+      cf. 같은 교훈의 탭 버전 = `ocr_or_dump_tap`.
+    """
+    out: list[dict] = []
+    try:
+        xml = hw._dump(serial or hw._serial())
+    except Exception as e:
+        print(f"   [dump] 판독 실패(OCR 만 사용): {e}", flush=True)
+        return out
+    for m in re.finditer(r'text="([^"]+)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml):
+        x1, y1, x2, y2 = map(int, m.groups()[1:])
+        out.append({"text": m.group(1), "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2, "src": "dump"})
+    return out
+
+
 def _verify_pay_method(grid_name: str, timeout: float = 14) -> bool:
     """주문서 '결제수단' 행 **아래**에 목표 카드명 표기 **양성 검증** (fuzzy, 스크롤 포함).
     select_card 성공 판정은 이걸로만 — '신용카드 선택 placeholder 부재' 같은 부재 검증 금지(#17 오진).
@@ -686,7 +755,11 @@ def _verify_pay_method(grid_name: str, timeout: float = 14) -> bool:
     swiped_big = 0
     swiped_small = 0
     while time.time() < end:
-        its = _ocr_texts(cap())
+        # ★OCR + dump 를 **합쳐서** 읽는다 (2026-08-19 #3 실사고 — _dump_texts 주석 참고).
+        #   OCR 만 보던 종전 코드는 토스트('…적용되었어요')를 못 읽어 대기 가드가 안 걸리고,
+        #   토스트가 카드명 행을 덮은 채 소폭스크롤 2회 → 즉시 False → `SELECT_CARD_FAIL` 안전정지.
+        #   결제가 되는데도 계정마다 멈춰 사람이 재실행해야 했다.
+        its = _ocr_texts(cap()) + _dump_texts()
         txt = " ".join(it["text"] for it in its)
         pm = next((it for it in its if "결제수단" in it["text"]), None)
         if pm:
@@ -1637,7 +1710,8 @@ def pay_hyundai(pin: str = CARD_PIN) -> dict:
     time.sleep(0.8)
     out["step"] = "pin_entered"
     # 확인 (PIN) → 결제확인 WebView 로딩
-    if not ocr_tap("확인"):
+    # ★검은 버튼+흰 글씨라 Windows OCR 이 못 읽는다 → dump 폴백 필수 (2026-08-19, ocr_or_dump_tap 주석 참고)
+    if not ocr_or_dump_tap("확인"):
         out["err"] = "PIN 확인 실패"; return out
     if not wait_text("결제합니다", timeout=15) and not wait_text("결제하기", timeout=3):
         out["err"] = "결제확인 화면 미도달"; return out
@@ -1650,11 +1724,14 @@ def pay_hyundai(pin: str = CARD_PIN) -> dict:
 
 
 def pay_hyundai_general() -> dict:
-    """★GENERAL_PAY_IDS(skykow) 전용 — 현대카드 **일반 결제** 경로 (2026-07-10).
-    실측(probe): 카드선택 직후 주문서에 결제수단 영역 노출 — '일반 결제'(303,593) / '앱카드 결제'(776,594),
-    앱카드 기본선택(the Red 4***...8387 카드 UI). 탭은 좌표 아닌 OCR로(레이아웃 드리프트 대비).
-    ⚠️ '결제하기' 이후 후속 화면은 라이브 미검증 — 아는 마커(PIN번호 결제/본인인증/주문완료)만 진행,
-    모르는 화면이면 OCR 텍스트 덤프 출력 후 안전 정지(err). 카드 인증 전 정지는 미결제라 재시도 안전."""
+    """현대카드 **일반 결제** 경로 — 현대카드 결제의 **유일한 진입점** (사용자 지시 2026-08-19).
+    실측(probe): 카드선택 직후 주문서에 결제수단 영역 노출 — '일반 결제' / '앱카드 결제' 탭 쌍,
+    앱카드 기본선택. 탭은 좌표 아닌 OCR로(레이아웃 드리프트 대비 — 2026-07-10 y593, 08-19 y1576).
+    탭이 **없으면** 앱카드 미등록 = 이미 일반결제 → `pay_hyundai()`(PIN) 로 위임한다.
+
+    라이브 검증: 2026-07-13 skykow(#17) 완주 `✓ 결제 완료`.
+    ⚠️ 후속 화면은 아는 마커(PIN번호 결제/본인인증/주문완료)만 진행, 모르는 화면이면 OCR 덤프 출력 후
+    안전 정지(err). 카드 인증 전 정지는 미결제라 재시도 안전."""
     out = {"step": "general_tab"}
     # 1) 결제수단 영역 '일반 결제' 탭 — 카드할인(700px) 아래에 있음 → 아래로 스크롤하며 탐색
     #    (2026-07-10 1차 시도: 위로만 폴백해 미발견. 주문서 순서 = 카드할인 → 결제수단 → 총결제)
@@ -1666,7 +1743,13 @@ def pay_hyundai_general() -> dict:
             if ocr_tap("일반 결제", contains=True, retries=1):
                 found = True; break
     if not found:
-        out["err"] = "'일반 결제' 탭 미발견 (아래 5스크롤 탐색 실패)"; return out
+        # ★탭이 없다 = 앱카드 **미등록** 계정 = 결제수단이 이미 일반결제다 → 에러가 아니라 기존 PIN 경로.
+        #   (사용자 지시 "무조건 일반결제" 를 전 계정에 적용하면서, 비등록 계정이 여기서
+        #    헛되게 PAY_FAIL 나던 것을 막는다. 2026-08-19)
+        print("   [general] '일반 결제' 탭 없음 = 앱카드 미등록 → 이미 일반결제, PIN 경로로 진행", flush=True)
+        r = pay_hyundai()
+        r["via"] = "pay_hyundai(앱카드 탭 없음)"
+        return r
     time.sleep(1.5)
     out["step"] = "order_page"
     # 2) 결제하기 (금액 버튼)
@@ -1702,7 +1785,8 @@ def pay_hyundai_general() -> dict:
              "tap_delay_sec": 0.4, "use_camera": False})
         time.sleep(0.8)
         out["step"] = "pin_entered"
-        if not ocr_tap("확인"):
+        # ★검은 버튼+흰 글씨 = Windows OCR 미판독 → dump 폴백 (2026-08-19 실측, #1 이 여기서 멈췄다)
+        if not ocr_or_dump_tap("확인"):
             out["err"] = "PIN 확인 실패"; return out
         if not wait_text("결제합니다", timeout=15) and not wait_text("결제하기", timeout=3):
             out["err"] = "결제확인 화면 미도달"; return out
@@ -1716,11 +1800,32 @@ def pay_hyundai_general() -> dict:
     return out
 
 
+def _dismiss_extra_auth_popup() -> bool:
+    """'안전한 결제를 위해 추가 인증을 진행합니다.' 팝업이 떠 있으면 '확인' 을 눌러 닫는다. True=닫음.
+
+    ★왜 **여러 번** 확인해야 하나 (2026-08-19 #3 실사고):
+      종전엔 `handle_after_pay` **맨 앞에서 한 번만** 검사했다. 그런데 이 팝업은 본인인증 화면이
+      뜬 **뒤에** 늦게 올라올 수 있다 → 그 시점엔 없다가, 나중에 떠서 **카드비번 키패드를 덮는다.**
+      덮인 채로 키패드를 판독하면 뒤 배경 글자가 잡혀 엉뚱한 매핑이 나온다
+      (실측 #3: need ['1','3','6','7'] 인데 got ['1','4','8'] → 로컬 2엔진+클로드 3회 전부 실패
+       → `AFTER_PAY_CARDPW_MANUAL` 로 결제 미완).
+      모듈 docstring 이 이미 경고하던 함정이다 — "팝업 '확인' 먼저 누르고(키패드를 덮음!)".
+      한 번만 보는 코드가 그 경고를 지키지 못했다.
+    ★판독은 OCR+dump 병합(`_dump_texts`) — 딤 처리된 화면에서 OCR 이 흘리는 경우가 있다.
+    """
+    txt = " ".join(it["text"] for it in _ocr_texts(cap()) + _dump_texts())
+    if ("안전한 결제" not in txt) and ("추가 인증" not in txt):
+        return False
+    print("   [after_pay] '추가 인증' 팝업 감지 → 확인 (키패드 가림 제거)", flush=True)
+    ok = ocr_or_dump_tap("확인", retries=2)
+    time.sleep(1.0)
+    return ok
+
+
 def handle_after_pay(timeout: float = 30) -> str:
     """결제하기 후: 안전결제 팝업 확인 → 본인인증 자동입력 → 주문완료 판정.
     반환: 'ORDER_COMPLETE' | 'IDENTITY_FAIL' | 'AFTER_AUTH_UNKNOWN' | 'UNKNOWN'."""
-    if screen_has("안전한 결제") or screen_has("추가 인증"):
-        ocr_tap("확인", retries=2)
+    _dismiss_extra_auth_popup()
     end = time.time() + timeout
     while time.time() < end:
         txt = " ".join(it["text"] for it in _ocr_texts(cap()))
@@ -1749,6 +1854,9 @@ def handle_after_pay(timeout: float = 30) -> str:
                     return "ORDER_COMPLETE"           # 카드비번 불필요 계정
                 if "카드 비밀번호" in t or "카드비밀번호" in t:
                     lap("카드비번 화면 등장 감지(폴링)")
+                    # ★키패드를 덮는 '추가 인증' 팝업을 **여기서 다시** 확인 (2026-08-19 #3 실사고).
+                    #   맨 앞 1회 검사만으론 늦게 뜨는 팝업을 놓쳐 키패드 판독이 배경을 읽는다.
+                    _dismiss_extra_auth_popup()
                     cp = enter_card_password()
                     print(f"   [cardpw] {cp}", flush=True)
                     if not cp.get("ok"):
@@ -1848,12 +1956,12 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
     # 카드별 SDK ⚠️실돈
     print(f"[#{idx}] ⚠️ {use_card}카드 결제 실행", flush=True)
     if use_card == "현대":
-        # ★GENERAL_PAY_IDS(skykow): 앱카드 등록 계정 — '일반 결제' 탭 필수 (앱카드=인증벽. 식품·설화수 공통)
-        if (res.get("id") or "") in GENERAL_PAY_IDS:
-            print(f"[#{idx}] ★{res['id']} = 일반결제 강제 계정 → pay_hyundai_general", flush=True)
-            pay = pay_hyundai_general()
-        else:
-            pay = pay_hyundai()
+        # ★현대카드 = **무조건 일반 결제** (사용자 지시 2026-08-19: "앱카드결제하면안되잖아 무조건 일반결제야").
+        #   앱카드는 누적금액 임계를 넘으면 '현대카드 인증이 필요합니다' 모달로 자동화가 막힌다.
+        #   임계가 계정별 누적이라 계정 선별(GENERAL_PAY_IDS)·런타임 감지 둘 다 "언젠간 막히는" 구조였다.
+        #   → 분기 제거. 탭이 없는 계정(앱카드 미등록)은 pay_hyundai_general 안에서 기존 PIN 경로로 이어간다.
+        print(f"[#{idx}] ★{res['id']} 현대카드 = 무조건 일반결제 → pay_hyundai_general", flush=True)
+        pay = pay_hyundai_general()
         res["pay"] = pay
         if pay.get("err"):
             res["status"] = f"PAY_FAIL@{pay.get('step')}:{pay['err']}"; return res
@@ -1929,7 +2037,23 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
         _ledger_append(idx, res.get("id"), active)   # 누적 추적 (세션 릴레이)
     lap(f"뷰티포인트 재인증 → ★계정 #{idx} 총소요")
     res["status"] = "DONE" + ("" if bp.get("ok") else f"(beauty_fail:{bp.get('err')})")
-    # 구매대장 기록 (JSON + 시트). 실패해도 결제엔 영향 없음. (resume 경로 _do_beauty 는 미기록)
+    _record_after_done(res, idx, combo_idx, only)
+    return res
+
+
+def _record_after_done(res: dict, idx: int, combo_idx: int | None = None,
+                       only: list[str] | None = None) -> dict:
+    """주문완료 후 **뒷기록 정본** — 구매대장 + H.Point 적립 + 매니페스트 paid 플래그.
+
+    ★`buy_one` 과 `resume` **양쪽에서** 부른다 (2026-08-19 신설).
+      종전엔 이 블록이 buy_one 안에만 있어서, `resume` 으로 완주하면
+      **구매대장 0건 + 적립 0건 + paid 미기록** 이 조용히 발생했다 (실측 #3: 사람이 손으로 메꿨다).
+      사용자 지시로 resume 을 상시 경로로 쓰게 됐으므로(2026-08-19 "다른부분에서도 resume기능써"),
+      한쪽에만 있는 기록은 곧 누락이 된다. READ_FIRST 「출력물은 두 군데 — 양쪽 다 검증」.
+    ★paid 플래그: `buy.py` 는 자기 경로에서만 기록하므로 resume 완주분은 미결제로 남아
+      **다음 실행이 같은 계정을 또 결제하려 한다**(카트가 비어 SKIP_EMPTY 로 막히긴 하나 헛돈다).
+    """
+    # 구매대장 기록 (JSON + 시트). 실패해도 결제엔 영향 없음.
     # combo=NN 지정(설화수) → 조합가 기록 / 미지정(식품) → cart/today_carts.json 상품·수량으로 기록
     try:
         import purchase_ledger as PL
@@ -1959,6 +2083,18 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
     except Exception as e:
         print(f"   [ledger] 기록 실패(무시): {e}", flush=True)
     res["reward"] = apply_reward_now(idx, only)   # ★H.Point 적립신청 (결제 직후 자동) — 결과를 요약까지 끌고 간다
+    # 매니페스트 paid 플래그 — buy.py 를 안 거치는 resume 경로에서도 중복결제 방지가 되게.
+    try:
+        mf_path = Path(__file__).resolve().parent.parent / "cart" / "today_carts.json"
+        mf = json.loads(mf_path.read_text(encoding="utf-8"))
+        cart = next((c for c in mf.get("carts", [])
+                     if c.get("mall") in ("현대", "hmall") and c.get("account") == idx), None)
+        if cart is not None and not cart.get("paid"):
+            cart["paid"] = True
+            mf_path.write_text(json.dumps(mf, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            print(f"   [manifest] #{idx} paid=True 기록", flush=True)
+    except Exception as e:
+        print(f"   [manifest] paid 기록 실패(무시): {e}", flush=True)
     return res
 
 
@@ -2055,6 +2191,18 @@ def resume(idx=None, max_steps: int = 50) -> dict:
         if s == "ORDER_COMPLETE":
             close_home_popup()
             _do_beauty(res)                    # status=DONE 세팅
+            # ★뒷기록을 buy_one 과 **동일하게** 남긴다 (2026-08-19 — 없으면 대장·적립·paid 조용한 누락).
+            if idx is not None:
+                if not res.get("id"):
+                    try:
+                        res["id"] = hw.load_accounts()[int(idx) - 1]["id"]
+                    except Exception:
+                        pass
+                res.setdefault("card", "현대")
+                _record_after_done(res, int(idx))
+            else:
+                print("   [ledger] ⚠️ resume 에 계정번호가 없어 대장·적립·paid 를 못 남긴다 — "
+                      "`resume <계정번호>` 로 다시 호출할 것", flush=True)
             return res
         elif s == "AD_POPUP":
             close_home_popup()
