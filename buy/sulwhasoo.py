@@ -45,16 +45,14 @@ GALLERIA_HOME = "https://www.galleria.co.kr/main/initMain.action"
 LOTTE_HOME = "https://www.lotteimall.com/"
 LOTTE_LOGIN_URL = "https://www.lotteimall.com/member/login/forward.LCLoginMem_pop.lotte"
 
-# 갤러리아 상품 정보 (hsmaster/config/sulwhasoo-ids.json 기준)
-GALLERIA_PRODUCTS = {
-    "b": {"name": "윤조3종",            "goods_no": "2502913432"},
-    "c": {"name": "자음2종",            "goods_no": "2502913250"},
-    "d": {"name": "본윤2종",            "goods_no": "2206740470"},
-    "e": {"name": "탄력3종",            "goods_no": "2502913294"},
-    "f": {"name": "윤조에센스90",        "goods_no": "2204658942"},
-    "g": {"name": "자음생2종",          "goods_no": "2408977039"},
-    "h": {"name": "자음생크림리치세트", "goods_no": "2408977059"},
-    "n": {"name": "탄력크림EX75",       "goods_no": "2502913437"},
+# 갤러리아 상품 정보 — ★goods_no 는 config(SoT) 에서 읽는다 (2026-08-19).
+#   종전엔 여기 번호를 하드코딩해 뒀는데, 롯데가 8/17 에 겪은 것과 **같은 사고 구조**다:
+#   config 만 갱신하면 담기는 여기 박힌 구 번호를 계속 썼다. (n=2502913437 이 그 상태였다.)
+#   READ_FIRST "버그 하나를 고치면 같은 모양을 폴더 전체에서 찾는다" 에 따라 같이 정리.
+#   이름(짧은 표기)은 로그·매칭용이라 유지하고, **번호만** SoT 에서 가져온다.
+_GALLERIA_SHORT_NAMES = {
+    "b": "윤조3종", "c": "자음2종", "d": "본윤2종", "e": "탄력3종",
+    "f": "윤조에센스90", "g": "자음생2종", "h": "자음생크림리치세트", "n": "탄력크림EX75",
 }
 
 # 롯데 상품 정보 — ★goods_no 는 hsmaster/config/sulwhasoo-ids.json (SoT) 에서 읽는다.
@@ -67,20 +65,41 @@ _LOTTE_SHORT_NAMES = {
     "b": "윤조3종", "c": "자음2종", "d": "본윤2종", "e": "탄력3종",
     "f": "윤조에센스90", "g": "자음생2종", "h": "자음생크림리치세트", "n": "탄력크림EX75",
 }
+sys.path.insert(0, str(PROJECT_ROOT / "rate-check"))
+from _common import id_candidates as _id_candidates  # noqa: E402
+
 _IDS_FILE = PROJECT_ROOT / "hsmaster" / "config" / "sulwhasoo-ids.json"
-_LOTTE_IDS = json.loads(_IDS_FILE.read_text(encoding="utf-8"))["ids"]
-LOTTE_PRODUCTS = {
-    code: {"name": short, "goods_no": str(_LOTTE_IDS[code]["lotte"])}
-    for code, short in _LOTTE_SHORT_NAMES.items()
-    if code in _LOTTE_IDS and _LOTTE_IDS[code].get("lotte")
-}
-_missing = [c for c in _LOTTE_SHORT_NAMES if c not in LOTTE_PRODUCTS]
-if _missing:   # 조용히 빠지면 담기에서 그 상품만 누락된다 → 크게 알린다
-    print(f"[WARN] sulwhasoo-ids.json 에 롯데 goods_no 없음: {_missing}")
+_ALL_IDS = json.loads(_IDS_FILE.read_text(encoding="utf-8"))["ids"]
+_LOTTE_IDS = _ALL_IDS   # 하위호환 별칭
+
+
+def _mall_products(short_names: dict, mall: str) -> dict:
+    """{code: {name, goods_no, goods_no_candidates}} — goods_no 는 **1순위 후보**.
+
+    ★2026-08-19: config 값이 문자열이 아니라 **후보 리스트**일 수 있다(`n` 은 상품번호가
+      수시로 바뀌고, `g` 는 한정품→공통품 순). goods_no 는 기존 호출부 호환을 위해 1순위를
+      그대로 담고, 폴백이 필요한 호출부는 goods_no_candidates 를 쓴다.
+    """
+    out = {}
+    for code, short in short_names.items():
+        entry = _ALL_IDS.get(code) or {}
+        cands = _id_candidates(entry, mall)
+        if not cands:
+            continue
+        out[code] = {"name": short, "goods_no": cands[0], "goods_no_candidates": cands}
+    return out
+
+
+LOTTE_PRODUCTS = _mall_products(_LOTTE_SHORT_NAMES, "lotte")
+GALLERIA_PRODUCTS = _mall_products(_GALLERIA_SHORT_NAMES, "galleria")
+for _label, _tbl, _src in (("롯데", LOTTE_PRODUCTS, _LOTTE_SHORT_NAMES),
+                           ("갤러리아", GALLERIA_PRODUCTS, _GALLERIA_SHORT_NAMES)):
+    _missing = [c for c in _src if c not in _tbl]
+    if _missing:   # 조용히 빠지면 담기에서 그 상품만 누락된다 → 크게 알린다
+        print(f"[WARN] sulwhasoo-ids.json 에 {_label} goods_no 없음: {_missing}")
 
 # 조합 = rate-check/_common.py 의 COMBOS 단일 소스 (TOP 20).
 # rate-check 의 list[0..N-1] 을 dict{1..N} 으로 변환 (combo_no 1-based 사용).
-sys.path.insert(0, str(PROJECT_ROOT / "rate-check"))
 from _common import COMBOS as _COMBOS_LIST  # noqa: E402
 COMBOS: dict[int, list[tuple[str, int]]] = {i + 1: c for i, c in enumerate(_COMBOS_LIST)}
 

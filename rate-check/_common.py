@@ -648,6 +648,42 @@ def load_ids() -> dict:
     return json.loads(SULWHASOO_IDS.read_text(encoding="utf-8"))["ids"]
 
 
+# ============================================================
+# 상품번호 후보 (2026-08-19 신설)
+# ============================================================
+# ★왜: `n`(탄력크림EX 75ml) 은 **상품번호가 수시로 바뀐다**(사용자 지시 2026-08-19).
+#   구 번호는 죽지 않고 '일시품절' 로 남아 페이지·가격이 멀쩡히 보이므로, 단순 교체로는
+#   조용한 오측정을 못 막는다(2026-08-19 실측: 롯데 구번호 2923418727 이 13% 117,450원을
+#   그대로 표시했다). 그래서 **후보를 여러 개 두고 실패하면 다음으로 넘어간다.**
+#   `g` 도 한정품(1순위) → 소진 시 공통품(2순위) 로 같은 구조.
+def id_candidates(entry: dict, mall: str) -> list[str]:
+    """몰별 상품번호 **후보 리스트**. 값이 문자열이면 1개짜리 리스트로 정규화한다.
+
+    앞에서부터 시도하고 실패(담기 실패 / 리디렉트 / 일시품절)하면 다음 후보로 넘어간다.
+    호출부는 반드시 **폴백까지 구현**해야 한다 — 첫 후보만 쓰면 이 구조가 무의미하다.
+    """
+    v = entry.get(mall)
+    if v is None:
+        return []
+    if isinstance(v, str):
+        return [v]
+    return [str(x) for x in v if x]
+
+
+def galleria_url_for(entry: dict, idx: int) -> str | None:
+    """galleria 후보 idx 에 대응하는 전체 URL. galleria_url 은 galleria 와 같은 순서·길이.
+
+    ⚠️ 짧은 URL(goods_no 만) 은 sale_shop_divi_cd 등이 없어 **다른 상품으로 리디렉트**된
+       사례가 있다(2026-08-01). 그래서 전체 URL 을 후보별로 들고 있어야 한다.
+    """
+    u = entry.get("galleria_url")
+    if not u:
+        return None
+    if isinstance(u, str):
+        return u if idx == 0 else None
+    return u[idx] if idx < len(u) else None
+
+
 def load_hmall_first_account() -> dict:
     """hmall_config.json 첫 계정."""
     return json.loads(HMALL_CONFIG.read_text(encoding="utf-8"))["accounts"][0]

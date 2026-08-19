@@ -109,13 +109,10 @@ def derive_alias_result(base: dict, prod: dict) -> dict:
             break
     member = alias_benefit_unit * qty
 
-    # 카드 슬라이드는 base 결과 재사용 (같은 URL이라 같은 카드 즉시할인 적용)
+    # 카드 슬라이드는 base 결과 재사용 (같은 URL이라 같은 카드 즉시할인 적용).
+    # ★2026-08-19: 종전엔 max(percent) 로 골라 **7% 청구할인을 즉시할인으로 오인**할 수 있었다.
+    #   이제 _settle() 이 즉시할인 슬라이드만 고르고 청구할인은 제외한다.
     card_slides = base_pay.get("card_slides") or []
-    pick_slide = next((s for s in card_slides if "카카오" in (s.get("text") or "")), None)
-    if not pick_slide:
-        with_pct = [s for s in card_slides if s.get("percent")]
-        if with_pct:
-            pick_slide = max(with_pct, key=lambda s: s.get("percent") or 0)
 
     payment = {
         "qty": qty,
@@ -130,21 +127,11 @@ def derive_alias_result(base: dict, prod: dict) -> dict:
         "error": None,
     }
 
-    if pick_slide and pick_slide.get("percent") and member > 0:
-        imm_pct = pick_slide["percent"] / 100
-        slide_text = pick_slide.get("text") or ""
-        pb_pct = 0
-        for name, pct in EVERYDAY_PAYBACK_CARDS:
-            short = name.replace("카드", "")
-            if name in slide_text or short in slide_text:
-                pb_pct = pct
-                break
-        imm_price = round(member * (1 - imm_pct))
-        after_payback = round(imm_price * (1 - pb_pct))
-        rw = _compute_reward(imm_price, base.get("tiers") or [], base.get("simple_ranges") or [])
-        payment["kakao_price"] = imm_price
-        payment["kakao_reward_pt"] = rw
-        payment["kakao_final_cost"] = after_payback - rw
+    if member > 0:
+        # trust_price=False — base 슬라이드의 절대금액은 alias 수량에 안 맞는다 (% 만 빌린다)
+        payment["kakao_price"], payment["kakao_reward_pt"], payment["kakao_final_cost"] = _settle(
+            card_slides, member, base.get("tiers") or [], base.get("simple_ranges") or [],
+            trust_price=False)
 
     out = dict(base)
     out["id"] = prod["id"]
@@ -192,6 +179,60 @@ GUIDE_PATH = Path(__file__).parent / "Hmall 10% Check Guide.md"
 _GUIDE_ROW_RE = re.compile(
     r"^\|\s*(\d+(?:-\d+)?)\s*\|\s*([^|]+?)\s*\|\s*(https?://www\.hmall\.com/md/pda/itemPtc\?[^\s|]+)"
 )
+
+
+# ============================================================
+# 주문서 정산 — H(즉시할인가) / I(실비)   ★2026-08-19 사용자 지시로 규칙 2건 정정
+# ============================================================
+def _settle(card_slides: list, member: int, tiers: list, simple_ranges: list,
+            *, trust_price: bool = True):
+    """주문서 슬라이드 → (H 즉시할인가, 적립, I 실비). 계산 불가면 (None, 0, None).
+
+    trust_price=False 는 **alias 상품 전용** — alias 는 base 의 card_slides 를 재사용하는데
+    slide['price'] 는 base 의 수량·금액 기준 절대값이라 alias 에 그대로 쓰면 틀린다.
+    이때는 % 만 빌려 쓰고 금액은 alias 자신의 member 로 계산한다.
+
+    ★① H = **주문서가 알려준 실제 결제금액(slide['price'])** 을 우선 쓴다.
+       이 금액에는 **결제 단계에서만 뜨는 '결제금액할인'** 이 이미 반영돼 있다 — 장바구니
+       단계에도 안 뜨고 결제창에서만 뜬다(사용자 2026-08-19). 코드는 이미 바로구매로
+       주문서까지 들어가 이 값을 읽어오면서도 버리고 member×(1-pct) 로 재계산했다.
+       실측(2026-08-19): 대상 6건 전부 우수가 대비 **정확히 -10,000원** 차이.
+       ⚠️ price 는 **즉시할인 슬라이드만** 신뢰한다 — 토스페이/네이버페이 슬라이드의 숫자는
+          주문총액이 아니라 '최대 N원 혜택' 상한액이다(그대로 쓰면 13,000원짜리 주문이 된다).
+       price 가 없을 때만 member×(1-pct) 로 추정한다.
+
+    ★② **청구할인은 무조건 제외한다**(사용자 지시 2026-08-19).
+       '제휴카드 현대홈쇼핑 현대카드 Ed2 7% 청구할인' 같은 구매혜택 배너는 안내일 뿐
+       실제로 못 받는다. 종전엔 즉시할인과 청구할인을 겹쳐 적용해 실비가 과소계상됐다.
+       (별건: 같은 이름의 '7% 적립' 은 인정 대상이나 **현재 수집되지 않는다** — 미해결.)
+    """
+    imm_candidates = [s for s in card_slides
+                      if s.get("percent") and (s.get("discount_type") == "즉시할인"
+                                               or "카카오" in (s.get("text") or ""))]
+    imm_slide = max(imm_candidates, key=lambda s: s.get("percent") or 0) if imm_candidates else None
+
+    imm_price = None
+    if imm_slide:
+        price = imm_slide.get("price") if trust_price else None
+        if price and price > 0:
+            imm_price = int(price)                 # 주문서 실측값 (결제금액할인 포함)
+        elif member > 0:
+            imm_price = round(member * (1 - (imm_slide.get("percent") or 0) / 100))
+    if imm_price is None:
+        imm_price = member or None
+    if not imm_price:
+        return None, 0, None
+
+    # 일상 페이백 — 실제로 결제하는 카드(즉시할인 슬라이드) 기준
+    pb_pct = 0.0
+    if imm_slide:
+        text = (imm_slide.get("text") or "") + " " + (imm_slide.get("alt") or "")
+        for name, pct in EVERYDAY_PAYBACK_CARDS:
+            if name in text or name.replace("카드", "") in text:
+                pb_pct = max(pb_pct, pct)
+
+    rw = _compute_reward(imm_price, tiers, simple_ranges)
+    return imm_price, rw, round(imm_price * (1 - pb_pct)) - rw
 
 
 def _load_products_from_guide() -> list[dict]:
@@ -1053,52 +1094,13 @@ def check_payment_flow(page: Page, prod: dict, tiers: list[dict], simple_ranges:
         out["member_price"] = info.get("member_price")
     out["qty"] = actual_qty
 
-    kakao_slide = next((s for s in out["card_slides"] if "카카오" in (s.get("text") or "")), None)
-
-    # ── H열/I열 (즉시할인가 / 실비) — 수식 기반 ──
-    # H = 우수가 × (1 - 즉시할인%)
-    # I = H × (1 - 청구할인% - 일상페이백%) - 적립금(H 기준)
-    #   ★ 즉시할인 = 결제 시점 차감, 청구할인 = 카드사 환급 (페이백 취급)
-    #   ★ 적립금은 H 기준 — 청구할인은 결제 시점에 적용 안 되므로
+    # ── H열/I열 (즉시할인가 / 실비) ──
+    # ★2026-08-19: 계산을 _settle() 로 단일화 (alias 경로와 같은 규칙을 쓰기 위함).
+    #   H = 주문서 실제 결제금액 우선 / 청구할인 제외. 상세는 _settle docstring.
     member = out.get("member_price") or 0
+    out["kakao_price"], out["kakao_reward_pt"], out["kakao_final_cost"] = _settle(
+        out["card_slides"], member, tiers, simple_ranges)
 
-    # 즉시할인 slide: discount_type='즉시할인' 또는 카카오 (legacy: 카카오는 항상 즉시할인 취급)
-    imm_candidates = [s for s in out["card_slides"]
-                      if s.get("percent") and (s.get("discount_type") == "즉시할인" or "카카오" in (s.get("text") or ""))]
-    imm_slide = max(imm_candidates, key=lambda s: s.get("percent") or 0) if imm_candidates else None
-    imm_pct = (imm_slide.get("percent") or 0) / 100 if imm_slide else 0
-
-    # 청구할인 slide (페이백 취급)
-    billed_candidates = [s for s in out["card_slides"]
-                         if s.get("percent") and s.get("discount_type") == "청구할인"]
-    billed_slide = max(billed_candidates, key=lambda s: s.get("percent") or 0) if billed_candidates else None
-    billed_pct = (billed_slide.get("percent") or 0) / 100 if billed_slide else 0
-
-    # 일상 페이백 카드 매칭 (EVERYDAY_PAYBACK_CARDS) — slide 텍스트 기반
-    pb_pct = 0
-    for slide in (imm_slide, billed_slide):
-        if not slide:
-            continue
-        slide_text = slide.get("text") or ""
-        for name, pct in EVERYDAY_PAYBACK_CARDS:
-            short = name.replace("카드", "")
-            if name in slide_text or short in slide_text:
-                pb_pct = max(pb_pct, pct)
-
-    if member > 0 and (imm_pct or billed_pct or pb_pct):
-        imm_price = round(member * (1 - imm_pct))
-        total_pb = billed_pct + pb_pct
-        after_payback = round(imm_price * (1 - total_pb))
-        rw = _compute_reward(imm_price, tiers, simple_ranges)  # ★ H 기준
-        out["kakao_price"] = imm_price        # H열
-        out["kakao_reward_pt"] = rw
-        out["kakao_final_cost"] = after_payback - rw   # I열
-    elif member > 0:
-        # 할인 슬라이드 전무 → H = 우수가 그대로, I = H - 적립금
-        rw = _compute_reward(member, tiers, simple_ranges)
-        out["kakao_price"] = member
-        out["kakao_reward_pt"] = rw
-        out["kakao_final_cost"] = member - rw
 
     # 페이백 5개 카드 — 카드할인 슬라이드에 등장한 경우에만 적용
     # (예: 어느 날 슬라이드에 '롯데 7%즉시할인' 가 뜨면 → 즉시할인가 × 0.98 - 적립)

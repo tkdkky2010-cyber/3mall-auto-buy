@@ -114,7 +114,7 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 | 9 | 이디야 카페인 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2246603712&sectId=3059445 |
 | 11 | 라메종드미엘 프랑스 라벤더 천연꿀 8병 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2246845189&sectId=3059445 |
 | 16 | 루솔 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2225275921 |
-| 17 | 데이즈온 원데이 알파 18개 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2247036059&sectId=3059445 |
+| 17 | 데이즈온 원데이 알파 8개 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2247036059&sectId=3059445 |
 | 22 | 올바른건강식품 와이 9박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244934734&sectId=3059445 |
 | 25 | 유기농 석류젤리 9박(90개) | https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445 |
 | 28 | 스키니랩 시서스 다이어트 11박 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2202464603&sectId=3059445 |

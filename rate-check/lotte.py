@@ -22,6 +22,7 @@ from _common import (
     today_tab_name, gs_client, COMBOS, CARD_PAYBACK, PRODUCT_CODES, PRODUCTS,
     LOTTE_HEADER_ROW, LOTTE_COMBO_END_ROW, CHART_RANGE,
     matched_chromedriver_service,
+    id_candidates as C_id_candidates,
 )
 
 import os as _os
@@ -58,13 +59,46 @@ driver.get("https://www.lotteimall.com/main/viewMain.lotte")
 time.sleep(2)
 block_dialogs()
 
+def _sold_out() -> bool:
+    """현재 열린 롯데 상품페이지가 **일시품절**인지. (2026-08-19 실측 기반)
+
+    ★왜 필요한가: 죽은 상품번호도 페이지가 열리고 **가격까지 멀쩡히 표시된다**
+      (구 n 2923418727 이 13% 117,450원 표시). 리디렉트도 404도 아니라 감지 수단이 없어서
+      step1 롯데가 판매불가 상품을 조용히 측정했다(2026-08-19 발견).
+    ★신호 = 옵션(타입 선택) 영역의 **`재입고알림` 버튼**. 품절일 때만 나타난다.
+      body 전체 검색 금지(RULES §1-2) — 버튼/링크 텍스트만 좁게 본다.
+    ⚠️ 문구는 `판매중단` 이 아니라 **`일시품절`** 이다. 워크로그(8/18)엔 '판매중단'으로
+      적혀 있었는데 실제 페이지 문구가 달라, 그 단어로 짰으면 못 잡았다.
+    """
+    try:
+        return bool(driver.execute_script("""
+            return Array.from(document.querySelectorAll('button, a'))
+                        .some(e => /재입고알림|일시품절/.test((e.innerText||'').trim()));
+        """))
+    except Exception:
+        return False
+
+
 for code in PRODUCT_CODES:
-    goods = IDS[code]['lotte']
-    url = f"https://www.lotteimall.com/goods/viewGoodsDetail.lotte?goods_no={goods}"
-    print(f"[{code}] {url}")
-    driver.get(url)
-    time.sleep(3)
-    block_dialogs()
+    # ★2026-08-19: lotte 도 **후보 리스트** 가능. 품절이면 다음 후보로.
+    _cands = C_id_candidates(IDS[code], "lotte")
+    goods, url = None, None
+    for _ci, _gno in enumerate(_cands):
+        goods = _gno
+        url = f"https://www.lotteimall.com/goods/viewGoodsDetail.lotte?goods_no={_gno}"
+        print(f"[{code}] {url}")
+        driver.get(url)
+        time.sleep(3)
+        block_dialogs()
+        if not _sold_out():
+            if _ci:
+                print(f"  [WARN] {code} 1순위 {_cands[0]} 일시품절 → 후보 {_ci+1} {_gno} 사용. "
+                      f"sulwhasoo-ids.json 순서 갱신 검토")
+            break
+        if _ci + 1 < len(_cands):
+            print(f"  [WARN] {code} 후보 {_ci+1} {_gno} **일시품절** → 다음 후보 시도")
+        else:
+            print(f"  [WARN] {code} 후보 {len(_cands)}개 전부 일시품절 — 마지막 후보로 측정 진행(값 신뢰 주의)")
     # 스크롤 불필요 — 쿠폰받기는 아래 JS el.click() 로 스크롤 위치 무관하게 클릭됨. 바로 쿠폰 단계로.
 
     # 쿠폰받기 클릭 — 팝업/레이어 등장
@@ -198,7 +232,7 @@ _VERIFY_JS = r"""
 
 def fetch_global_tiers():
     """상품 b 1개의 #eventBanner 에서 적립 이벤트 발견 → 이벤트 페이지 tier표 파싱. driver 재사용(단일)."""
-    url0 = f"https://www.lotteimall.com/goods/viewGoodsDetail.lotte?goods_no={IDS['b']['lotte']}"
+    url0 = f"https://www.lotteimall.com/goods/viewGoodsDetail.lotte?goods_no={C_id_candidates(IDS['b'], 'lotte')[0]}"
     driver.get(url0); time.sleep(4); block_dialogs()
     for y in range(0, 10000, 700):
         driver.execute_script(f"window.scrollTo(0, {y})"); time.sleep(0.2)

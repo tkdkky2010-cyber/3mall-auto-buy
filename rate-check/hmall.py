@@ -218,11 +218,24 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
 
     # 2) 본품 담기
     for c, q in combo:
-        info = {"name": IDS[c]["name"], "slitmCd": IDS[c]["hyundai"],
-                "url_extra": "", "option_index": 1, "auto_coupon": True}
-        print(f"  [STEP] add_to_cart {c} × {q}")
-        if not add_to_cart(page, c, info, q):
-            return {"idx": idx, "error": f"add_to_cart 실패: {c}×{q}"}
+        # ★2026-08-19: slitmCd 는 **후보 리스트**일 수 있다(`n` 은 상품번호가 수시로 바뀐다).
+        #   앞 후보로 담기 실패하면 다음 후보로 재시도한다. 전부 실패해야 에러.
+        cands = C.id_candidates(IDS[c], "hyundai")
+        if not cands:
+            return {"idx": idx, "error": f"상품번호 없음: {c} (hyundai)"}
+        for ci, slitm in enumerate(cands):
+            info = {"name": IDS[c]["name"], "slitmCd": slitm,
+                    "url_extra": "", "option_index": 1, "auto_coupon": True}
+            suffix = "" if len(cands) == 1 else f"  [후보 {ci+1}/{len(cands)} {slitm}]"
+            print(f"  [STEP] add_to_cart {c} × {q}{suffix}")
+            if add_to_cart(page, c, info, q):
+                if ci:      # 폴백으로 성공 = 1순위가 죽었다는 신호 → 크게 알린다
+                    print(f"  [WARN] {c} 1순위 {cands[0]} 실패 → 후보 {ci+1} {slitm} 로 성공. "
+                          f"sulwhasoo-ids.json 순서 갱신 검토")
+                break
+            page.wait_for_timeout(400)
+        else:
+            return {"idx": idx, "error": f"add_to_cart 실패: {c}×{q} (후보 {len(cands)}개 전부)"}
         page.wait_for_timeout(400)
 
     # 3) cart → 일반상품 체크 → 구매하기

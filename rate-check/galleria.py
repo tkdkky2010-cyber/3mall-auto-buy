@@ -503,8 +503,20 @@ def main(argv=None):
 
     try:
         for code in codes:
-            goods_no = ids[code]["galleria"]
-            r = scrape_product(driver, code, goods_no, url=ids[code].get("galleria_url"))
+            # ★2026-08-19: galleria 도 **후보 리스트** 가능(`n` 상품번호 수시 변경).
+            #   리디렉트(=다른 상품으로 튐)면 다음 후보로 재시도한다.
+            cands = C.id_candidates(ids[code], "galleria")
+            r, goods_no = None, None
+            for ci, gno in enumerate(cands):
+                r = scrape_product(driver, code, gno, url=C.galleria_url_for(ids[code], ci))
+                goods_no = gno
+                if not r.get("redirected"):
+                    if ci:
+                        print(f"  [WARN] {code} 1순위 {cands[0]} 리디렉트 → 후보 {ci+1} {gno} 사용. "
+                              f"sulwhasoo-ids.json 순서 갱신 검토")
+                    break
+                if ci + 1 < len(cands):
+                    print(f"  [WARN] {code} 후보 {ci+1} {gno} 리디렉트 → 다음 후보 시도")
             raw_results[code] = r
             samples, new_items = parse_add_gifts(r["add_blocks"])
             basic, coupon = parse_basic_and_coupon(r)
