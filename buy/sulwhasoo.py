@@ -854,14 +854,35 @@ def lotte_add_product_by_url(page: Page, goods_no: str, qty: int) -> bool:
             coupon_status = f"err_open:{type(oe).__name__}"
         print(f"      [coupon] {goods_no}: {coupon_status}")
 
-        # 옵션 (타입 선택 → 세트)
+        # ★쿠폰 레이어(#layer_down_coupon)는 '닫기' 클릭 후에도 남는 경우가 있어
+        #   '타입 선택' 클릭을 가로챈다(2026-08-21 실측: 옵션 클릭 timeout → 옵션 미선택 →
+        #   saveCart 에서 "타입 옵션을 선택해주세요" alert 가 자동 dismiss 돼 조용히 미담김).
+        #   → 옵션 선택 **전에** 강제 숨김. (saveCart 직전 숨김만으론 옵션 단계가 무방비)
         try:
-            page.get_by_role("link", name="타입 선택").click(timeout=3000)
-            page.wait_for_timeout(500)
-            page.get_by_role("link", name="세트", exact=True).click(timeout=3000)
-            page.wait_for_timeout(500)
+            page.evaluate(
+                "() => { const l = document.querySelector('#layer_down_coupon');"
+                " if (l) l.style.display = 'none'; }")
         except Exception:
             pass
+
+        # 옵션 (타입 선택 → 세트)
+        # ★실패를 삼키지 않는다(2026-08-21): 옵션 미선택이면 saveCart 가 "타입 옵션을
+        #   선택해주세요" alert 로 조용히 미담김 → 원인 로그가 없어 debugging 불가였다.
+        # ★'타입 선택'은 뷰포트 하단 경계(y≈810/vh≈811)에 걸쳐 있어 Playwright 자동 스크롤
+        #   재시도 루프가 ~3초 소요 → timeout 3000ms 가 경계선에서 터졌다(2026-08-21 실측,
+        #   창 크기 따라 되다 안 되다 한 원인). 명시 scrollIntoView 후 여유 timeout 으로 클릭.
+        try:
+            page.evaluate(
+                "() => { const a = Array.from(document.querySelectorAll('a'))"
+                ".find(x => (x.getAttribute('data-optselectnm')||'') === '타입 선택');"
+                " if (a) a.scrollIntoView({block: 'center'}); }")
+            page.wait_for_timeout(400)
+            page.get_by_role("link", name="타입 선택").click(timeout=6000)
+            page.wait_for_timeout(500)
+            page.get_by_role("link", name="세트", exact=True).click(timeout=6000)
+            page.wait_for_timeout(500)
+        except Exception as opt_e:
+            print(f"      [option] 선택 실패({type(opt_e).__name__}): {str(opt_e).splitlines()[0][:120]}")
 
         # 수량 (qty - 1) 번 + 클릭
         for _ in range(qty - 1):
@@ -894,6 +915,11 @@ def lotte_add_combo(page: Page, combo_no: int) -> bool:
     if not combo:
         print(f"    [ERR] 조합 {combo_no} 정의 없음")
         return False
+    # ★alert 가시화(2026-08-21): Playwright 기본은 dialog 자동 dismiss — 담기 실패 alert
+    #   ("타입 옵션을 선택해주세요" 등)가 로그 없이 사라져 미담김 원인을 못 봤다.
+    if not getattr(page, "_lotte_dialog_logged", False):
+        page.on("dialog", lambda d: (print(f"      [dialog:{d.type}] {d.message.strip()[:120]}"), d.dismiss()))
+        page._lotte_dialog_logged = True
     for sku, qty in combo:
         prod = LOTTE_PRODUCTS.get(sku)
         if not prod:
