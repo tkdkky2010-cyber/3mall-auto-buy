@@ -1,36 +1,242 @@
 {
-  "date": "2026-08-23",
+  "date": "2026-08-21",
   "account_used": "tkdkky2002",
   "products": [
     {
       "id": "1",
       "name": "이너플로라 유산균 60정",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2154750833",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강은 金이다 최대 10%적립",
+      "events": [
+        {
+          "prmo": "P202608196501",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "8.21 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 30000,
+            "max_won": 2000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "8.21 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [
+        {
+          "min_won": 30000,
+          "max_won": 2000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": 122000,
+        "member_price": 115900,
+        "card_slides": [
+          {
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 104,600원",
+            "percent": 5,
+            "price": 104600
+          },
+          {
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 104,600원",
+            "percent": 5,
+            "price": 104600
+          }
+        ],
+        "kakao_price": 115900,
+        "kakao_reward_pt": 11590,
+        "kakao_final_cost": 104310,
+        "paybacks": {
+          "비씨카드": {
+            "immediate_price": 104600,
+            "payback_pct": 1.5,
+            "after_payback": 103031,
+            "reward_pt": 10460,
+            "final_cost": 92571
+          }
+        },
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 30000,
+          "tier_reward": 3000,
+          "nominal_pct": 10.0,
+          "actual_total": 115900,
+          "actual_reward": 3000,
+          "effective_pct": 2.5884383088869716
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 115900,
+        "options": [
+          {
+            "idx": 1,
+            "name": "[H] 유한건강생활 이너플로라 질유산균 3박스 총6개월분",
+            "list_price": 115900
+          },
+          {
+            "idx": 2,
+            "name": "[H] 유한건강생활 이너플로라 질유산균 2박스 총4개월분",
+            "list_price": 87970
+          },
+          {
+            "idx": 3,
+            "name": "[H] 유한건강생활 이너플로라 질유산균 1박스 2개월분",
+            "list_price": 49880
+          },
+          {
+            "idx": 4,
+            "name": "유한건강생활 식물성rTG알티지오메가 미니 1박스 1개월분",
+            "list_price": 23580
+          },
+          {
+            "idx": 5,
+            "name": "유한건강생활 식물성rTG알티지오메가 미니 3박스 총3개월분",
+            "list_price": 55350
+          },
+          {
+            "idx": 6,
+            "name": "유한건강생활 유한올인원종합비타민 이뮨 14일분",
+            "list_price": 32590
+          },
+          {
+            "idx": 7,
+            "name": "유한건강생활 유한올인원종합비타민 이뮨 7일분",
+            "list_price": 18430
+          },
+          {
+            "idx": 10,
+            "name": "유한건강생활 뉴오리진 당당 혈당유산균 HAC01 1박스 1개월분",
+            "list_price": 68400
+          },
+          {
+            "idx": 11,
+            "name": "[H] 뉴오리진 프로바이오틱스100억 30일분 6박스(총 6개월분)",
+            "list_price": 64030
+          },
+          {
+            "idx": 12,
+            "name": "[H] 뉴오리진 프로바이오틱스100억 30일분 3박스",
+            "list_price": 32210
+          }
+        ]
+      }
     },
     {
       "id": "1-1",
       "name": "이너플로라 유산균 30정",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2201017629&sectId=3060687",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강은 金이다 최대 10%적립",
+      "events": [
+        {
+          "prmo": "P202608196501",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "8.21 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 30000,
+            "max_won": 2000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "8.21 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [
+        {
+          "min_won": 30000,
+          "max_won": 2000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": 63900,
+        "member_price": 51120,
+        "card_slides": [
+          {
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 48,564원",
+            "percent": 5,
+            "price": 48564
+          },
+          {
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 48,564원",
+            "percent": 5,
+            "price": 48564
+          }
+        ],
+        "kakao_price": 51120,
+        "kakao_reward_pt": 5112,
+        "kakao_final_cost": 46008,
+        "paybacks": {
+          "비씨카드": {
+            "immediate_price": 48564,
+            "payback_pct": 1.5,
+            "after_payback": 47836,
+            "reward_pt": 4856,
+            "final_cost": 42980
+          }
+        },
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 30000,
+          "tier_reward": 3000,
+          "nominal_pct": 10.0,
+          "actual_total": 51120,
+          "actual_reward": 3000,
+          "effective_pct": 5.868544600938967
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 51120,
+        "options": [
+          {
+            "idx": 1,
+            "name": "유한건강생활 뉴오리진 이너플로라 질유산균 3박스 총3개월분",
+            "list_price": 63900
+          },
+          {
+            "idx": 3,
+            "name": "유한건강생활 여성갱년기 백수오 올인원(뼈+혈행건강+기억력개선) 1박스 1개월분",
+            "list_price": 66900
+          },
+          {
+            "idx": 4,
+            "name": "유한건강생활 여성갱년기 백수오 올인원(뼈+혈행건강+기억력개선) 2박스 총2개월분",
+            "list_price": 126900
+          },
+          {
+            "idx": 7,
+            "name": "유한건강생활 전홍삼스틱 홍삼즙 오리지널 1박스 1개월분",
+            "list_price": 58900
+          },
+          {
+            "idx": 9,
+            "name": "유한건강생활 수신비책(면역+피로+항산화) 1박스 4주분",
+            "list_price": 64900
+          },
+          {
+            "idx": 10,
+            "name": "유한건강생활 천수단 녹용홍삼 활력환 15환 1박스",
+            "list_price": 95900
+          }
+        ]
+      }
     },
     {
       "id": "2",
@@ -102,7 +308,7 @@
       ],
       "max_reward": "15,000P",
       "event_end": "8.30 23:59",
-      "has_coupon": true,
+      "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [],
@@ -112,24 +318,30 @@
         "member_price": 161820,
         "card_slides": [
           {
-            "alt": "",
-            "text": "5% 즉시할인",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 153,729원",
             "percent": 5,
-            "price": 144229,
-            "discount_type": "즉시할인"
+            "price": 153729
           },
           {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 153,729원",
+            "percent": 5,
+            "price": 153729
           }
         ],
-        "kakao_price": 144229,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 134229,
-        "paybacks": {},
+        "kakao_price": 161820,
+        "kakao_reward_pt": 15000,
+        "kakao_final_cost": 146820,
+        "paybacks": {
+          "비씨카드": {
+            "immediate_price": 153729,
+            "payback_pct": 1.5,
+            "after_payback": 151423,
+            "reward_pt": 15000,
+            "final_cost": 136423
+          }
+        },
         "optimal_tier": {
           "qty": 2,
           "tier_min": 100000,
@@ -221,9 +433,9 @@
       ],
       "max_reward": "15,000P",
       "event_end": "8.30 23:59",
-      "has_coupon": true,
+      "has_coupon": false,
       "error": null,
-      "coupon_claimed": true,
+      "coupon_claimed": false,
       "simple_ranges": [],
       "payment": {
         "qty": 2,
@@ -231,24 +443,30 @@
         "member_price": 159300,
         "card_slides": [
           {
-            "alt": "",
-            "text": "5% 즉시할인",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 151,335원",
             "percent": 5,
-            "price": 141835,
-            "discount_type": "즉시할인"
+            "price": 151335
           },
           {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 151,335원",
+            "percent": 5,
+            "price": 151335
           }
         ],
-        "kakao_price": 141835,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 131835,
-        "paybacks": {},
+        "kakao_price": 159300,
+        "kakao_reward_pt": 15000,
+        "kakao_final_cost": 144300,
+        "paybacks": {
+          "비씨카드": {
+            "immediate_price": 151335,
+            "payback_pct": 1.5,
+            "after_payback": 149065,
+            "reward_pt": 15000,
+            "final_cost": 134065
+          }
+        },
         "optimal_tier": {
           "qty": 2,
           "tier_min": 100000,
@@ -474,31 +692,30 @@
         "member_price": 131920,
         "card_slides": [
           {
-            "alt": "",
-            "text": "5% 즉시할인",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 125,324원",
             "percent": 5,
-            "price": 125324,
-            "discount_type": "즉시할인"
+            "price": 125324
           },
           {
-            "alt": "",
-            "text": "5% 즉시할인",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 125,324원",
             "percent": 5,
-            "price": null,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
+            "price": 125324
           }
         ],
-        "kakao_price": 125324,
+        "kakao_price": 131920,
         "kakao_reward_pt": 10000,
-        "kakao_final_cost": 115324,
-        "paybacks": {},
+        "kakao_final_cost": 121920,
+        "paybacks": {
+          "비씨카드": {
+            "immediate_price": 125324,
+            "payback_pct": 1.5,
+            "after_payback": 123444,
+            "reward_pt": 10000,
+            "final_cost": 113444
+          }
+        },
         "optimal_tier": {
           "qty": 4,
           "tier_min": 100000,
@@ -555,9 +772,9 @@
       "tiers": [],
       "max_reward": null,
       "event_end": null,
-      "has_coupon": true,
+      "has_coupon": false,
       "error": null,
-      "coupon_claimed": true,
+      "coupon_claimed": false,
       "simple_ranges": []
     },
     {
@@ -585,40 +802,175 @@
       "tiers": [],
       "max_reward": null,
       "event_end": null,
-      "has_coupon": true,
-      "error": null,
-      "coupon_claimed": true,
-      "simple_ranges": []
-    },
-    {
-      "id": "22",
-      "name": "올바른건강식품 와이 9박",
-      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244934734&sectId=3059445",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
-      "tiers": [],
-      "max_reward": null,
-      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": []
     },
     {
+      "id": "22",
+      "name": "올바른건강식품 와이 9박",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244934734&sectId=3059445",
+      "ten_percent": true,
+      "phrase": "건강은 金이다 최대 10%적립",
+      "events": [
+        {
+          "prmo": "P202608196501",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "8.21 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 30000,
+            "max_won": 2000000,
+            "pct": 10
+          }
+        }
+      ],
+      "tiers": [],
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "8.21 23:59",
+      "has_coupon": false,
+      "error": null,
+      "coupon_claimed": false,
+      "simple_ranges": [
+        {
+          "min_won": 30000,
+          "max_won": 2000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": 73710,
+        "member_price": 66340,
+        "card_slides": [
+          {
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 63,023원",
+            "percent": 5,
+            "price": 63023
+          },
+          {
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 63,023원",
+            "percent": 5,
+            "price": 63023
+          }
+        ],
+        "kakao_price": 66340,
+        "kakao_reward_pt": 6634,
+        "kakao_final_cost": 59706,
+        "paybacks": {
+          "비씨카드": {
+            "immediate_price": 63023,
+            "payback_pct": 1.5,
+            "after_payback": 62078,
+            "reward_pt": 6302,
+            "final_cost": 55776
+          }
+        },
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 30000,
+          "tier_reward": 3000,
+          "nominal_pct": 10.0,
+          "actual_total": 66340,
+          "actual_reward": 3000,
+          "effective_pct": 4.522158577027435
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 66340,
+        "options": [
+          {
+            "idx": 1,
+            "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 9박스 (총 27개월분)",
+            "list_price": 73710
+          },
+          {
+            "idx": 2,
+            "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 6박스 (총 18개월분)",
+            "list_price": 53910
+          }
+        ]
+      }
+    },
+    {
       "id": "25",
       "name": "유기농 석류젤리 9박(90개)",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강은 金이다 최대 10%적립",
+      "events": [
+        {
+          "prmo": "P202608196501",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "8.21 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 30000,
+            "max_won": 2000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
-      "has_coupon": true,
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "8.21 23:59",
+      "has_coupon": false,
       "error": null,
-      "coupon_claimed": true,
-      "simple_ranges": []
+      "coupon_claimed": false,
+      "simple_ranges": [
+        {
+          "min_won": 30000,
+          "max_won": 2000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": 68900,
+        "member_price": 55120,
+        "card_slides": [
+          {
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 52,364원",
+            "percent": 5,
+            "price": 52364
+          },
+          {
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 52,364원",
+            "percent": 5,
+            "price": 52364
+          }
+        ],
+        "kakao_price": 55120,
+        "kakao_reward_pt": 5512,
+        "kakao_final_cost": 49608,
+        "paybacks": {
+          "비씨카드": {
+            "immediate_price": 52364,
+            "payback_pct": 1.5,
+            "after_payback": 51579,
+            "reward_pt": 5236,
+            "final_cost": 46343
+          }
+        },
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 30000,
+          "tier_reward": 3000,
+          "nominal_pct": 10.0,
+          "actual_total": 55120,
+          "actual_reward": 3000,
+          "effective_pct": 5.44267053701016
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 55120,
+        "options": []
+      }
     },
     {
       "id": "28",
@@ -637,16 +989,89 @@
       "id": "33",
       "name": "GRN 붓기캔디",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2250831230&sectId=3060687",
-      "ten_percent": false,
-      "phrase": "출석하면 매일 100% 적립",
-      "events": [],
+      "ten_percent": true,
+      "phrase": "건강은 金이다 최대 10%적립",
+      "events": [
+        {
+          "prmo": "P202608196501",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "8.21 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 30000,
+            "max_won": 2000000,
+            "pct": 10
+          }
+        }
+      ],
       "tiers": [],
-      "max_reward": null,
-      "event_end": null,
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "8.21 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": []
+      "simple_ranges": [
+        {
+          "min_won": 30000,
+          "max_won": 2000000,
+          "pct": 10
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": 69900,
+        "member_price": 59420,
+        "card_slides": [
+          {
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 56,445원",
+            "percent": 5,
+            "price": 56445
+          },
+          {
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 56,445원",
+            "percent": 5,
+            "price": 56445
+          }
+        ],
+        "kakao_price": 59420,
+        "kakao_reward_pt": 5942,
+        "kakao_final_cost": 53478,
+        "paybacks": {
+          "비씨카드": {
+            "immediate_price": 56445,
+            "payback_pct": 1.5,
+            "after_payback": 55598,
+            "reward_pt": 5644,
+            "final_cost": 49954
+          }
+        },
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 30000,
+          "tier_reward": 3000,
+          "nominal_pct": 10.0,
+          "actual_total": 59420,
+          "actual_reward": 3000,
+          "effective_pct": 5.048805116122518
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 59420,
+        "options": [
+          {
+            "idx": 1,
+            "name": "GRN 붓기 케어 리셋 브이 캔디 6박스 (타트체리맛)",
+            "list_price": 69900
+          },
+          {
+            "idx": 2,
+            "name": "GRN 붓기 케어 리셋 브이 캔디 3EA (타트체리맛)",
+            "list_price": 36900
+          }
+        ]
+      }
     },
     {
       "id": "34",
@@ -658,9 +1083,9 @@
       "tiers": [],
       "max_reward": null,
       "event_end": null,
-      "has_coupon": true,
+      "has_coupon": false,
       "error": null,
-      "coupon_claimed": true,
+      "coupon_claimed": false,
       "simple_ranges": []
     },
     {
@@ -738,9 +1163,14 @@
     }
   ],
   "ten_percent_ids": [
+    "1",
+    "1-1",
     "2",
     "3",
     "8",
-    "9"
+    "9",
+    "22",
+    "25",
+    "33"
   ]
 }
