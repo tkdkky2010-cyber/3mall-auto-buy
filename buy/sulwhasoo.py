@@ -365,8 +365,11 @@ def naver_pay_input_password(pay_page, password_6: str) -> bool:
     return True
 
 
-def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_pay_pw: str = "") -> dict:
-    """갤러리아 카트 → 주문하기 → 결제 popup → Naver Pay → DRY 모드 종료."""
+def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_pay_pw: str = "",
+                      order_phone: str = "") -> dict:
+    """갤러리아 카트 → 주문하기 → 결제 popup → Naver Pay → DRY 모드 종료.
+    order_phone: 첫 주문 계정은 주문고객 휴대폰번호가 비어 있어 결제가 막힌다(2026-08-23 #13 실측)
+    — 주면 빈 칸일 때만 채운다."""
     out = {"success": False, "error": None}
     try:
         # 카트 link 클릭 (URL 직접보다 안정)
@@ -396,6 +399,36 @@ def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_
         except Exception as e:
             print(f"    [WARN] 배송메시지 입력 실패: {e}")
 
+        # 1.5) 주문고객 휴대폰번호 — 첫 주문 계정은 비어 있어 결제 popup 자체가 안 뜬다(#13 실측).
+        #      빈 칸일 때만 채운다(기존 번호 덮어쓰기 금지).
+        if order_phone:
+            try:
+                digits = re.sub(r"\D", "", order_phone)
+                p1, p2, p3 = digits[:3], digits[3:-4], digits[-4:]
+                filled = page.evaluate("""(ph) => {
+                    const label = [...document.querySelectorAll('*')].find(
+                        e => e.children.length === 0 && /휴대폰\s*번호/.test(e.innerText || ''));
+                    if (!label) return 'label 미발견';
+                    let box = label.closest('tr, li, dl, div');
+                    for (let i = 0; box && i < 4; i++) {
+                        if (box.querySelector('select') && box.querySelectorAll('input[type=text],input[type=tel]').length >= 2) break;
+                        box = box.parentElement;
+                    }
+                    if (!box) return '입력영역 미발견';
+                    const sel = box.querySelector('select');
+                    const inputs = [...box.querySelectorAll('input[type=text],input[type=tel]')];
+                    if (inputs.some(i => i.value.trim())) return '이미 입력됨 — skip';
+                    sel.value = ph.p1;
+                    sel.dispatchEvent(new Event('change', {bubbles: true}));
+                    inputs[0].value = ph.p2; inputs[1].value = ph.p3;
+                    inputs.forEach(i => { i.dispatchEvent(new Event('input', {bubbles: true}));
+                                          i.dispatchEvent(new Event('change', {bubbles: true})); });
+                    return 'ok';
+                }""", {"p1": p1, "p2": p2, "p3": p3})
+                print(f"    [주문고객 휴대폰] {filled}")
+            except Exception as e:
+                print(f"    [WARN] 휴대폰번호 입력 실패: {e}")
+
         # 2) 포인트 전체사용 — id #point_all_2300 (G포인트/LIVE 포인트 X, 별도)
         try:
             page.locator("#point_all_2300").click(timeout=3000)
@@ -410,6 +443,28 @@ def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_
             page.wait_for_timeout(300)
         except Exception:
             pass
+
+        # 3.5) ★결제수단 = 네이버페이 양성검증 (2026-08-23 #13 실측: 첫 주문 계정은 기본값이
+        #      삼성카드라 그대로 누르면 카드사 모달이 뜨고 주문서 상태가 오염된다. 토글 UI 원칙 —
+        #      상태 확인 없이 진행 금지. 미확인이면 결제 중단.)
+        try:
+            pay_sel = page.evaluate("""() => {
+                const radios = [...document.querySelectorAll('input[name=pay_rdo]')];
+                if (!radios.length) return 'radio 없음 — 구UI(기본 네이버페이) 가정';
+                const naverLi = [...document.querySelectorAll('li')].find(
+                    li => li.querySelector('input[name=pay_rdo]') && /네이버페이/.test(li.innerText || ''));
+                if (!naverLi) return 'FAIL: 네이버페이 항목 미발견';
+                const rd = naverLi.querySelector('input[name=pay_rdo]');
+                if (!rd.checked) rd.click();
+                return rd.checked ? 'ok' : 'FAIL: 클릭 후에도 미체크';
+            }""")
+            print(f"    [결제수단] 네이버페이: {pay_sel}")
+            if str(pay_sel).startswith("FAIL"):
+                out["error"] = f"네이버페이 선택 실패({pay_sel}) — 오결제 방지 위해 중단"
+                return out
+            page.wait_for_timeout(800)
+        except Exception as e:
+            print(f"    [WARN] 결제수단 검증 예외: {e}")
 
         # 4) 결제하기 — id `regist_order_button` 직접 클릭
         # alert이 떠서 popup 막힐 수 있으므로 dialog handler 등록
@@ -428,9 +483,18 @@ def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_
                 # nidlogin URL이면 로그인 폼 채움. 이미 pay.naver.com이면 cookies 살아있어 skip.
                 if "nidlogin" in pay_page.url and naver_id and naver_pw:
                     try:
-                        pay_page.locator("#id").fill(naver_id)
-                        pay_page.locator("#pw").fill(naver_pw)
-                        pay_page.locator("#submit_btn").click()
+                        # ★2026-08-23 Naver 로그인 V3 UI: 제출버튼 #submit_btn → #loginBtn_row/#loginBtn_column.
+                        #   fill 은 bvsd 봇감지에 걸릴 수 있어 키 타이핑(delay)으로 입력.
+                        pay_page.locator("#id").click(); pay_page.locator("#id").fill("")
+                        pay_page.keyboard.type(naver_id, delay=120)
+                        pay_page.locator("#pw").click(); pay_page.locator("#pw").fill("")
+                        pay_page.keyboard.type(naver_pw, delay=130)
+                        pay_page.wait_for_timeout(500)
+                        for _bid in ("loginBtn_row", "loginBtn_column", "submit_btn"):
+                            _b = pay_page.locator(f"#{_bid}")
+                            if _b.count() and _b.first.is_visible():
+                                _b.first.click()
+                                break
                         pay_page.wait_for_load_state("domcontentloaded", timeout=15000)
                         pay_page.wait_for_timeout(2500)
                         # deviceConfirm — Register (#new.save)
@@ -452,11 +516,13 @@ def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_
                 TARGET_CARD = "롯데 2224"
 
                 def _active_card():
+                    # ★2026-08-23 UI: CardPlate_name 없어진 카드(머니통장 등) 대비 — active slide innerText 폴백.
                     return pay_page.evaluate("""() => {
                         const a = document.querySelector('.swiper-slide-active');
                         if (!a) return '';
                         const n = a.querySelector('[class*=CardPlate_name]');
-                        return n ? (n.innerText || '').trim() : '';
+                        if (n && (n.innerText || '').trim()) return n.innerText.trim();
+                        return (a.innerText || '').trim().replace(/\\s+/g, ' ');
                     }""")
 
                 def _nav_card(label):
