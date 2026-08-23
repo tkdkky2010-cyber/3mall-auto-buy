@@ -1,226 +1,36 @@
 {
-  "date": "2026-08-19",
+  "date": "2026-08-23",
   "account_used": "tkdkky2002",
   "products": [
     {
       "id": "1",
       "name": "이너플로라 유산균 60정",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2154750833",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
-      "events": [
-        {
-          "prmo": "P202608145877",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.20 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.20 23:59",
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 122000,
-        "member_price": 115900,
-        "card_slides": [
-          {
-            "alt": "토스페이 최대 13,000원 혜택",
-            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
-            "percent": null,
-            "price": 13000
-          },
-          {
-            "alt": "네이버페이 최대 2천원 혜택",
-            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
-            "percent": null,
-            "price": null
-          }
-        ],
-        "kakao_price": 115900,
-        "kakao_reward_pt": 11590,
-        "kakao_final_cost": 104310,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 115900,
-          "actual_reward": 5000,
-          "effective_pct": 4.3140638481449525
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 115900,
-        "options": [
-          {
-            "idx": 1,
-            "name": "[H] 유한건강생활 이너플로라 질유산균 3박스 총6개월분",
-            "list_price": 115900
-          },
-          {
-            "idx": 2,
-            "name": "[H] 유한건강생활 이너플로라 질유산균 2박스 총4개월분",
-            "list_price": 87970
-          },
-          {
-            "idx": 3,
-            "name": "[H] 유한건강생활 이너플로라 질유산균 1박스 2개월분",
-            "list_price": 49880
-          },
-          {
-            "idx": 4,
-            "name": "유한건강생활 식물성rTG알티지오메가 미니 1박스 1개월분",
-            "list_price": 23580
-          },
-          {
-            "idx": 5,
-            "name": "유한건강생활 식물성rTG알티지오메가 미니 3박스 총3개월분",
-            "list_price": 55350
-          },
-          {
-            "idx": 6,
-            "name": "유한건강생활 유한올인원종합비타민 이뮨 14일분",
-            "list_price": 32590
-          },
-          {
-            "idx": 7,
-            "name": "유한건강생활 유한올인원종합비타민 이뮨 7일분",
-            "list_price": 18430
-          },
-          {
-            "idx": 10,
-            "name": "유한건강생활 뉴오리진 당당 혈당유산균 HAC01 1박스 1개월분",
-            "list_price": 68400
-          },
-          {
-            "idx": 11,
-            "name": "[H] 뉴오리진 프로바이오틱스100억 30일분 6박스(총 6개월분)",
-            "list_price": 64030
-          },
-          {
-            "idx": 12,
-            "name": "[H] 뉴오리진 프로바이오틱스100억 30일분 3박스",
-            "list_price": 32210
-          }
-        ]
-      }
+      "simple_ranges": []
     },
     {
       "id": "1-1",
       "name": "이너플로라 유산균 30정",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2201017629&sectId=3060687",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
-      "events": [
-        {
-          "prmo": "P202608145877",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.20 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.20 23:59",
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 63900,
-        "member_price": 51120,
-        "card_slides": [
-          {
-            "alt": "토스페이 최대 13,000원 혜택",
-            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
-            "percent": null,
-            "price": 13000
-          },
-          {
-            "alt": "네이버페이 최대 2천원 혜택",
-            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
-            "percent": null,
-            "price": null
-          }
-        ],
-        "kakao_price": 51120,
-        "kakao_reward_pt": 5112,
-        "kakao_final_cost": 46008,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 51120,
-          "actual_reward": 5000,
-          "effective_pct": 9.780907668231611
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 51120,
-        "options": [
-          {
-            "idx": 1,
-            "name": "유한건강생활 뉴오리진 이너플로라 질유산균 3박스 총3개월분",
-            "list_price": 63900
-          },
-          {
-            "idx": 3,
-            "name": "유한건강생활 여성갱년기 백수오 올인원(뼈+혈행건강+기억력개선) 1박스 1개월분",
-            "list_price": 66900
-          },
-          {
-            "idx": 4,
-            "name": "유한건강생활 여성갱년기 백수오 올인원(뼈+혈행건강+기억력개선) 2박스 총2개월분",
-            "list_price": 126900
-          },
-          {
-            "idx": 7,
-            "name": "유한건강생활 전홍삼스틱 홍삼즙 오리지널 1박스 1개월분",
-            "list_price": 58900
-          },
-          {
-            "idx": 9,
-            "name": "유한건강생활 수신비책(면역+피로+항산화) 1박스 4주분",
-            "list_price": 64900
-          },
-          {
-            "idx": 10,
-            "name": "유한건강생활 천수단 녹용홍삼 활력환 15환 1박스",
-            "list_price": 95900
-          }
-        ]
-      }
+      "simple_ranges": []
     },
     {
       "id": "2",
@@ -292,7 +102,7 @@
       ],
       "max_reward": "15,000P",
       "event_end": "8.30 23:59",
-      "has_coupon": false,
+      "has_coupon": true,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [],
@@ -306,13 +116,6 @@
             "text": "5% 즉시할인",
             "percent": 5,
             "price": 144229,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "",
-            "text": "5% 즉시할인",
-            "percent": 5,
-            "price": null,
             "discount_type": "즉시할인"
           },
           {
@@ -418,9 +221,9 @@
       ],
       "max_reward": "15,000P",
       "event_end": "8.30 23:59",
-      "has_coupon": false,
+      "has_coupon": true,
       "error": null,
-      "coupon_claimed": false,
+      "coupon_claimed": true,
       "simple_ranges": [],
       "payment": {
         "qty": 2,
@@ -432,13 +235,6 @@
             "text": "5% 즉시할인",
             "percent": 5,
             "price": 141835,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "",
-            "text": "5% 즉시할인",
-            "percent": 5,
-            "price": null,
             "discount_type": "즉시할인"
           },
           {
@@ -678,21 +474,30 @@
         "member_price": 131920,
         "card_slides": [
           {
-            "alt": "토스페이 최대 13,000원 혜택",
-            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
-            "percent": null,
-            "price": 13000
+            "alt": "",
+            "text": "5% 즉시할인",
+            "percent": 5,
+            "price": 125324,
+            "discount_type": "즉시할인"
           },
           {
-            "alt": "네이버페이 최대 2천원 혜택",
-            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
-            "percent": null,
-            "price": null
+            "alt": "",
+            "text": "5% 즉시할인",
+            "percent": 5,
+            "price": null,
+            "discount_type": "즉시할인"
+          },
+          {
+            "alt": "현대홈쇼핑 현대카드 Ed2",
+            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
+            "percent": 7,
+            "price": null,
+            "discount_type": "청구할인"
           }
         ],
-        "kakao_price": 131920,
+        "kakao_price": 125324,
         "kakao_reward_pt": 10000,
-        "kakao_final_cost": 121920,
+        "kakao_final_cost": 115324,
         "paybacks": {},
         "optimal_tier": {
           "qty": 4,
@@ -744,468 +549,76 @@
       "id": "11",
       "name": "라메종드미엘 프랑스 라벤더 천연꿀 8병",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2246845189&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
-      "events": [
-        {
-          "prmo": "P202608145877",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.20 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.20 23:59",
-      "has_coupon": false,
+      "max_reward": null,
+      "event_end": null,
+      "has_coupon": true,
       "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 328000,
-        "member_price": 262400,
-        "card_slides": [
-          {
-            "alt": "",
-            "text": "5% 즉시할인",
-            "percent": 5,
-            "price": 239780,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "",
-            "text": "5% 즉시할인",
-            "percent": 5,
-            "price": null,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 239780,
-        "kakao_reward_pt": 23978,
-        "kakao_final_cost": 215802,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 262400,
-          "actual_reward": 5000,
-          "effective_pct": 1.9054878048780488
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 262400,
-        "options": []
-      }
+      "coupon_claimed": true,
+      "simple_ranges": []
     },
     {
       "id": "16",
       "name": "루솔",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2225275921",
-      "ten_percent": true,
-      "phrase": "우리가족 여름 휴가 준비 10%적립",
-      "events": [
-        {
-          "prmo": "P202608135417",
-          "name": "우리가족 여름 휴가 준비 10%적립",
-          "event_end": "8.19 23:59",
-          "tiers": [
-            {
-              "min_won": 30000,
-              "min_unit": "원",
-              "reward_pt": 3000
-            },
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 150000,
-              "min_unit": "원",
-              "reward_pt": 15000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 30000,
-          "min_unit": "원",
-          "reward_pt": 3000
-        },
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 150000,
-          "min_unit": "원",
-          "reward_pt": 15000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "8.19 23:59",
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 1,
-        "list_price": 51500,
-        "member_price": 46350,
-        "card_slides": [
-          {
-            "alt": "토스페이 최대 13,000원 혜택",
-            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
-            "percent": null,
-            "price": 13000
-          },
-          {
-            "alt": "네이버페이 최대 2천원 혜택",
-            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
-            "percent": null,
-            "price": null
-          }
-        ],
-        "kakao_price": 46350,
-        "kakao_reward_pt": 3000,
-        "kakao_final_cost": 43350,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 30000,
-          "tier_reward": 3000,
-          "nominal_pct": 10.0,
-          "actual_total": 46350,
-          "actual_reward": 3000,
-          "effective_pct": 6.472491909385113
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 46350,
-        "options": [
-          {
-            "idx": 1,
-            "name": "[루솔] 진한 배도라지즙 선물박스(60포) 배즙",
-            "list_price": 51500
-          },
-          {
-            "idx": 2,
-            "name": "[루솔] 진한 배도라지즙 선물박스(80포) 배즙",
-            "list_price": 71000
-          },
-          {
-            "idx": 3,
-            "name": "[루솔] 진한 배도라지즙 선물박스(100포) 배즙",
-            "list_price": 87000
-          },
-          {
-            "idx": 4,
-            "name": "[루솔] 진한 배도라지즙 선물박스(120포) 배즙",
-            "list_price": 103000
-          }
-        ]
-      }
+      "simple_ranges": []
     },
     {
       "id": "17",
       "name": "데이즈온 원데이 알파 8개",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2247036059&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
-      "events": [
-        {
-          "prmo": "P202608145877",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.20 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.20 23:59",
-      "has_coupon": false,
+      "max_reward": null,
+      "event_end": null,
+      "has_coupon": true,
       "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 2,
-        "list_price": 119800,
-        "member_price": 95840,
-        "card_slides": [
-          {
-            "alt": "",
-            "text": "5% 즉시할인",
-            "percent": 5,
-            "price": 81548,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "",
-            "text": "5% 즉시할인",
-            "percent": 5,
-            "price": null,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 81548,
-        "kakao_reward_pt": 8155,
-        "kakao_final_cost": 73393,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 2,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 95840,
-          "actual_reward": 5000,
-          "effective_pct": 5.217028380634391
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 47920,
-        "options": []
-      }
+      "coupon_claimed": true,
+      "simple_ranges": []
     },
     {
       "id": "22",
       "name": "올바른건강식품 와이 9박",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244934734&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
-      "events": [
-        {
-          "prmo": "P202608145877",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.20 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.20 23:59",
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 73710,
-        "member_price": 66340,
-        "card_slides": [
-          {
-            "alt": "토스페이 최대 13,000원 혜택",
-            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
-            "percent": null,
-            "price": 13000
-          },
-          {
-            "alt": "네이버페이 최대 2천원 혜택",
-            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
-            "percent": null,
-            "price": null
-          }
-        ],
-        "kakao_price": 66340,
-        "kakao_reward_pt": 6634,
-        "kakao_final_cost": 59706,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 66340,
-          "actual_reward": 5000,
-          "effective_pct": 7.5369309617123905
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 66340,
-        "options": [
-          {
-            "idx": 1,
-            "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 9박스 (총 27개월분)",
-            "list_price": 73710
-          },
-          {
-            "idx": 2,
-            "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 6박스 (총 18개월분)",
-            "list_price": 53910
-          }
-        ]
-      }
+      "simple_ranges": []
     },
     {
       "id": "25",
       "name": "유기농 석류젤리 9박(90개)",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
-      "events": [
-        {
-          "prmo": "P202608145877",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.20 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.20 23:59",
-      "has_coupon": false,
+      "max_reward": null,
+      "event_end": null,
+      "has_coupon": true,
       "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 68900,
-        "member_price": 55120,
-        "card_slides": [
-          {
-            "alt": "토스페이 최대 13,000원 혜택",
-            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
-            "percent": null,
-            "price": 13000
-          },
-          {
-            "alt": "네이버페이 최대 2천원 혜택",
-            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
-            "percent": null,
-            "price": null
-          }
-        ],
-        "kakao_price": 55120,
-        "kakao_reward_pt": 5512,
-        "kakao_final_cost": 49608,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 55120,
-          "actual_reward": 5000,
-          "effective_pct": 9.071117561683598
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 55120,
-        "options": []
-      }
+      "coupon_claimed": true,
+      "simple_ranges": []
     },
     {
       "id": "28",
@@ -1224,298 +637,57 @@
       "id": "33",
       "name": "GRN 붓기캔디",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2250831230&sectId=3060687",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
-      "events": [
-        {
-          "prmo": "P202608145877",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.20 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.20 23:59",
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 69900,
-        "member_price": 59420,
-        "card_slides": [
-          {
-            "alt": "토스페이 최대 13,000원 혜택",
-            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
-            "percent": null,
-            "price": 13000
-          },
-          {
-            "alt": "네이버페이 최대 2천원 혜택",
-            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
-            "percent": null,
-            "price": null
-          }
-        ],
-        "kakao_price": 59420,
-        "kakao_reward_pt": 5942,
-        "kakao_final_cost": 53478,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 59420,
-          "actual_reward": 5000,
-          "effective_pct": 8.41467519353753
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 59420,
-        "options": [
-          {
-            "idx": 1,
-            "name": "GRN 붓기 케어 리셋 브이 캔디 6박스 (타트체리맛)",
-            "list_price": 69900
-          },
-          {
-            "idx": 2,
-            "name": "GRN 붓기 케어 리셋 브이 캔디 3EA (타트체리맛)",
-            "list_price": 36900
-          }
-        ]
-      }
+      "simple_ranges": []
     },
     {
       "id": "34",
       "name": "데이즈온 파라다이스 버닝 9박스",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2250397383&sectId=3060687",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
-      "events": [
-        {
-          "prmo": "P202608145877",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.20 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.20 23:59",
-      "has_coupon": false,
+      "max_reward": null,
+      "event_end": null,
+      "has_coupon": true,
       "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 248000,
-        "member_price": 198400,
-        "card_slides": [
-          {
-            "alt": "",
-            "text": "5% 즉시할인",
-            "percent": 5,
-            "price": 178980,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "",
-            "text": "5% 즉시할인",
-            "percent": 5,
-            "price": null,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 178980,
-        "kakao_reward_pt": 17898,
-        "kakao_final_cost": 161082,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 198400,
-          "actual_reward": 5000,
-          "effective_pct": 2.5201612903225805
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 198400,
-        "options": []
-      }
+      "coupon_claimed": true,
+      "simple_ranges": []
     },
     {
       "id": "35",
       "name": "데이즈온 프리바이오틱스 에프오에스 트리플",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2247305088",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립",
-      "events": [
-        {
-          "prmo": "P202608145877",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.20 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        }
-      ],
+      "ten_percent": false,
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.20 23:59",
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 92000,
-        "member_price": 82800,
-        "card_slides": [
-          {
-            "alt": "",
-            "text": "5% 즉시할인",
-            "percent": 5,
-            "price": 69160,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "",
-            "text": "5% 즉시할인",
-            "percent": 5,
-            "price": null,
-            "discount_type": "즉시할인"
-          },
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 69160,
-        "kakao_reward_pt": 6916,
-        "kakao_final_cost": 62244,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 82800,
-          "actual_reward": 5000,
-          "effective_pct": 6.038647342995169
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 82800,
-        "options": []
-      }
+      "simple_ranges": []
     },
     {
       "id": "36",
       "name": "센텔리안24 더 마데카 크림 50ml 20개 (옵션3)",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546",
       "ten_percent": false,
-      "phrase": "애프터 바캉스 케어 7%적립",
-      "events": [
-        {
-          "prmo": "P202608125179",
-          "name": "애프터 바캉스 케어 7%적립",
-          "event_end": "8.19 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 3500
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 7000
-            },
-            {
-              "min_won": 150000,
-              "min_unit": "원",
-              "reward_pt": 10500
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 14000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 3500
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 7000
-        },
-        {
-          "min_won": 150000,
-          "min_unit": "원",
-          "reward_pt": 10500
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 14000
-        }
-      ],
-      "max_reward": "14,000P",
-      "event_end": "8.19 23:59",
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -1526,61 +698,11 @@
       "name": "센텔리안24 마데카크림 타임리버스 50ml 10개 (옵션6)",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546",
       "ten_percent": false,
-      "phrase": "애프터 바캉스 케어 7%적립",
-      "events": [
-        {
-          "prmo": "P202608125179",
-          "name": "애프터 바캉스 케어 7%적립",
-          "event_end": "8.19 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 3500
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 7000
-            },
-            {
-              "min_won": 150000,
-              "min_unit": "원",
-              "reward_pt": 10500
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 14000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 3500
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 7000
-        },
-        {
-          "min_won": 150000,
-          "min_unit": "원",
-          "reward_pt": 10500
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 14000
-        }
-      ],
-      "max_reward": "14,000P",
-      "event_end": "8.19 23:59",
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -1591,61 +713,11 @@
       "name": "센텔리안24 마데카크림 타이트 리프팅 50ml 20개 (옵션2)",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546",
       "ten_percent": false,
-      "phrase": "애프터 바캉스 케어 7%적립",
-      "events": [
-        {
-          "prmo": "P202608125179",
-          "name": "애프터 바캉스 케어 7%적립",
-          "event_end": "8.19 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 3500
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 7000
-            },
-            {
-              "min_won": 150000,
-              "min_unit": "원",
-              "reward_pt": 10500
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 14000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 3500
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 7000
-        },
-        {
-          "min_won": 150000,
-          "min_unit": "원",
-          "reward_pt": 10500
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 14000
-        }
-      ],
-      "max_reward": "14,000P",
-      "event_end": "8.19 23:59",
+      "phrase": "출석하면 매일 100% 적립",
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -1666,19 +738,9 @@
     }
   ],
   "ten_percent_ids": [
-    "1",
-    "1-1",
     "2",
     "3",
     "8",
-    "9",
-    "11",
-    "16",
-    "17",
-    "22",
-    "25",
-    "33",
-    "34",
-    "35"
+    "9"
   ]
 }

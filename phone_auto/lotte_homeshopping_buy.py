@@ -1081,7 +1081,7 @@ def _ignore_keywords() -> list[str]:
 
 def claim_lotte_reward(goods_no: str | None = None) -> dict:    # (search_term 제거 — 검색폐기로 미사용)
     """구매사은 적립금 신청 (G). ★**구매한 상품 상세로 직접 진입**(주문완료 화면의 구매상품 항목 탭)
-    → '구매사은·혜택' 섹션의 '최대 N% 적립' (★ignore 제외) → '광세일' 행사페이지 → '혜택 신청하기'.
+    → '구매사은·혜택' 섹션의 '최대 N% 적립'/'최대 N만 적립' (★ignore 제외) → '광세일' 행사페이지 → '혜택 신청하기'.
 
     ★검색 방식 폐기(2026-06-03 사용자 지적): 설화수 검색→랜덤상품 선택은 **구매 안 한 제품에 오claim** 위험
     (#14 실측: 자음생크림리치 구매했는데 검색결과 '자음생2종'에 적립). → 주문완료의 **그 주문 상품**만 탭해 상세 진입.
@@ -1119,12 +1119,13 @@ def claim_lotte_reward(goods_no: str | None = None) -> dict:    # (search_term �
         # 게이트: 상품 상세(GoodDetail) 진입 검증 — 주문완료에 머물렀으면(상품 미진입) SKIP.
         if screen_has("주문이 완료") or screen_has("주문완료"):
             out["skip"] = "구매상품 탭 후 상품상세 미진입(주문완료 잔류) — reward SKIP"; out["ok"] = True; return out
-    # 4) ★'구매사은 · 혜택' 섹션까지 스크롤 → 그 섹션 안의 '최대 N% 적립' 카드 탐색 (6/2 #9 라이브 확정).
+    # 4) ★'구매사은 · 혜택' 섹션까지 스크롤 → 그 섹션 안의 '최대 N% 적립'/'최대 N만 적립' 카드 탐색 (6/2 #9 라이브 확정).
     #    상품상세엔 "최대 N% 적립"이 3종 존재:
     #      ① 상단 프로모 배너 "'광세일' 구매시 최대 N% 적립금" (섹션 밖, 탭하면 향수 등 엉뚱한 페이지)
-    #      ② '구매/리뷰 적립혜택' "최대 NNNP/N원 적립" (% 없음 → 정규식에서 자동 제외)
-    #      ③ '구매사은·혜택' 섹션 카드 "최대 N% 적립" ← ★정답(탭→광세일 행사페이지→혜택 신청하기)
-    #    판별 = '구매사은' 헤더(cy) **아래** + 정규식 `최대\d+%적립`(N은 10/15/20 등 매일 변동) + ignore 제외.
+    #      ② '구매/리뷰 적립혜택' "최대 NNNP/N원 적립" (%·만 없음 → 정규식에서 자동 제외)
+    #      ③ '구매사은·혜택' 섹션 카드 "최대 N% 적립" 또는 "최대 N만(원) 적립" ← ★정답(탭→광세일 행사페이지→혜택 신청하기)
+    #    판별 = '구매사은' 헤더(cy) **아래** + 정규식 `최대\d+[%만]적립`(단위·수치 매일 변동,
+    #    2026-08-23 사용자: 8/18 '최대 5만 적립' 형식이라 %전용 정규식이 못 찾음) + ignore 제외.
     #    헤더 아래로 스코프하면 ①배너(섹션 위)·②소액카드(섹션 위)가 자동 배제됨.
     card = None
     in_section = False
@@ -1139,15 +1140,15 @@ def claim_lotte_reward(goods_no: str | None = None) -> dict:    # (search_term �
             for it in its:
                 if it["cy"] < ymin:
                     continue
-                m = re.search(r"최대\s*(\d+)\s*%\s*적립", it["text"])
+                m = re.search(r"최대\s*(\d+)\s*(?:%|만\s*원?)\s*적립", it["text"])
                 if m and not any(k in it["text"] for k in ignore):
                     cands.append((int(m.group(1)), it))
             if cands:
-                cands.sort(key=lambda x: x[0], reverse=True)     # 최고 % 적립 이벤트
+                cands.sort(key=lambda x: x[0], reverse=True)     # 최고 수치 적립 이벤트 (%·만 혼재 시 통상 카드 1장)
                 card = cands[0][1]; break
         _adb().swipe(540, 1500, 540, 900, 450); time.sleep(0.9)
     if not card:
-        out["err"] = "구매사은 '최대 N% 적립' 카드 미발견(광세일 행사상품 아닐 수 있음)"; return out
+        out["err"] = "구매사은 '최대 N%/N만 적립' 카드 미발견(광세일 행사상품 아닐 수 있음)"; return out
     out["card"] = card["text"]
     _adb().tap(card["cx"], card["cy"]); time.sleep(3.0)
     # 5) ★광세일 구매사은 행사페이지인지 게이트 검증 (선물/live 오이동 시 신청완료 오매칭 방지 — #6 교훈)
