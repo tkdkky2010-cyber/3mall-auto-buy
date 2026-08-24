@@ -25,6 +25,9 @@ CLI:
     python3 -m phone_auto.lotte_homeshopping_buy 5          # #5 라이브 (로그아웃→#5 로그인→구매)
     python3 -m phone_auto.lotte_homeshopping_buy 5 6 7      # 연속
     python3 -m phone_auto.lotte_homeshopping_buy now        # 현재화면 OCR (디버그)
+    python3 -m phone_auto.lotte_homeshopping_buy resume 5 combo=3
+        # ★결제는 됐는데 뒷처리(대장·뷰티·적립)를 못 끝냈을 때 — 주문완료 화면에서 실행.
+        #   결제를 다시 하지 않는다. 처음부터 재실행하면 이중결제 위험(2026-08-24 신설 이유).
 """
 from __future__ import annotations
 import json
@@ -1275,12 +1278,20 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
     if not pay.get("ok"):
         res["status"] = f"PAY_FAIL@{pay.get('step')}:{pay.get('err')}"; return res
     res["status"] = f"DONE(주문 {pay.get('order')})"
+    _finish_after_order(res, idx, pay.get("order"), use_card, combo_idx, goods_no)
+    return res
+
+
+def _finish_after_order(res: dict, idx: int, order: str | None, card: str | None,
+                        combo_idx: int | None, goods_no: str | None = None) -> dict:
+    """주문완료 이후 뒷정리 = 구매대장 + 카드등록 dismiss + 뷰티포인트 + 구매사은 적립.
+    ★buy_one 과 resume **양쪽에서** 부른다 (2026-08-24) — 한쪽만 고쳐져 대장·적립이
+      조용히 누락되는 걸 막으려고 분리했다(현대몰 _record_after_done 과 같은 이유)."""
     # 구매대장 기록 (JSON + 시트). 실패해도 결제 후처리엔 영향 없음.
     try:
         sys.path.insert(0, str(ROOT))
         import purchase_ledger as PL
-        PL.record_combo("롯데홈쇼핑", res.get("id"), combo_idx,
-                        order_no=pay.get("order"), card=use_card)
+        PL.record_combo("롯데홈쇼핑", res.get("id"), combo_idx, order_no=order, card=card)
     except Exception as e:
         print(f"   [ledger] 기록 실패(무시): {e}", flush=True)
     # F. 카드등록 안내(있으면 dismiss). 삼성/PAYCO 경로엔 안 뜸 → 보통 no-op.
@@ -1301,9 +1312,50 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
     return res
 
 
+def resume(idx: int, combo_idx: int | None = None, card: str | None = None,
+           goods_no: str | None = None) -> dict:
+    """★결제는 됐는데 뒷처리를 못 끝낸 건을 **현재 주문완료 화면에서** 이어서 마무리 (2026-08-24).
+
+    왜 필요한가: 롯데는 `pay_loca` 가 '주문완료 미확인(timeout)'·'롯데앱 복귀 실패' 로 죽으면
+    **실제로는 결제가 된 상태일 수 있다.** 그대로 재실행하면 이중결제다(2026-08-24 사용자 지적).
+    → 결제를 다시 하지 않고 대장·뷰티·구매사은만 채운다.
+
+    ⚠️ 주문완료 화면이 아니면 아무것도 하지 않는다(결제 대행 안 함 — 그건 buy_one 담당).
+       주문번호를 못 읽으면 대장에 번호 없이 기록되므로 화면을 벗어나기 전에 실행할 것."""
+    res = {"idx": idx, "mode": "resume", "status": None}
+    ws = wake_screen()
+    if not ws["ok"]:
+        res["status"] = f"SCREEN_LOCKED(awake={ws['awake']},keyguard={ws['keyguard']})"; return res
+    confirmed, order = _poll_order_complete(8)
+    if not confirmed:
+        res["status"] = ("NOT_ORDER_COMPLETE — 주문완료 화면이 아니다. 결제 전이면 buy_one(계정번호)로, "
+                         "결제됐는지 모르면 PC 주문내역부터 확인할 것(이중결제 방지)")
+        return res
+    try:
+        res["id"] = json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8"))["accounts"][idx - 1]["id"]
+    except Exception:
+        pass
+    res["status"] = f"DONE(주문 {order})"
+    print(f"[#{idx}] resume — 주문완료 확인({order}) → 대장·뷰티·적립만 진행", flush=True)
+    _finish_after_order(res, idx, order, card, combo_idx, goods_no)
+    return res
+
+
 def main() -> int:
     a = sys.argv[1:]
     _resolve_serial()
+    if a and a[0] == "resume":
+        idx = next((int(x) for x in a[1:] if x.isdigit()), None)
+        if idx is None:
+            print("사용: python3 -m phone_auto.lotte_homeshopping_buy resume <계정번호> [combo=N] [카드]")
+            return 2
+        cb = next((int(x.split("=", 1)[1]) for x in a if x.startswith("combo=")), None)
+        r = resume(idx, combo_idx=cb, card=next((x for x in a if x in CARD_GRID_NAME), None))
+        b, g = r.get("beauty", {}), r.get("reward", {})
+        print(f"\n===== 요약 =====\n  #{idx} {r.get('id','')}: {r['status']}  "
+              f"[{'뷰티✓' if b.get('completed') else '뷰티?'} / "
+              f"{'적립✓' if g.get('completed') or g.get('already') else '적립?'}]")
+        return 0 if str(r["status"]).startswith("DONE") else 1
     if not a or a[0] == "now":
         for t in sorted(_ocr_texts(cap()), key=lambda z: z["cy"]):
             print(f"  ({t['cx']:4d},{t['cy']:4d})  {t['text']}")
