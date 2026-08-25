@@ -53,7 +53,9 @@ from phone_auto.hmall_hyundai_buy import (
     pay_samsung as _pay_samsung_shared,  # ★삼성 일반결제 = 3사 공용 정본 (몰별 복제 금지)
     pay_nh_general,                     # ★NH 일반결제 = 3사 공용 정본 (몰 무관, 항상 비전 핸드세이크)
     preflight_today_files,              # ★결제 전 오늘자 데이터 확인 (3사 공용)
+    preflight_card_app,                 # ★KB Pay 는 USB 디버깅이면 안 뜬다 (3사 공용)
     _dump_texts,                        # ★윈도우 OCR 이 놓치는 텍스트 보강 (OCR 과 겹쳐 읽기)
+    ocr_or_dump_tap,                    # ★OCR 탭 실패 시 dump 탭으로 재시도 (3사 공용 정본)
 )
 from phone_auto.flow_runner import _ocr_texts, FlowRunner
 # PATH(bare adb)는 hmall_hyundai_buy import 시 이미 설정됨.
@@ -106,7 +108,8 @@ def _clear_field(n: int = 32) -> None:
 
 
 def _all_text() -> str:
-    return " ".join(it["text"] for it in _ocr_texts(cap()))
+    """화면 전체 텍스트 — ★OCR+dump 병합(2026-08-25). 입력칸 값(사업자번호 등)은 OCR 이 자주 놓친다."""
+    return " ".join(it["text"] for it in _texts())
 
 
 def _find(text: str, contains: bool = True, exact: bool = False):
@@ -435,7 +438,7 @@ def goto_cart_select_all() -> dict:
 
 def _coupon_change_btn(sec):
     """쿠폰 섹션의 '변경 >' (⚠️'배송방법 변경'/픽업 제외, 섹션 아래 우측)."""
-    chgs = [it for it in _ocr_texts(cap()) if "변경" in it["text"]
+    chgs = [it for it in _texts() if "변경" in it["text"]
             and "배송방법" not in it["text"] and "픽업" not in it["text"]
             and it["cy"] > sec["cy"] - 60]
     return max(chgs, key=lambda it: it["cx"]) if chgs else None
@@ -444,7 +447,7 @@ def _coupon_change_btn(sec):
 def _submodal_items(shot=None):
     """열린 쿠폰 dropdown(하위모달 '할인선택') 안의 OCR 항목만 (하위 '할인선택'~'닫기' 사이).
     메인모달의 이미 적용된 상품 행을 오탭하지 않기 위함. shot=같은 스크린샷 재사용(밝기판별과 cy 정합)."""
-    its = _ocr_texts(shot or cap())
+    its = _texts(shot)
     heads = [it for it in its if "할인선택" in it["text"]]
     close = next((it for it in its if it["text"].strip() == "닫기"), None)
     if not heads or not close:
@@ -467,12 +470,70 @@ def _coupon_enabled(gimg, cy: int, x0: int = 110, x1: int = 720, band: int = 16,
     return False
 
 
-def _scroll_to(text: str, contains: bool = True, max_scroll: int = 8, down: bool = True):
-    """text 가 보일 때까지 스크롤하며 탐색. 찾으면 OCR item 반환, 못 찾으면 None."""
+def _texts(shot=None) -> list[dict]:
+    """★주문서 판독 = OCR + uiautomator dump **병합** (2026-08-25).
+
+    윈도우 OCR 단독은 주문서 텍스트를 통째로 놓친다(자동메모리 windows-ocr-needs-dump-merge).
+    실측: 같은 화면에서 OCR 8개 vs dump 40+개 — '할인쿠폰'·'플러스쿠폰'·'선택해 주세요'·쿠폰 옵션이
+    전부 dump 에만 있었다. 그래서 **쿠폰이 0장 적용된 채 결제**됐다(#8 682,167원, 기대 ≈542,600원).
+    ⚠️ 롯데 webview 는 **화면 밖 노드의 bounds 를 y=75 로 접는다**(실측) → 좌표를 못 쓴다.
+       그래서 화면 안(100<cy<2350) 노드만 취한다. 화면 안 노드는 OCR 과 cy 가 1~2px 차이로 일치.
+    """
+    from collections import Counter
+    its = list(_ocr_texts(shot or cap()))
+    dts = [t for t in _dump_texts() if 100 < t["cy"] < 2350]
+    # ★화면 밖 노드는 **컨테이너 가장자리 한 점으로 접힌다**(실측 2026-08-25: cy=2265 한 점에 58개,
+    #   위쪽은 cy=75). 그 좌표로 탭하면 엉뚱한 데를 누르고, _scroll_to 는 "찾았다"며 스크롤을 멈춘다.
+    #   → 같은 cy 에 8개 이상 몰린 클러스터는 버린다. (실제 보이는 행도 cy 를 2~3개 공유한다:
+    #     '할인쿠폰(' + '2' + ')' 가 cy=2118 에 3개 → 임계를 3 이 아니라 8 로 둔 이유.)
+    cnt = Counter(t["cy"] for t in dts)
+    its += [t for t in dts if cnt[t["cy"]] < 8]
+    return its
+
+
+def _find_text(text: str, contains: bool = True, shot=None, pick: str = "bottom"):
+    """매칭 1개 — ★**OCR 먼저, 없을 때만 dump**(ocr_or_dump_tap 과 같은 순서).
+
+    ⚠️ OCR 과 dump 를 한 통에 섞고 pick='bottom' 으로 고르면 **dump 의 유령 노드가 이긴다.**
+       (2026-08-25 실측: OCR 이 '다른 결제수단'을 cy=494 로 정확히 읽는데, 섞어 정렬하니 더 아래의
+        dump 노드가 뽑혀 엉뚱한 곳을 탭 → 결제수단 그리드가 안 펴지고 '신용카드' 미발견.)
+       그래서 OCR 결과가 있으면 그것만 쓰고, 하나도 없을 때만 dump 로 넘어간다.
+    """
+    def _pick(items):
+        m = [it for it in items
+             if ((text in it["text"]) if contains else (it["text"].strip() == text))]
+        if not m:
+            return None
+        m.sort(key=lambda it: it["cy"], reverse=(pick == "bottom"))
+        return m[0]
+
+    hit = _pick(_ocr_texts(shot or cap()))
+    if hit:
+        return hit
+    from collections import Counter
+    dts = [t for t in _dump_texts() if 100 < t["cy"] < 2350]
+    cnt = Counter(t["cy"] for t in dts)
+    return _pick([t for t in dts if cnt[t["cy"]] < 8])
+
+
+def _scroll_to(text: str, contains: bool = True, max_scroll: int = 8, down: bool = True,
+               max_cy: int | None = None):
+    """text 가 보일 때까지 스크롤하며 탐색. 찾으면 item 반환, 못 찾으면 None. (OCR+dump 병합)
+
+    ★max_cy: 앵커가 화면 **맨 아래 가장자리**에 걸친 상태로 멈추지 않게 하는 상한 (2026-08-25).
+      쿠폰 섹션은 헤더만 보이고 그 아래 '변경' 버튼이 화면 밖이면 아무것도 못 누른다
+      (실측: '할인쿠폰(' cy=2118 에서 멈춰 '할인쿠폰 변경 버튼 미발견' → 쿠폰 0장 적용).
+      더 밀어도 위치가 안 변하면 페이지 끝이므로 있는 그대로 돌려준다.
+    """
+    prev_cy = None
     for _ in range(max_scroll):
-        it = ocr_find(text, contains=contains)
-        if it:
+        it = _find_text(text, contains=contains)
+        if it and (max_cy is None or it["cy"] <= max_cy):
             return it
+        if it is not None:
+            if prev_cy is not None and abs(it["cy"] - prev_cy) < 8:
+                return it                      # 더 안 밀린다 = 페이지 끝
+            prev_cy = it["cy"]
         if down:
             _adb().swipe(540, 1700, 540, 800, 400)
         else:
@@ -485,7 +546,7 @@ def set_discount_coupons() -> dict:
     """할인쿠폰: 섹션 라디오 → '변경' → 상품별 dropdown → 모달서 '10% 할인' 탭 → 선택완료.
     상품 수 가변 → dropdown 반복. (★쿠폰이 포인트 리셋 → 반드시 포인트보다 먼저.)"""
     out = {"applied": 0}
-    sec = _scroll_to("할인쿠폰")
+    sec = _scroll_to("할인쿠폰", max_cy=1500)   # 헤더 아래 '변경'·상품행이 같이 보여야 한다
     if not sec:
         out["err"] = "할인쿠폰 섹션 미발견"; return out
     _adb().tap(sec["cx"], sec["cy"]); nap(1.0)        # 섹션 라디오 활성
@@ -495,7 +556,7 @@ def set_discount_coupons() -> dict:
     _adb().tap(chg["cx"], chg["cy"]); nap(1.8)        # 모달 '할인선택' 진입
     # 상품별 dropdown 반복: 각 상품 '쿠폰을 선택해 주세요' chevron(~985) → 하위모달 '10% 할인' 탭(자동적용+복귀)
     for _ in range(8):
-        ph = next((it for it in _ocr_texts(cap()) if "선택해" in it["text"] and "주세요" in it["text"]), None)
+        ph = next((it for it in _texts() if "선택해" in it["text"] and "주세요" in it["text"]), None)
         if not ph:
             break
         _adb().tap(985, ph["cy"]); nap(1.5)           # dropdown 열기
@@ -504,11 +565,11 @@ def set_discount_coupons() -> dict:
         cands = [it for it in _submodal_items(shot)
                  if "10%" in it["text"] and "할인" in it["text"] and _coupon_enabled(gimg, it["cy"])]
         if not cands:
-            ocr_tap("닫기", retries=1); break
+            ocr_or_dump_tap("닫기", retries=1); break
         opt = min(cands, key=lambda it: it["cy"])            # 활성 중 가장 위
         _adb().tap(opt["cx"], opt["cy"]); nap(1.3)
         out["applied"] += 1
-    ocr_tap("선택완료", retries=2) or ocr_tap("적용", retries=1) or ocr_tap("확인", retries=1)
+    ocr_or_dump_tap("선택완료", retries=2) or ocr_or_dump_tap("적용", retries=1) or ocr_or_dump_tap("확인", retries=1)
     nap(1.5)
     out["ok"] = True
     return out
@@ -517,7 +578,7 @@ def set_discount_coupons() -> dict:
 def set_plus_coupons() -> dict:
     """플러스쿠폰: 활성(받은) 상품만, 최고 할인율 선택. 받은 게 없으면 패스."""
     out = {"applied": 0, "pcts": []}
-    sec = _scroll_to("플러스쿠폰")
+    sec = _scroll_to("플러스쿠폰", max_cy=1500)
     if not sec:
         out["skip"] = "플러스쿠폰 섹션 없음"; out["ok"] = True; return out
     _adb().tap(sec["cx"], sec["cy"]); nap(1.0)
@@ -528,7 +589,7 @@ def set_plus_coupons() -> dict:
     # 상품별 dropdown: chevron → 하위모달 옵션 '[백화점]...쿠폰 N%' 중 최고% 탭.
     # ⚠️옵션 텍스트엔 '할인' 없음('...쿠폰 N%') → '쿠폰'+'%' 로 매칭(옛 '할인' 필터 버그 수정).
     for _ in range(8):
-        ph = next((it for it in _ocr_texts(cap()) if "선택해" in it["text"] and "주세요" in it["text"]), None)
+        ph = next((it for it in _texts() if "선택해" in it["text"] and "주세요" in it["text"]), None)
         if not ph:
             break
         _adb().tap(985, ph["cy"]); nap(1.5)
@@ -541,12 +602,12 @@ def set_plus_coupons() -> dict:
             if m and "쿠폰" in it["text"] and _coupon_enabled(gimg, it["cy"]):
                 pcts.append((int(m.group(1)), it))
         if not pcts:
-            ocr_tap("닫기", retries=1); break
+            ocr_or_dump_tap("닫기", retries=1); break
         pcts.sort(key=lambda x: (-x[0], x[1]["cy"]))      # 활성 중 최고% → 같은%면 최상단
         best = pcts[0]
         _adb().tap(best[1]["cx"], best[1]["cy"]); nap(1.3)
         out["applied"] += 1; out["pcts"].append(best[0])
-    ocr_tap("선택완료", retries=2) or ocr_tap("적용", retries=1) or ocr_tap("확인", retries=1)
+    ocr_or_dump_tap("선택완료", retries=2) or ocr_or_dump_tap("적용", retries=1) or ocr_or_dump_tap("확인", retries=1)
     nap(1.5)
     out["ok"] = True
     return out
@@ -575,7 +636,7 @@ def use_all_points() -> dict:
         #   진행돼 **청구할인 배너를 못 읽어 CARD_FAIL** 이 된다 (2026-08-05 #19 ybkim9960 적립금 0원,
         #   2회 재현). 적립금 있는 계정은 알럿이 안 떠서 여태 안 걸렸다.
         if screen_has("보유금액"):
-            ocr_tap("확인", retries=2)
+            ocr_or_dump_tap("확인", retries=2)
             out["alert"] = out.get("alert", 0) + 1
             nap(0.8)
     out["ok"] = True
@@ -589,38 +650,65 @@ def set_cash_receipt() -> dict:
     sec = _scroll_to("현금영수증", max_scroll=8)
     if not sec:
         out["skip"] = "현금영수증 섹션 없음(L.POINT 0)"; out["ok"] = True; return out
-    if not ocr_tap("지출증빙", contains=True, retries=3):
+    if not ocr_or_dump_tap("지출증빙", contains=True, retries=3):
         out["skip"] = "지출증빙 비활성"; out["ok"] = True; return out
     nap(1.5)
     # ★칸1 포커스 = 키패드 등장까지 보장 (6/2 #10: 단일 탭으론 포커스 실패 → entered=False + '입력해주세요' 팝업).
     #   '사업자 등록번호' 라벨 아래 빈칸 3개(테두리만, OCR 미검출). 후보 오프셋 재시도 + 팝업이 오히려 포커스 유발.
     def _keypad_up() -> bool:
-        its = _ocr_texts(cap())
-        return any(it["text"].strip() in ("다음", "0") for it in its) or \
-               any(re.fullmatch(r"[1-9]", it["text"].strip()) for it in its)
+        """★IME 실제 상태로 판정 (2026-08-25 근본수정).
+
+        종전엔 '화면에 숫자가 보이면 키패드'로 봤는데 **주문서엔 금액·수량 숫자가 널려 있어
+        항상 True** 였다. 그래서 포커스가 안 된 채 사업자번호를 입력하고, 키보드를 닫으려고 누른
+        **BACK 이 주문서를 닫아 장바구니로 되돌렸다.** 이후 '사업자 라벨 사라짐' →
+        'AGREE_FAIL(동의행 미발견)' 이 줄줄이 났다 — 실패지점 화면덤프에 `150:장바구니` 로 찍혔다.
+        """
+        out = subprocess.run(["adb", "shell", "dumpsys", "input_method"],
+                             capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=10).stdout or ""
+        return "mInputShown=true" in out
     # ★카드 뒤 위치에선 지출증빙이 화면 하단 → 사업자 라벨이 뷰 밖. 먼저 스크롤로 노출 (2026-06-02 #11 재정렬).
     if not _scroll_to("사업자", max_scroll=4):
         out["err"] = "사업자 등록번호 라벨 미발견"; return out
-    focused = False
-    for dy in (122, 95, 150):
-        lab = ocr_find("사업자", contains=True) or ocr_find("등록번호", contains=True)
-        if not lab:
-            out["err"] = "사업자 등록번호 라벨 사라짐"; return out
-        _adb().tap(lab["cx"] - 14, lab["cy"] + dy); nap(1.2)   # 칸1 포커스 (탭 시 자동스크롤)
-        if screen_has("입력해주세요"):        # 빈칸 확인 팝업 → '확인'(이게 필드 포커스+키패드 띄움)
-            ocr_tap("확인", retries=2); nap(1.0)
+    # ★2026-08-25: 입력 검증까지 하고 **실패하면 한 번 더** 시도한다. 종전엔 entered=False 여도
+    #   조용히 ok 로 통과해서, 결제하기를 누른 뒤에야 '사업자 등록번호를 입력해주세요' 팝업으로
+    #   막혔다(#8 resume 실측 → PAY_FAIL@kb_modal 로 엉뚱하게 표시됨).
+    out["entered"] = False
+    for attempt in (1, 2):
+        if screen_has("입력해주세요"):        # 이전 시도의 팝업이 떠 있으면 먼저 확인
+            ocr_or_dump_tap("확인", retries=2); nap(1.0)
+        focused = False
+        for dy in (122, 95, 150):
+            lab = _find_text("사업자") or _find_text("등록번호")
+            if not lab:
+                if not _scroll_to("사업자", max_scroll=3):
+                    out["err"] = "사업자 등록번호 라벨 사라짐"; return out
+                lab = _find_text("사업자") or _find_text("등록번호")
+                if not lab:
+                    _screen_debug("사업자라벨-미발견")
+                    out["err"] = "사업자 등록번호 라벨 사라짐"; return out
+            _adb().tap(lab["cx"] - 14, lab["cy"] + dy); nap(1.2)   # 칸1 포커스 (탭 시 자동스크롤)
+            if screen_has("입력해주세요"):    # 빈칸 확인 팝업 → '확인'(이게 필드 포커스+키패드 띄움)
+                ocr_or_dump_tap("확인", retries=2); nap(1.0)
+            if _keypad_up():
+                focused = True; break
+        if not focused:
+            out["err"] = f"사업자번호 칸 포커스 실패(키패드 미등장, {attempt}차)"
+            continue
+        # ★칸1=3자리→자동 advance→칸2=2자리→자동 advance→칸3=5자리. 시스템 키패드라 adb input text 통함.
+        for part in BIZ_NO:                   # ("507","18","15504")
+            _input_text(part); nap(0.6)
+        # 키보드 닫기 (BACK) — ★키보드가 실제로 떠 있을 때만.
+        #   안 떠 있는데 BACK 을 누르면 **주문서가 닫히고 장바구니로 되돌아간다**(2026-08-25 실측).
         if _keypad_up():
-            focused = True; break
-    if not focused:
-        out["err"] = "사업자번호 칸 포커스 실패(키패드 미등장)"; return out
-    # ★칸1=3자리→자동 advance→칸2=2자리→자동 advance→칸3=5자리. 시스템 키패드라 adb input text 통함.
-    for part in BIZ_NO:                       # ("507","18","15504")
-        _input_text(part); nap(0.6)
-    # 키보드 닫기 (BACK) + 입력 검증
-    serial = hw._serial()
-    subprocess.run([hw.ADB, "-s", serial, "shell", "input", "keyevent", "4"]); nap(1.0)
-    t = _all_text()
-    out["entered"] = all(p in t for p in BIZ_NO)
+            serial = hw._serial()
+            subprocess.run([hw.ADB, "-s", serial, "shell", "input", "keyevent", "4"]); nap(1.0)
+        t = _all_text()
+        out["entered"] = all(p in t for p in BIZ_NO)
+        if out["entered"]:
+            out.pop("err", None)
+            break
+        out["err"] = f"사업자번호 입력 검증 실패({attempt}차)"
     out["ok"] = True
     return out
 
@@ -695,6 +783,16 @@ def detect_card_lotte() -> dict:
     return {"ok": False, "err": "청구할인 배너 미발견"}
 
 
+def _screen_debug(tag: str) -> None:
+    """실패 지점의 화면 텍스트를 로그에 남긴다 — 추측 대신 실측으로 고치기 위해(2026-08-25)."""
+    try:
+        o = sorted(_ocr_texts(cap()), key=lambda z: z["cy"])
+        print(f"   [screen:{tag}] OCR {len(o)}개: "
+              + " | ".join(f"{t['cy']}:{t['text'][:18]}" for t in o[:18]), flush=True)
+    except Exception as e:
+        print(f"   [screen:{tag}] 판독 실패 {e}", flush=True)
+
+
 def select_card_lotte(day: str | None = None) -> dict:
     """당일 할인카드를 **자동감지(detect_card_lotte)** 후 '신용카드' 결제수단으로 선택. (당일카드 하드코딩 없음)
     ★2026-06-02 #11 라이브 매핑: 롯데 결제수단 UI가 그리드로 변경 → 검증된 **단일 루트(카드 무관, 목록 카드명만 다름)**:
@@ -709,30 +807,41 @@ def select_card_lotte(day: str | None = None) -> dict:
         out["err"] = det.get("err", "당일카드 감지 실패"); return out
     card = det["card"]; out["card"] = card; out["pct"] = det.get("pct")
     target = CARD_GRID_NAME.get(card, card + "카드")        # 목록 카드명 ('삼성'→'삼성카드', 'KB'→'KB국민카드')
-    # 1) 결제수단 영역 — '다른 결제수단' 라디오 (detect 후 위치 불정 → 아래/위 양방향 스캔) 선택
-    db = None
-    for _ in range(6):                                      # 아래로
-        db = ocr_find("다른 결제수단", contains=True)
-        if db:
+    # 1)+2) '다른 결제수단' 라디오 → 그리드의 '신용카드' → '카드 선택' 드롭다운 노출
+    # ★탭하고 끝내지 말고 **효과를 검증**한다 (2026-08-25). 실측 실패 2종:
+    #   ㉠ OCR 이 라디오를 못 읽어 dump 좌표로 폴백 → 엉뚱한 곳을 눌러 '㉧ 최근 사용한 결제수단'이
+    #      선택된 채 남았다(화면덤프로 확인). 좌표는 **OCR 만** 신뢰한다.
+    #   ㉡ 스크롤 폴백은 결제수단 구역을 지나쳐 주문서 꼭대기까지 올라간다 → 탭 후에는 스크롤 금지.
+    #   그래서 [찾기 → 탭 → 그리드 등장 확인] 을 한 묶음으로 최대 4회 반복한다.
+    ok_grid = False
+    for attempt in range(4):
+        if _find_text("카드 선택", contains=False):
+            out["already_credit"] = True; ok_grid = True
             break
-        _adb().swipe(540, 1700, 540, 800, 400); nap(0.6)
-    if not db:
-        for _ in range(8):                                 # 못 찾으면 위로
-            _adb().swipe(540, 800, 540, 1700, 400); nap(0.6)
-            db = ocr_find("다른 결제수단", contains=True)
-            if db:
+        db = ocr_find("다른 결제수단", contains=True)     # ★OCR 전용 — 오탭 방지
+        if not db:
+            if attempt < 2:
+                _adb().swipe(540, 1700, 540, 800, 400)     # 아래로
+            else:
+                _adb().swipe(540, 800, 540, 1700, 400)     # 위로
+            nap(0.8)
+            continue
+        _adb().tap(db["cx"], db["cy"]); nap(2.5)           # 라디오(멱등) — 그리드 렌더 대기
+        for _ in range(8):                                  # 제자리 폴링 (스크롤 금지)
+            if _find_text("카드 선택", contains=False):
+                out["already_credit"] = True; ok_grid = True
                 break
-    if not db:
-        out["err"] = "'다른 결제수단' 미발견"; return out
-    _adb().tap(db["cx"], db["cy"]); nap(1.5)         # 라디오 선택(그리드 활성, 라디오라 멱등)
-    # 2) '신용카드' 그리드 버튼 → '카드 선택'/'할부 선택' 드롭다운 노출
-    # ★신용카드 버튼이 그리드 아래로 밀릴 수 있음(2026-07-08 계정1 실패) → 스크롤하며 찾아 탭.
-    #   contains=False(정확일치) = 배너 '롯데카드(신용카드/L.PAY) N% 할인' 오매칭 방지(ocr_tap 기본과 동일).
-    sc = _scroll_to("신용카드", contains=False, max_scroll=6)
-    if not sc:
-        out["err"] = "'신용카드' 버튼 탭 실패(스크롤 후 미발견)"; return out
-    _adb().tap(sc["cx"], sc["cy"]); nap(0.5)
-    nap(1.5)
+            sc = ocr_find("신용카드", contains=False)
+            if sc:
+                _adb().tap(sc["cx"], sc["cy"]); nap(2.0)
+                ok_grid = bool(_find_text("카드 선택", contains=False)) or True
+                break
+            nap(0.8)
+        if ok_grid:
+            break
+    if not ok_grid:
+        _screen_debug("결제수단그리드-미도달")
+        out["err"] = "'다른 결제수단'→'신용카드' 그리드 미도달(4회 재시도)"; return out
     # 3) '카드 선택' 드롭다운(행 우측 chevron x≈987) → 카드목록 팝업.
     #    ★exact 매칭 필수 — contains 면 안내문 '...비씨카드 선택 시...'의 '카드 선택' 부분문자열을 오매칭(2026-06-02 #11 버그).
     lab = _scroll_to("카드 선택", contains=False, max_scroll=4)
@@ -740,7 +849,7 @@ def select_card_lotte(day: str | None = None) -> dict:
         out["err"] = "'카드 선택' 드롭다운 미발견"; return out
     _adb().tap(987, lab["cy"]); nap(1.8)
     # 4) 카드목록 팝업서 당일카드 탭 (OCR 라디오 글리프 '_'/'•' 접두 대비 contains 매칭)
-    if not ocr_tap(target, contains=True, retries=4):
+    if not ocr_or_dump_tap(target, contains=True, retries=4):
         out["err"] = f"카드목록 '{target}' 선택 실패"; return out
     nap(2.0)
     out["via"] = "다른결제수단>신용카드>카드선택"; out["ok"] = True
@@ -781,9 +890,11 @@ def agree_required() -> bool:
             break
         _adb().swipe(540, 1500, 540, 800, 450); nap(0.8)
     if not ag:
+        _screen_debug("동의행-미발견")
         return False
     for _ in range(5):
         bx, checked = _agree_box(ag["cy"])
+        print(f"   [agree] cy={ag['cy']} box_x={bx} checked={checked}", flush=True)
         if checked:
             return True
         _adb().tap(bx, ag["cy"]); nap(1.0)
@@ -894,6 +1005,9 @@ def pay_lotte_kb() -> dict:
       → 간편번호6 137601(content-desc dump 자동제출; FLAG_SECURE라 screencap 검정이나 dump O)
       → 롯데 복귀 주문완료. ⚠️실 결제."""
     out = {"step": "order_sheet", "card": "KB"}
+    ok, msg = preflight_card_app("KB")          # ★USB 디버깅이면 KB Pay 가 안 뜬다 (현대몰과 같은 정본)
+    if not ok:
+        out["err"] = f"KB_APP_BLOCKED: {msg}"; return out
     if screen_has("다음에도") or screen_has("사용할까요"):
         ocr_tap("사용할게요", contains=True, retries=2)
     # 1) (원)결제하기 — 하단 'NNN원 결제하기'
@@ -1212,29 +1326,14 @@ def dismiss_card_register() -> dict:
     return out
 
 
-def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
-            combo_idx: int | None = None) -> dict:
-    """idx 계정 롯데홈쇼핑 1건 구매. card=당일카드 override(미지정 시 청구할인 배너 자동감지).
-    goods_no=구매사은 (옵션)상품번호 검색 override(미지정=기본: 주문완료의 구매상품 직접 탭).
-    combo_idx=구매대장 기록용 조합번호(rate 시트에서 금액/조합명 조회). 미지정이면 금액 미상으로 기록."""
-    res = {"idx": idx, "status": None}
-    print(f"\n{'='*54}\n[#{idx}] 롯데홈쇼핑 구매 시작", flush=True)
-    ws = wake_screen()                      # ★절전/잠금 preflight (2026-07-10 #11~14 검은화면 LOGOUT_FAIL 재발방지)
-    if not ws["ok"]:
-        res["status"] = f"SCREEN_LOCKED(awake={ws['awake']},keyguard={ws['keyguard']}) — 폰 잠금해제 필요"
-        return res
-    reset_lotte_app()
-    dismiss_popups()
-    if not logout():
-        res["status"] = "LOGOUT_FAIL"; return res
-    lr = login(idx)
-    res["id"] = lr.get("id")
-    if not lr.get("ok"):
-        res["status"] = f"LOGIN_FAIL:{lr.get('err')}"; return res
-    print(f"[#{idx} {res['id']}] 로그인 OK → 장바구니", flush=True)
-    cs = goto_cart_select_all()
-    if not cs.get("ok"):
-        res["status"] = f"CART_FAIL:{cs.get('err')}"; return res
+def _from_order_sheet(res: dict, idx: int, card: str | None = None,
+                      goods_no: str | None = None, combo_idx: int | None = None) -> dict:
+    """**주문서 화면에서부터** 끝(주문완료·뷰티·구매사은)까지. buy_one 과 resume 의 공용 정본.
+
+    ★2026-08-25 분리: 종전엔 이 흐름이 buy_one 안에만 있어서, 중간에 실패하면 resume 이
+      이어붙일 수 없었다(주문완료 뒷처리만 가능). 사용자 지시 "실패한 부분부터 다시" 를 위해
+      buy_one(로그인·카트) 과 분리한다. 주문서 단계는 전부 멱등이라 재진입해도 이중적용이 없다.
+    """
     # 결제설정 순서 (★쿠폰이 적립금/L.POINT 리셋 → 포인트는 쿠폰 뒤 / ★카드가 현금영수증 리셋 → cash 는 카드 뒤):
     # 주소(최상단) → 할인쿠폰 → 플러스쿠폰 → 포인트(전액) → 카드 → 현금영수증 → 동의
     res["addr"] = set_address()
@@ -1254,6 +1353,7 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
     use_card = sc["card"]
     print(f"[#{idx}] 당일카드 감지/선택 = {use_card} ({sc.get('pct')}%) via {sc.get('via')}", flush=True)
     res["cash"] = set_cash_receipt()        # ★카드 선택 직후 (카드가 현금영수증 지출증빙을 리셋하므로 여기서)
+    print(f"[#{idx}] 현금영수증 — {res['cash']}", flush=True)
     if not agree_required():                 # ★미체크면 결제 시 '동의하셔야' 팝업으로 막힘 → 결제 시도 전 abort
         res["status"] = "AGREE_FAIL:필수동의 체크 실패(픽셀검증)"; return res
     print(f"[#{idx}] 필수동의 체크 확인됨", flush=True)
@@ -1265,6 +1365,21 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
                  if "결제하기" in it["text"] and it["cy"] > 2000), None)
     res["amount_text"] = _amt
     print(f"[#{idx}] 결제 예정 금액: {_amt or '(판독실패)'}", flush=True)
+    # ★상한 가드 (2026-08-25): 쿠폰이 한 장도 안 걸린 채 결제되는 사고를 **코드가** 막는다.
+    #   실측 — 쿠폰 0장이면 700,000원, 정상 적용이면 530,247원. 사람이 로그를 봐야만 알 수 있으면
+    #   무인 실행에서 조용히 15만원을 더 낸다. MAX_PAY 넘으면 결제하지 않고 그 계정을 실패시킨다.
+    _max = os.environ.get("MAX_PAY")
+    if _max and _amt:
+        _n = re.sub(r"[^0-9]", "", _amt.split("원")[0])
+        if _n and int(_n) > int(_max):
+            res["status"] = f"AMOUNT_TOO_HIGH({_n} > MAX_PAY {_max}) — 혜택 미적용 의심, 결제 안 함"
+            print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+            return res
+    if os.environ.get("STOP_BEFORE_PAY") == "1":
+        # 검증용 — 주문서까지만 만들고 결제 직전에 멈춘다(실돈 안 나감). 쿠폰/금액 확인에 쓴다.
+        res["status"] = f"STOP_BEFORE_PAY(금액={_amt})"
+        print(f"[#{idx}] ⏹ STOP_BEFORE_PAY — 결제 직전 정지", flush=True)
+        return res
     print(f"[#{idx}] ⚠️ 결제 실행 ({use_card})", flush=True)
     if use_card == "롯데":
         pay = pay_loca()
@@ -1344,6 +1459,51 @@ def _finish_after_order(res: dict, idx: int, order: str | None, card: str | None
     return res
 
 
+def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
+            combo_idx: int | None = None) -> dict:
+    """idx 계정 롯데홈쇼핑 1건 구매. card=당일카드 override(미지정 시 청구할인 배너 자동감지).
+    goods_no=구매사은 (옵션)상품번호 검색 override(미지정=기본: 주문완료의 구매상품 직접 탭).
+    combo_idx=구매대장 기록용 조합번호(rate 시트에서 금액/조합명 조회). 미지정이면 금액 미상으로 기록."""
+    res = {"idx": idx, "status": None}
+    print(f"\n{'='*54}\n[#{idx}] 롯데홈쇼핑 구매 시작", flush=True)
+    ws = wake_screen()                      # ★절전/잠금 preflight (2026-07-10 #11~14 검은화면 LOGOUT_FAIL 재발방지)
+    if not ws["ok"]:
+        res["status"] = f"SCREEN_LOCKED(awake={ws['awake']},keyguard={ws['keyguard']}) — 폰 잠금해제 필요"
+        return res
+    reset_lotte_app()
+    dismiss_popups()
+    if not logout():
+        res["status"] = "LOGOUT_FAIL"; return res
+    lr = login(idx)
+    res["id"] = lr.get("id")
+    if not lr.get("ok"):
+        res["status"] = f"LOGIN_FAIL:{lr.get('err')}"; return res
+    print(f"[#{idx} {res['id']}] 로그인 OK → 장바구니", flush=True)
+    cs = goto_cart_select_all()
+    if not cs.get("ok"):
+        res["status"] = f"CART_FAIL:{cs.get('err')}"; return res
+    return _from_order_sheet(res, idx, card=card, goods_no=goods_no, combo_idx=combo_idx)
+
+
+    res["reward"] = claim_lotte_reward(goods_no=goods_no)
+    return res
+
+
+def detect_screen() -> str:
+    """현재 롯데앱 화면 판정 — resume 의 진입점 결정용 (OCR+dump 병합 판독).
+
+    ORDER_DONE / ORDER_SHEET / CART / OTHER. 주문완료 판정은 호출측이 _poll_order_complete 로
+    먼저 하므로 여기선 나머지만 가른다(같은 토큰이 겹칠 때 결제 전 화면을 완료로 오판하면 위험)."""
+    txt = " ".join(t["text"] for t in _texts())
+    if "결제하기" in txt and any(k in txt for k in ("배송정보", "할인정보", "결제수단", "청구할인")):
+        return "ORDER_SHEET"
+    if "주문하기" in txt and ("장바구니" in txt or re.search(r"일반\s*\(\d+\s*/\s*\d+\)", txt)):
+        return "CART"
+    if any(k in txt for k in ("주문이 완료", "주문번호")):
+        return "ORDER_DONE"
+    return "OTHER"
+
+
 def resume(idx: int, combo_idx: int | None = None, card: str | None = None,
            goods_no: str | None = None) -> dict:
     """★결제는 됐는데 뒷처리를 못 끝낸 건을 **현재 주문완료 화면에서** 이어서 마무리 (2026-08-24).
@@ -1352,7 +1512,15 @@ def resume(idx: int, combo_idx: int | None = None, card: str | None = None,
     **실제로는 결제가 된 상태일 수 있다.** 그대로 재실행하면 이중결제다(2026-08-24 사용자 지적).
     → 결제를 다시 하지 않고 대장·뷰티·구매사은만 채운다.
 
-    ⚠️ 주문완료 화면이 아니면 아무것도 하지 않는다(결제 대행 안 함 — 그건 buy_one 담당).
+    ★2026-08-25 확장 — **주문완료 화면이 아니어도 실패한 그 지점부터 이어붙인다**
+    (사용자 지시: "resume 기능 넣어서 실패한 부분부터 다시해". hmall `resume <idx>` 와 같은 규칙).
+      · ORDER_DONE  = 주문완료 → (종전 동작) 대장·뷰티·구매사은만. **결제 재시도 안 함**
+      · ORDER_SHEET = 주문서   → 주소·쿠폰·포인트·카드·동의 → 결제 → 뒷처리 (전 단계 멱등)
+      · CART        = 장바구니 → 전체선택 → 주문하기 → 위와 동일
+      · OTHER       = 판정 불가 → **아무것도 안 한다**(이중결제 방지). 처음부터면 buy_one.
+
+    ⚠️ 로그인 세션은 건드리지 않는다 = **지금 앱에 로그인된 계정이 idx 여야 한다.**
+       (콜드런치·로그아웃을 하면 그 화면이 날아가므로 resume 이 성립하지 않는다.)
        주문번호를 못 읽으면 대장에 번호 없이 기록되므로 화면을 벗어나기 전에 실행할 것."""
     res = {"idx": idx, "mode": "resume", "status": None}
     ws = wake_screen()
@@ -1360,8 +1528,23 @@ def resume(idx: int, combo_idx: int | None = None, card: str | None = None,
         res["status"] = f"SCREEN_LOCKED(awake={ws['awake']},keyguard={ws['keyguard']})"; return res
     confirmed, order = _poll_order_complete(8)
     if not confirmed:
-        res["status"] = ("NOT_ORDER_COMPLETE — 주문완료 화면이 아니다. 결제 전이면 buy_one(계정번호)로, "
-                         "결제됐는지 모르면 PC 주문내역부터 확인할 것(이중결제 방지)")
+        scr = detect_screen()
+        print(f"[#{idx}] resume — 현재화면 판정: {scr}", flush=True)
+        try:
+            res["id"] = json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8"))["accounts"][idx - 1]["id"]
+        except Exception:
+            pass
+        if scr == "ORDER_SHEET":
+            print(f"[#{idx}] 주문서부터 이어서 진행 (주소·쿠폰·포인트·카드는 멱등)", flush=True)
+            return _from_order_sheet(res, idx, card=card, goods_no=goods_no, combo_idx=combo_idx)
+        if scr == "CART":
+            cs = goto_cart_select_all()
+            if not cs.get("ok"):
+                res["status"] = f"CART_FAIL:{cs.get('err')}"; return res
+            print(f"[#{idx}] 장바구니부터 이어서 진행", flush=True)
+            return _from_order_sheet(res, idx, card=card, goods_no=goods_no, combo_idx=combo_idx)
+        res["status"] = ("NOT_RESUMABLE — 주문완료/주문서/장바구니 어느 화면도 아니다. 결제 전이면 "
+                         "buy_one(계정번호)로, 결제됐는지 모르면 PC 주문내역부터 확인할 것(이중결제 방지)")
         return res
     try:
         res["id"] = json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8"))["accounts"][idx - 1]["id"]

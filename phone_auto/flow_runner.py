@@ -481,6 +481,8 @@ class FlowRunner:
                         m = BOUNDS.match(n.attrib.get("bounds", ""))
                         if m:
                             x1, y1, x2, y2 = map(int, m.groups())
+                            if x2 <= x1 or y2 <= y1:
+                                continue      # ★0 크기 노드(bounds [0,0][0,0]) — 탭하면 (0,0) 을 누른다
                             cx, cy = (x1+x2)//2, (y1+y2)//2
                             self.adb.tap(cx, cy)
                             self._log(f"  ✓ '{target}' tap @ ({cx},{cy})")

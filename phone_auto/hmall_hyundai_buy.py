@@ -936,6 +936,35 @@ def pay_lotte() -> dict:
     return out
 
 
+# ★카드앱 실행 차단 감지 — **3사 공용**(현대몰 식품·설화수 / 롯데몰 설화수 전부).
+#   KB Pay(com.kbcard.cxh.appcard) 는 **USB 디버깅이 켜져 있으면 실행 즉시 스스로 종료**한다.
+#   2026-08-25 실측(윈도우 첫 KB 결제): IntroActivity 가 떴다가 isExiting → 알림만 남는다
+#     "KB Pay 앱을 종료합니다. / USB 디버깅 해제 후 다시 실행해주세요."
+#   증상이 'KB앱 미진입'·'KB 결제 모달 미도달' 같은 **엉뚱한 이름**으로 나타나서 원인을 찾는 데
+#   오래 걸렸다 → 결제 시작 전에 먼저 보고 **이름 붙여** 막는다.
+#   해결: 폰 개발자옵션에서 **무선 디버깅**을 켜고 페어링한 뒤 **USB 디버깅을 끈다**
+#     (adb pair <ip:port> <코드> → adb connect <ip:port>). 실측으로 KB Pay 정상 실행 확인.
+#   ⚠️ 롯데카드(LOCA)·현대카드 앱은 USB 디버깅 상태에서도 정상 실행된다 = KB 전용 제약.
+CARD_APPS_BLOCKED_BY_USB_DEBUG = ("KB",)
+
+
+def preflight_card_app(card: str | None) -> tuple[bool, str]:
+    """당일카드가 USB 디버깅을 싫어하는 카드면 결제 전에 막는다. 반환 (ok, msg)."""
+    if not card or card not in CARD_APPS_BLOCKED_BY_USB_DEBUG:
+        return True, ""
+    try:
+        v = subprocess.run(["adb", "shell", "settings", "get", "global", "adb_enabled"],
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=10).stdout or ""
+    except Exception as e:
+        return True, f"adb_enabled 확인 실패({e}) — 그대로 진행"
+    if v.strip() == "1":
+        return False, ("USB 디버깅이 켜져 있어 KB Pay 가 실행되지 않는다(앱이 즉시 자기 종료). "
+                       "폰 개발자옵션 → 무선 디버깅 켜고 페어링 → USB 디버깅 끄기 후 재실행할 것. "
+                       "(adb pair <ip:port> <코드> → adb connect <ip:port>)")
+    return True, ""
+
+
 def _wait_app(pkg: str, timeout: float = 15) -> bool:
     """foreground 액티비티가 pkg 가 될 때까지 대기 (카드앱 진입/hmall 복귀 판정)."""
     end = time.time() + timeout
@@ -1004,6 +1033,9 @@ def pay_kb() -> dict:
     → 간편번호6(137601, content-desc dump; FLAG_SECURE라 화면캡처 검정이나 dump O; **6자리 자동제출**) → hmall 복귀 주문완료.
     ⚠️ '입력완료' 불필요(자동제출). ⚠️ 지체 금지 — 주문완료가 곧 home(initApp)으로 자동이동(뷰티포인트는 buy_one이 즉시 처리)."""
     out = {"step": "kb"}
+    ok, msg = preflight_card_app("KB")          # ★USB 디버깅이면 KB Pay 가 안 뜬다 (3사 공용 정본)
+    if not ok:
+        out["err"] = f"KB_APP_BLOCKED: {msg}"; return out
     if not ocr_tap("결제하기", contains=True):                       # 1) 원 결제하기 (hmall WebView OCR)
         out["err"] = "원결제하기 실패"; return out
     if not wait_text("KB Pay", timeout=12):
