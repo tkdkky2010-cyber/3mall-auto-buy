@@ -875,6 +875,52 @@ def _agree_box(cy: int) -> tuple[int, bool]:
     return bx, dark >= 20
 
 
+def _fill_biz_no_if_prompted() -> bool:
+    """'사업자 등록번호를 입력해주세요.' 팝업이 떴으면 그 자리에서 채운다. 채웠으면 True.
+
+    ★이게 이 앱의 **정상 루트**다 (2026-08-25 실측). 주문서에서 빈칸을 직접 탭해 포커스를 잡는
+    건 실패율이 높은데(칸이 webview 라 dump 에 EditText 로도 안 나온다), **결제하기를 누르면
+    앱이 스스로 팝업을 띄우고 '확인'을 누르는 순간 칸에 포커스 + 키보드가 뜬다**
+    (`mInputShown=true` 로 확인). 그래서 여기서 입력하고 키보드를 닫은 뒤 결제하기를 다시 누른다.
+    안 그러면 `PAY_FAIL@kb_modal` 처럼 **엉뚱한 이름**으로 죽는다(오늘 #8 이 그랬다).
+    """
+    if not screen_has("사업자 등록번호"):
+        return False
+    print("   [현금영수증] 사업자번호 미입력 팝업 → 확인 후 입력", flush=True)
+    ocr_or_dump_tap("확인", retries=2); nap(1.5)
+    if not _ime_shown():
+        print("   [현금영수증] ⚠️ 확인 눌렀는데 키보드가 안 떴다 — 입력 불가", flush=True)
+        return False
+    for part in BIZ_NO:
+        _input_text(part); nap(0.6)
+    t = _all_text()
+    ok = all(p in t for p in BIZ_NO)
+    _close_ime()                       # ★키보드가 남으면 하단 '결제하기'가 가려진다
+    print(f"   [현금영수증] 사업자번호 입력 {'성공' if ok else '검증실패'}", flush=True)
+    return ok
+
+
+def _ime_shown() -> bool:
+    """소프트 키보드가 실제로 떠 있는가 (dumpsys input_method)."""
+    out = subprocess.run(["adb", "shell", "dumpsys", "input_method"],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=10).stdout or ""
+    return "mInputShown=true" in out
+
+
+def _close_ime() -> bool:
+    """키보드가 떠 있으면 BACK 으로 닫는다. ★떠 있을 때만 — 안 떠 있으면 BACK 은 페이지 뒤로가기다.
+
+    왜 필요한가 (2026-08-25 실측): 사업자번호 입력 후 키보드가 열린 채로 남으면 화면 하단이 가려져
+    **동의행 스크롤도, 하단 '결제하기' 탭도 실패**한다('동의행 미발견' → '원결제하기 실패').
+    """
+    if not _ime_shown():
+        return False
+    subprocess.run([hw.ADB, "-s", hw._serial(), "shell", "input", "keyevent", "4"])
+    nap(1.0)
+    return True
+
+
 def agree_required() -> bool:
     """필수 동의 체크박스 체크. ★좌표 하드코딩 대신 **픽셀 박스검출 + 체크검증 + 재시도**
     (옛 cx-210 오프셋이 박스 빗나가 미체크→'동의하셔야 구매' 팝업으로 결제막힘, 2026-06-02 #12).
@@ -1017,6 +1063,14 @@ def pay_lotte_kb() -> dict:
     elif not ocr_tap("결제하기", contains=True):
         out["err"] = "원결제하기 실패"; return out
     time.sleep(3.0)
+    # ★사업자번호 미입력 팝업이면 여기서 채우고 결제하기를 다시 누른다 (정상 루트 — 위 함수 주석 참조)
+    if _fill_biz_no_if_prompted():
+        pay = next((it for it in _ocr_texts(cap()) if "결제하기" in it["text"] and it["cy"] > 2000), None)
+        if pay:
+            _adb().tap(pay["cx"], pay["cy"])
+        else:
+            ocr_or_dump_tap("결제하기", contains=True)
+        time.sleep(3.0)
     # 2) KB SDK 모달 → 'KB Pay 결제' 박스(노란 앱카드)
     out["step"] = "kb_modal"
     if not wait_text("KB Pay", timeout=12):
@@ -1177,16 +1231,28 @@ def claim_beauty_point(idx: int | None = None) -> dict:
     if not ok:
         out["err"] = "동의함 라디오 선택 실패(픽셀 미채움)"; _blog("✗ 라디오 선택 실패 → 적립 실패"); return out
     # 4) 적립신청 → '완료되었습니다' **폴링** 확인 (★완료팝업 지연렌더로 단발 체크가 false-negative[#19] → 최대 ~4s 폴링).
+    # ★이 화면은 **OCR 이 사실상 실명**이다 (2026-08-25 실측: OCR 1개 vs dump 277개).
+    #   #8 이 여기서 '적립신청 버튼 미발견'으로 죽었고, dump 로 (760,1815) 를 찾아 손으로 눌러 살렸다
+    #   — 뷰티포인트는 **주문완료 화면 only(now-or-never)** 라 놓치면 그 건은 복구 불가다.
+    #   → OCR 먼저, 없으면 **dump 좌표로 탭**한다.
     sj = next((it for it in _ocr_texts(cap()) if "적립신청" in it["text"]), None)
-    _blog(f"적립신청 버튼 {'발견 @('+str(sj['cx'])+','+str(sj['cy'])+')' if sj else 'OCR 미발견(_tap_fresh 재시도)'}")
-    if not _tap_fresh("적립신청", retries=3):
-        out["err"] = "적립신청 버튼 미발견"; _blog("✗ 적립신청 버튼 미발견 → 적립 실패"); return out
+    _blog(f"적립신청 버튼 {'OCR 발견 @('+str(sj['cx'])+','+str(sj['cy'])+')' if sj else 'OCR 미발견 → dump 폴백'}")
+    tapped = _tap_fresh("적립신청", retries=2) if sj else False
+    if not tapped:
+        dj = next((t for t in _dump_texts()
+                   if t["text"].strip() in ("적립신청", "적립 신청") and 100 < t["cy"] < 2350), None)
+        if dj:
+            _blog(f"적립신청 dump 탭 @({dj['cx']},{dj['cy']})")
+            _adb().tap(dj["cx"], dj["cy"]); time.sleep(1.0)
+            tapped = True
+    if not tapped:
+        out["err"] = "적립신청 버튼 미발견(OCR+dump)"; _blog("✗ 적립신청 버튼 미발견 → 적립 실패"); return out
     # ★완료판정 = OCR 텍스트 1개 안에 '적립'+'완료' 동시 존재 (모달 "뷰티포인트 적립신청이 완료되었습니다").
     #   주문완료 화면의 "주문이 완료 되었습니다"는 '적립'이 없어 자동 배제 → false-positive 차단.
     done_text = None
     for p in range(6):
         time.sleep(0.7)
-        its = _ocr_texts(cap())
+        its = _texts()                      # ★OCR+dump — 완료 모달도 OCR 이 못 읽는다(실측)
         hit = next((t for t in its if "적립" in t["text"] and "완료" in t["text"]), None)
         if hit:
             done_text = hit["text"]; break
@@ -1245,7 +1311,7 @@ def claim_lotte_reward(goods_no: str | None = None) -> dict:    # (search_term �
         #   '세트'+(공통/단독/ml/기획/설화수) 매칭. 콤보면 첫 구매상품. 뷰티/적립/도착예정 텍스트 제외.
         prod = None
         for _ in range(5):
-            prod = next((it for it in _ocr_texts(cap())
+            prod = next((it for it in _texts()          # ★OCR+dump — 주문완료 화면은 OCR 이 거의 실명
                          if "세트" in it["text"]
                          and any(k in it["text"] for k in ("공통", "단독", "ml", "기획", "설화수"))
                          and not any(k in it["text"] for k in ("적립", "포인트", "뷰티", "도착", "주문"))
@@ -1354,6 +1420,8 @@ def _from_order_sheet(res: dict, idx: int, card: str | None = None,
     print(f"[#{idx}] 당일카드 감지/선택 = {use_card} ({sc.get('pct')}%) via {sc.get('via')}", flush=True)
     res["cash"] = set_cash_receipt()        # ★카드 선택 직후 (카드가 현금영수증 지출증빙을 리셋하므로 여기서)
     print(f"[#{idx}] 현금영수증 — {res['cash']}", flush=True)
+    if _close_ime():                         # ★키보드가 남아 있으면 동의·결제하기가 가려진다
+        print(f"[#{idx}] 키보드 닫음(IME) — 동의/결제하기 노출", flush=True)
     if not agree_required():                 # ★미체크면 결제 시 '동의하셔야' 팝업으로 막힘 → 결제 시도 전 abort
         res["status"] = "AGREE_FAIL:필수동의 체크 실패(픽셀검증)"; return res
     print(f"[#{idx}] 필수동의 체크 확인됨", flush=True)
