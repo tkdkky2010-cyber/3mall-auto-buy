@@ -438,9 +438,17 @@ def goto_cart_select_all() -> dict:
 
 def _coupon_change_btn(sec):
     """쿠폰 섹션의 '변경 >' (⚠️'배송방법 변경'/픽업 제외, 섹션 아래 우측)."""
-    chgs = [it for it in _texts() if "변경" in it["text"]
-            and "배송방법" not in it["text"] and "픽업" not in it["text"]
-            and it["cy"] > sec["cy"] - 60]
+    # ★'변경' 뿐 아니라 **'선택'** 도 받는다 (2026-08-25 실측): 쿠폰을 한 번도 고른 적 없는 행은
+    #   버튼 라벨이 '선택' 이고, 그 행 안내문이 '변경 버튼을 클릭하여 할인을 선택해 주세요.' 라
+    #   '변경'만 찾으면 **안내문만 잡히고 버튼은 못 잡는다**(#12 가 여기서 10% 2장을 빠뜨렸다).
+    #   ⚠️ '선택완료'·'선택해 주세요' 같은 문장은 제외 — 버튼은 짧은 라벨이다.
+    def _ok(t: str) -> bool:
+        t = t.strip()
+        if any(k in t for k in ("배송방법", "픽업", "선택완료", "선택해", "클릭")):
+            return False
+        return t in ("변경", "선택") or (("변경" in t or "선택" in t) and len(t) <= 4)
+
+    chgs = [it for it in _texts() if _ok(it["text"]) and it["cy"] > sec["cy"] - 60]
     return max(chgs, key=lambda it: it["cx"]) if chgs else None
 
 
@@ -542,10 +550,30 @@ def _scroll_to(text: str, contains: bool = True, max_scroll: int = 8, down: bool
     return None
 
 
+def _scroll_top(n: int = 8) -> None:
+    """주문서를 맨 위로 올린다. ★쿠폰 단계 진입 전 필수 (2026-08-25).
+
+    `_scroll_to` 는 **아래로만** 훑는다. 앵커가 현재 위치보다 위에 있으면 영영 못 찾는다 —
+    #12 가 결제수단 구역까지 내려간 상태에서 쿠폰 단계에 들어가 '할인쿠폰 변경 버튼 미발견'으로
+    10% 2장을 통째로 빠뜨렸다(606,181원 vs 정상 545,000원대, MAX_PAY 가드가 막았다).
+    위치가 안 변하면 이미 top 이므로 조기 종료한다.
+    """
+    prev = None
+    for _ in range(n):
+        _adb().swipe(540, 800, 540, 1800, 350)
+        nap(0.5)
+        cur = _find_text("주문결제") or _find_text("배송정보")
+        cy = cur["cy"] if cur else None
+        if cy is not None and cy == prev:
+            break
+        prev = cy
+
+
 def set_discount_coupons() -> dict:
     """할인쿠폰: 섹션 라디오 → '변경' → 상품별 dropdown → 모달서 '10% 할인' 탭 → 선택완료.
     상품 수 가변 → dropdown 반복. (★쿠폰이 포인트 리셋 → 반드시 포인트보다 먼저.)"""
     out = {"applied": 0}
+    _scroll_top()                              # ★위에 있는 섹션은 아래로만 훑어선 못 찾는다
     sec = _scroll_to("할인쿠폰", max_cy=1500)   # 헤더 아래 '변경'·상품행이 같이 보여야 한다
     if not sec:
         out["err"] = "할인쿠폰 섹션 미발견"; return out
@@ -578,6 +606,7 @@ def set_discount_coupons() -> dict:
 def set_plus_coupons() -> dict:
     """플러스쿠폰: 활성(받은) 상품만, 최고 할인율 선택. 받은 게 없으면 패스."""
     out = {"applied": 0, "pcts": []}
+    _scroll_top()
     sec = _scroll_to("플러스쿠폰", max_cy=1500)
     if not sec:
         out["skip"] = "플러스쿠폰 섹션 없음"; out["ok"] = True; return out
@@ -875,6 +904,50 @@ def _agree_box(cy: int) -> tuple[int, bool]:
     return bx, dark >= 20
 
 
+def _blog2(m: str) -> None:
+    print(f"   [pay] {m}", flush=True)
+
+
+def _tap_pay_button(timeout: float = 10) -> bool:
+    """하단 'NNN원 결제하기' 버튼 탭. ★버튼이 나타날 때까지 기다렸다 누른다 (2026-08-25).
+
+    키보드를 닫은 직후엔 레이아웃이 정착하기 전이라, 그 순간 OCR 하면 하단 고정바를 못 읽고
+    **화면 중간의 다른 '결제하기'(cy≈1777)를 눌러** 아무 일도 안 일어난다
+    (실측: #8·#9 가 여기서 `PAY_FAIL@kb_modal` 로 죽었다 — 이름이 원인을 가렸다).
+    """
+    # ★좌표(cy>2000) 대신 **텍스트 패턴**으로 고른다: 진짜 버튼만 금액을 달고 있다
+    #   ('544,922원 결제하기'). 키보드를 닫아도 webview 뷰포트가 복원되지 않아 하단 바가
+    #   cy≈1777 로 올라와 있는 경우가 있어(실측), 좌표 기준은 조용히 빗나간다.
+    pat = re.compile(r"[\d,]{4,}\s*원\s*결제하기")
+
+    def _find_btn():
+        return next((it for it in _texts() if pat.search(it["text"])), None)
+
+    # ★탭하고 끝내지 말고 **전이를 검증**한다 (2026-08-25 실측).
+    #   키보드가 접히는 중에 찍힌 프레임을 읽으면 좌표가 어긋나(같은 버튼이 cy 2170 → 1777 로 읽힘)
+    #   탭이 헛돌고, 주문서가 그대로인 채 `PAY_FAIL@kb_modal` 로 죽는다.
+    for attempt in range(3):
+        end = time.time() + timeout
+        pay = None
+        while time.time() < end:
+            pay = _find_btn()
+            if pay:
+                break
+            nap(0.7)
+        if not pay:
+            break
+        _blog2(f"결제하기 탭#{attempt} @({pay['cx']},{pay['cy']}) '{pay['text'][:24]}'")
+        _adb().tap(pay["cx"], pay["cy"])
+        nap(2.5)
+        t = " ".join(x["text"] for x in _texts())
+        if "KB Pay" in t or "사업자 등록번호를" in t or "결제수단" not in t or not _find_btn():
+            return True                     # 전이 발생(모달/팝업/화면이동)
+        _blog2("탭이 먹지 않음 — 화면 그대로, 재시도")
+        nap(1.5)
+    _screen_debug("결제버튼-전이실패")
+    return ocr_or_dump_tap("결제하기", contains=True)
+
+
 def _fill_biz_no_if_prompted() -> bool:
     """'사업자 등록번호를 입력해주세요.' 팝업이 떴으면 그 자리에서 채운다. 채웠으면 True.
 
@@ -896,6 +969,7 @@ def _fill_biz_no_if_prompted() -> bool:
     t = _all_text()
     ok = all(p in t for p in BIZ_NO)
     _close_ime()                       # ★키보드가 남으면 하단 '결제하기'가 가려진다
+    nap(2.0)                           # ★webview 뷰포트 복원 대기 — 접히는 중 프레임을 읽으면 좌표가 어긋난다
     print(f"   [현금영수증] 사업자번호 입력 {'성공' if ok else '검증실패'}", flush=True)
     return ok
 
@@ -1057,23 +1131,17 @@ def pay_lotte_kb() -> dict:
     if screen_has("다음에도") or screen_has("사용할까요"):
         ocr_tap("사용할게요", contains=True, retries=2)
     # 1) (원)결제하기 — 하단 'NNN원 결제하기'
-    pay = next((it for it in _ocr_texts(cap()) if "결제하기" in it["text"] and it["cy"] > 2000), None)
-    if pay:
-        _adb().tap(pay["cx"], pay["cy"])
-    elif not ocr_tap("결제하기", contains=True):
+    if not _tap_pay_button():
         out["err"] = "원결제하기 실패"; return out
     time.sleep(3.0)
     # ★사업자번호 미입력 팝업이면 여기서 채우고 결제하기를 다시 누른다 (정상 루트 — 위 함수 주석 참조)
     if _fill_biz_no_if_prompted():
-        pay = next((it for it in _ocr_texts(cap()) if "결제하기" in it["text"] and it["cy"] > 2000), None)
-        if pay:
-            _adb().tap(pay["cx"], pay["cy"])
-        else:
-            ocr_or_dump_tap("결제하기", contains=True)
+        _tap_pay_button()
         time.sleep(3.0)
     # 2) KB SDK 모달 → 'KB Pay 결제' 박스(노란 앱카드)
     out["step"] = "kb_modal"
     if not wait_text("KB Pay", timeout=12):
+        _screen_debug("KB모달-미도달")
         out["err"] = "KB 결제 모달 미도달"; return out
     box = next((it for it in _ocr_texts(cap()) if it["text"].strip() == "KB Pay 결제"), None) or \
           next((it for it in _ocr_texts(cap()) if "KB Pay" in it["text"] and "결제" in it["text"]), None)
@@ -1235,27 +1303,42 @@ def claim_beauty_point(idx: int | None = None) -> dict:
     #   #8 이 여기서 '적립신청 버튼 미발견'으로 죽었고, dump 로 (760,1815) 를 찾아 손으로 눌러 살렸다
     #   — 뷰티포인트는 **주문완료 화면 only(now-or-never)** 라 놓치면 그 건은 복구 불가다.
     #   → OCR 먼저, 없으면 **dump 좌표로 탭**한다.
-    sj = next((it for it in _ocr_texts(cap()) if "적립신청" in it["text"]), None)
-    _blog(f"적립신청 버튼 {'OCR 발견 @('+str(sj['cx'])+','+str(sj['cy'])+')' if sj else 'OCR 미발견 → dump 폴백'}")
-    tapped = _tap_fresh("적립신청", retries=2) if sj else False
-    if not tapped:
+    def _tap_claim() -> bool:
+        sj = next((it for it in _ocr_texts(cap()) if "적립신청" in it["text"]), None)
+        if sj and _tap_fresh("적립신청", retries=2):
+            _blog(f"적립신청 OCR 탭 @({sj['cx']},{sj['cy']})")
+            return True
         dj = next((t for t in _dump_texts()
                    if t["text"].strip() in ("적립신청", "적립 신청") and 100 < t["cy"] < 2350), None)
         if dj:
             _blog(f"적립신청 dump 탭 @({dj['cx']},{dj['cy']})")
             _adb().tap(dj["cx"], dj["cy"]); time.sleep(1.0)
-            tapped = True
-    if not tapped:
+            return True
+        return False
+
+    def _claim_done():
+        return next((t for t in _texts() if "적립" in t["text"] and "완료" in t["text"]), None)
+
+    if not _tap_claim():
         out["err"] = "적립신청 버튼 미발견(OCR+dump)"; _blog("✗ 적립신청 버튼 미발견 → 적립 실패"); return out
     # ★완료판정 = OCR 텍스트 1개 안에 '적립'+'완료' 동시 존재 (모달 "뷰티포인트 적립신청이 완료되었습니다").
     #   주문완료 화면의 "주문이 완료 되었습니다"는 '적립'이 없어 자동 배제 → false-positive 차단.
+    # ★탭이 조용히 안 먹는 경우가 있다 (2026-08-25 #11: dump 탭은 나갔는데 완료 모달이 끝내 안 떴다).
+    #   뷰티포인트는 **주문완료 화면 only(now-or-never)** 라 한 번 놓치면 그 건은 복구 불가 →
+    #   완료문구가 안 뜨면 **다시 눌러본다**(최대 3회). 이미 신청됐으면 앱이 '이미 신청' 류로 답한다.
     done_text = None
-    for p in range(6):
-        time.sleep(0.7)
-        its = _texts()                      # ★OCR+dump — 완료 모달도 OCR 이 못 읽는다(실측)
-        hit = next((t for t in its if "적립" in t["text"] and "완료" in t["text"]), None)
-        if hit:
-            done_text = hit["text"]; break
+    for attempt in range(3):
+        for p in range(6):
+            time.sleep(0.7)
+            hit = _claim_done()             # ★OCR+dump — 완료 모달도 OCR 이 못 읽는다(실측)
+            if hit:
+                done_text = hit["text"]; break
+        if done_text:
+            break
+        if attempt < 2:
+            _blog(f"완료문구 미확인 → 적립신청 재탭 #{attempt+1}")
+            if not _tap_claim():
+                break
     shot = cap(f"/tmp/_lt_beauty_{idx if idx is not None else 'x'}.png")    # 계정별 스샷 (덮어쓰기 X)
     completed = done_text is not None
     if completed:
@@ -1406,7 +1489,16 @@ def _from_order_sheet(res: dict, idx: int, card: str | None = None,
     if not res["addr"].get("ok"):
         res["status"] = f"ADDR_FAIL:{res['addr'].get('err')}"; return res
     res["dc"] = set_discount_coupons()
+    # ★0장 + 에러면 한 번 더 (2026-08-25 #12: '할인쿠폰 변경 버튼 미발견'으로 10% 2장이 빠져
+    #   606,181원이 될 뻔했다 — MAX_PAY 가드가 막았다). 이미 적용된 상태면 재실행이 무해하다
+    #   (모달의 '선택해 주세요' 자리표시가 없어 루프가 즉시 끝난다).
+    if res["dc"].get("applied", 0) == 0 and res["dc"].get("err"):
+        print(f"[#{idx}] 할인쿠폰 0장({res['dc']['err']}) → 재시도", flush=True)
+        res["dc"] = set_discount_coupons()
     res["pc"] = set_plus_coupons()
+    if res["pc"].get("applied", 0) == 0 and res["pc"].get("err"):
+        print(f"[#{idx}] 플러스쿠폰 0장({res['pc']['err']}) → 재시도", flush=True)
+        res["pc"] = set_plus_coupons()
     res["pts"] = use_all_points()
     # ★주문서 혜택 적용 결과를 **숫자로** 남긴다 (2026-08-25 신설). 종전엔 res 에만 담고 안 찍어서,
     #   쿠폰이 안 걸린 채 결제가 시도돼도 로그만 보면 알 수 없었다(#8 승인시도 682,167원 vs 시트 기대치 괴리).
