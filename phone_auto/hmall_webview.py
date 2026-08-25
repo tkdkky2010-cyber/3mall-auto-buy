@@ -57,7 +57,7 @@ def _serial() -> str:
     s = os.environ.get("ANDROID_SERIAL")
     if s:
         return s
-    out = subprocess.run([ADB, "devices"], capture_output=True, text=True, timeout=10).stdout
+    out = subprocess.run([ADB, "devices"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10).stdout
     devs = [ln.split("\t")[0] for ln in out.splitlines()[1:] if "\tdevice" in ln]
     if not devs:
         raise RuntimeError("adb device 없음")
@@ -71,7 +71,7 @@ def _serial() -> str:
 
 
 def _sh(serial: str, *args: str, timeout: float = 15) -> str:
-    return subprocess.run([ADB, "-s", serial, *args], capture_output=True, text=True, timeout=timeout).stdout
+    return subprocess.run([ADB, "-s", serial, *args], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout).stdout
 
 
 def _tap(serial: str, xy: tuple[int, int], wait: float = 1.2) -> None:
@@ -138,7 +138,7 @@ def _dump(serial: str) -> str:
     tmp = "/tmp/_hmall_uia.xml"
     _sh(serial, "pull", "/sdcard/_uia.xml", tmp)
     try:
-        return Path(tmp).read_text()
+        return Path(tmp).read_text(encoding="utf-8", errors="replace")
     except Exception:
         return ""
 
@@ -165,7 +165,7 @@ def _webview_socket(serial: str) -> str:
 def _forward(serial: str) -> None:
     sock = _webview_socket(serial)
     subprocess.run([ADB, "-s", serial, "forward", f"tcp:{LOCAL_PORT}", f"localabstract:{sock}"],
-                   capture_output=True, text=True, timeout=10)
+                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
 
 
 def _http(path: str) -> str:

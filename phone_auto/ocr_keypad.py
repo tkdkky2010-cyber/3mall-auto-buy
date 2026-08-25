@@ -410,7 +410,7 @@ def _ocr_claude(img_path: str) -> list[tuple[str, int, int, float]]:
     while _time.time() < deadline:
         if res_json.exists():
             try:
-                data = json.loads(res_json.read_text())
+                data = json.loads(res_json.read_text(encoding="utf-8", errors="replace"))
             except Exception:
                 _time.sleep(CLAUDE_OCR_POLL); continue
             if str(data.get("id")) != rid:

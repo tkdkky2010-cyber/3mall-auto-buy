@@ -503,7 +503,7 @@ class FlowRunner:
             start = time.time()
             while time.time() - start < timeout:
                 r = subprocess.run(["adb", "shell", "dumpsys", "window"],
-                                   capture_output=True, text=True, timeout=5)
+                                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5)
                 m = re.search(r"mCurrentFocus=Window\{[^}]+\}", r.stdout)
                 cur = m.group(0) if m else ""
                 if target in cur:

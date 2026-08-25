@@ -222,7 +222,7 @@ def _resolve_serial() -> str:
     같은 기기 타겟. USB 우선, 없으면 무선(ip:port), 없으면 mDNS. USB·무선 무관 동작 보장."""
     if os.environ.get("ANDROID_SERIAL"):
         return os.environ["ANDROID_SERIAL"]
-    out = subprocess.run([hw.ADB, "devices"], capture_output=True, text=True, timeout=10).stdout
+    out = subprocess.run([hw.ADB, "devices"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10).stdout
     devs = [ln.split("\t")[0] for ln in out.splitlines()[1:] if "\tdevice" in ln]
     if not devs:
         raise RuntimeError("adb 연결 기기 없음 — USB 케이블 또는 무선 디버깅 확인")
@@ -253,7 +253,7 @@ def wake_screen() -> dict:
     → ok:False. 호출측(buy_one)은 즉시 중단하고 사용자 잠금해제 요청 (검은화면 헛돌기 금지).
     판정 문자열은 SM-G9960 실측: 'mWakefulness=Awake' / KeyguardServiceDelegate 'showing=true'."""
     def _sh(*args) -> str:
-        return subprocess.run(["adb", "shell", *args], capture_output=True, text=True).stdout
+        return subprocess.run(["adb", "shell", *args], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
     _sh("input", "keyevent", "224"); time.sleep(1.0)            # KEYCODE_WAKEUP
     kg = "showing=true" in _sh("dumpsys", "window", "policy")
     if kg:
@@ -941,7 +941,7 @@ def _wait_app(pkg: str, timeout: float = 15) -> bool:
     end = time.time() + timeout
     while time.time() < end:
         out = subprocess.run(["adb", "shell", "dumpsys", "activity", "activities"],
-                             capture_output=True, text=True).stdout
+                             capture_output=True, text=True, encoding="utf-8", errors="replace").stdout or ""
         if any("topResumedActivity" in ln and pkg in ln for ln in out.splitlines()):
             return True
         time.sleep(0.5)
@@ -2115,7 +2115,7 @@ def apply_reward_now(idx: int, only: list[str] | None = None) -> dict:
         return {"ok": False, "skip": "HMALL_NO_REWARD=1"}
     cmd = [sys.executable, str(ROOT / "buy.py"), "reward", str(idx)] + list(only or [])
     try:
-        r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, timeout=600)
+        r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
     except Exception as e:
         print(f"[#{idx}] [적립] ⚠️ 호출 실패(결제는 정상): {e} — "
               f"수동: python3 buy.py reward {idx}", flush=True)

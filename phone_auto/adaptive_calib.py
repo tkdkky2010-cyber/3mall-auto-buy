@@ -32,7 +32,7 @@ def load_reference(name: Optional[str] = None) -> Optional[dict]:
     """저장된 reference 로드. name=None 이면 dict (multiple screens) 전체."""
     if not REFERENCE_PATH.exists():
         return None
-    data = json.loads(REFERENCE_PATH.read_text())
+    data = json.loads(REFERENCE_PATH.read_text(encoding="utf-8", errors="replace"))
     if name is None:
         return data
     return data.get(name)
@@ -43,7 +43,7 @@ def save_reference(screen_name: str, anchors: list[dict]) -> None:
     REFERENCE_PATH.parent.mkdir(exist_ok=True)
     existing = {}
     if REFERENCE_PATH.exists():
-        existing = json.loads(REFERENCE_PATH.read_text())
+        existing = json.loads(REFERENCE_PATH.read_text(encoding="utf-8", errors="replace"))
     existing[screen_name] = {"anchors": anchors}
     REFERENCE_PATH.write_text(json.dumps(existing, indent=2, ensure_ascii=False))
 

@@ -1043,7 +1043,7 @@ def lotte_checkout(page: Page, account_id: str = "") -> dict:
         if account_id:
             try:
                 addr_map_path = Path(__file__).resolve().parent.parent / "lotte_address_map.json"
-                addr_map = json.loads(addr_map_path.read_text())
+                addr_map = json.loads(addr_map_path.read_text(encoding="utf-8", errors="replace"))
                 dlvp_sn = addr_map.get(account_id, {}).get("matched")
                 if dlvp_sn:
                     page.locator("#base_rmit_nm").select_option(value=str(dlvp_sn))

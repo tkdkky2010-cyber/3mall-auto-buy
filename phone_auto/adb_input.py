@@ -37,7 +37,7 @@ class ADBError(Exception):
 
 
 def _run(args: list[str], timeout: float = 10.0) -> str:
-    r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    r = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
     if r.returncode != 0:
         raise ADBError(f"{' '.join(args)} → {r.returncode}\n{r.stderr}")
     return r.stdout
@@ -157,7 +157,7 @@ def load_coords(name: str) -> dict:
     path = COORDS_DIR / name
     if not path.exists():
         raise FileNotFoundError(f"coords not found: {path}")
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8", errors="replace"))
 
 
 def tap_named(adb: ADB, app_or_button: str, source: str = "home_apps") -> tuple[int,int]:

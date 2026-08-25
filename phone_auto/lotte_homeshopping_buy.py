@@ -53,6 +53,7 @@ from phone_auto.hmall_hyundai_buy import (
     pay_samsung as _pay_samsung_shared,  # ★삼성 일반결제 = 3사 공용 정본 (몰별 복제 금지)
     pay_nh_general,                     # ★NH 일반결제 = 3사 공용 정본 (몰 무관, 항상 비전 핸드세이크)
     preflight_today_files,              # ★결제 전 오늘자 데이터 확인 (3사 공용)
+    _dump_texts,                        # ★윈도우 OCR 이 놓치는 텍스트 보강 (OCR 과 겹쳐 읽기)
 )
 from phone_auto.flow_runner import _ocr_texts, FlowRunner
 # PATH(bare adb)는 hmall_hyundai_buy import 시 이미 설정됨.
@@ -385,19 +386,42 @@ def goto_cart_select_all() -> dict:
     if not (wait_text("주문하기", timeout=8) or screen_has("장바구니")):
         out["err"] = "장바구니 미도달"; return out
     # 전체선택: 헤더 "일반 (a/b)" 좌측 체크박스 (~70,cy). ⚠️체크박스는 토글 → 이미 전체선택(a==b>0)이면
-    # 탭하면 해제됨 → a==b>0 일 때만 통과, 아니면 n/n 될 때까지 토글(최대 3회). (#6 '0/2' 오해 방지)
+    # 탭하면 해제됨 → a==b>0 일 때만 통과, 아니면 n/n 될 때까지 토글(최대 4회+확정검증). (#6 '0/2' 오해 방지)
     def _gen():
-        return next((it for it in _ocr_texts(cap()) if it["text"].strip().startswith("일반")
+        # ★OCR 단독 금지 (2026-08-25): 윈도우 OCR 이 헤더 '일반 (0/2)' 를 통째로 못 읽어
+        #   '전체선택 실패(헤더=판독불가)' 가 났다. 같은 순간 dump 는 '일반 (0/2) 선택삭제' 를
+        #   깨끗하게 준다(자동메모리 windows-ocr-needs-dump-merge). → 겹쳐 읽는다.
+        its = _ocr_texts(cap()) + _dump_texts()
+        return next((it for it in its if it["text"].strip().startswith("일반")
                      and "/" in it["text"]), None)
-    for _ in range(3):
+    # ★2026-08-25: 종전엔 3회 루프의 **마지막 탭 뒤 검증이 없어서** 토글이 뒤집힌 채로 통과했다.
+    #   실제로 #8 이 '일반 (0/2)' 상태로 주문하기를 눌러 '주문하실 상품을 선택해 주세요' 팝업에 막히고
+    #   그게 'CART_FAIL:주문서 미도달' 로 나타났다(원인이 이름에 안 드러남).
+    #   → 탭할 때마다 다시 읽고, 끝나고 한 번 더 확정 검증. 못 맞추면 **여기서** 이름 붙여 실패시킨다.
+    #   무선 adb 는 screencap 이 느려 직전 프레임을 읽는 일이 잦아 대기도 늘렸다.
+    def _sel_state():
         g = _gen()
         if not g:
-            _adb().tap(70, 303); nap(1.0); continue   # 헤더 못 읽으면 기본좌표 1회
+            return None, None
         m = re.search(r"\((\d+)\s*/\s*(\d+)\)", g["text"])
-        out["selected"] = g["text"]
-        if m and m.group(1) == m.group(2) and m.group(1) != "0":
+        return ((m.group(1), m.group(2)) if m else None), g
+
+    def _all_selected(st):
+        return bool(st) and st[0] == st[1] and st[0] != "0"
+
+    ok_sel = False
+    for _ in range(4):
+        st, g = _sel_state()
+        if _all_selected(st):
+            out["selected"] = g["text"]; ok_sel = True
             break                                            # 이미 전체선택 → 통과(탭 X)
-        _adb().tap(70, g["cy"]); nap(1.2)
+        _adb().tap(70, g["cy"] if g else 303); nap(1.8)      # 헤더 못 읽으면 기본좌표
+    if not ok_sel:
+        st, g = _sel_state()                                  # 마지막 탭 뒤 확정 검증
+        if not _all_selected(st):
+            out["err"] = f"전체선택 실패 (헤더={g['text'] if g else '판독불가'})"
+            return out
+        out["selected"] = g["text"]
     # 주문하기 (1회 탭 — 결제하기 등장으로 전환검증)
     if not ocr_tap("주문하기", contains=True, retries=4):
         out["err"] = "주문하기 탭 실패"; return out
@@ -1219,6 +1243,9 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
     res["dc"] = set_discount_coupons()
     res["pc"] = set_plus_coupons()
     res["pts"] = use_all_points()
+    # ★주문서 혜택 적용 결과를 **숫자로** 남긴다 (2026-08-25 신설). 종전엔 res 에만 담고 안 찍어서,
+    #   쿠폰이 안 걸린 채 결제가 시도돼도 로그만 보면 알 수 없었다(#8 승인시도 682,167원 vs 시트 기대치 괴리).
+    print(f"[#{idx}] 혜택 적용 — 할인쿠폰 {res['dc']} / 플러스쿠폰 {res['pc']} / 포인트 {res['pts']}", flush=True)
     # 당일 할인카드 자동감지 + 선택 (★하드코딩 제거 — 청구할인 배너 최고%). ★cash 보다 먼저(카드가 지출증빙 리셋).
     sc = select_card_lotte(day=card)
     res["card"] = sc
@@ -1233,6 +1260,11 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
     # 카드별 결제경로 분기: 롯데=LOCA(137601) / 삼성=일반결제(카드번호 직접, PAYCO/ARS 회피).
     #   ★PAYCO 경로(구 pay_lotte_payco, #10 검증)는 **2026-08-07 삭제** — ARS 전화의존이라 무인불가.
     #   그 외 카드 = 라이브 검증 필요(false-auto 금지).
+    # ★PIN 직전 금액 확인 (READ_FIRST 규칙) — 하단 'NNN원 결제하기' 버튼 텍스트를 그대로 남긴다.
+    _amt = next((it["text"] for it in _ocr_texts(cap())
+                 if "결제하기" in it["text"] and it["cy"] > 2000), None)
+    res["amount_text"] = _amt
+    print(f"[#{idx}] 결제 예정 금액: {_amt or '(판독실패)'}", flush=True)
     print(f"[#{idx}] ⚠️ 결제 실행 ({use_card})", flush=True)
     if use_card == "롯데":
         pay = pay_loca()

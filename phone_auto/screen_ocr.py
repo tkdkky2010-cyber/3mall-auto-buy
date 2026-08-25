@@ -223,7 +223,7 @@ def ocr_text(img_path: str, languages: list[str] | None = None) -> list[dict]:
 def load_calibration() -> Optional[dict]:
     if not CALIB_PATH.exists():
         return None
-    return json.loads(CALIB_PATH.read_text())
+    return json.loads(CALIB_PATH.read_text(encoding="utf-8", errors="replace"))
 
 
 def save_calibration(calib: dict) -> None:
