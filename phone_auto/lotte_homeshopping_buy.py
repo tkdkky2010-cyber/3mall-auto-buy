@@ -748,21 +748,25 @@ def set_address() -> dict:
     ⚠️배송정보는 주문서 최상단 → 먼저 스크롤업(_scroll_to 는 아래로만 탐색하므로 직접 위로)."""
     out = {}
     # 주문서 최상단(배송정보)으로 스크롤업
+    # ★판독은 OCR+dump 병합 (2026-08-25): 윈도우 OCR 이 주소줄을 못 읽으면 "이미 203호"인데도
+    #   변경 절차로 들어가 'ADDR_FAIL:주소 변경 버튼 미발견' 으로 죽는다(#12 resume 실측).
     for _ in range(6):
-        if screen_has(ADDR_KEY) or screen_has("배송정보") or screen_has("배송지"):
+        t = _all_text()
+        if ADDR_KEY in t or "배송정보" in t or "배송지" in t:
             break
         _adb().swipe(540, 700, 540, 1700, 400); nap(0.6)
     # 접힌 상태서 선택된 주소가 이미 203호면 변경 불필요
-    if screen_has(ADDR_KEY):
+    if ADDR_KEY in _all_text():
         out["skip"] = f"기본배송지 이미 '{ADDR_KEY}'"; out["ok"] = True; return out
     # 배송정보 펼치기 (우측 chevron) → 주소 '변경 >' 노출 (#6 검증: 접힘 상태선 변경버튼 숨김)
     bi = _find("배송정보", contains=True)
     if bi:
         _adb().tap(1000, bi["cy"]); nap(1.5)
     # 주소 '변경 >' (배송방법/픽업 제외, 우측 최대 cx)
-    chgs = [it for it in _ocr_texts(cap()) if "변경" in it["text"]
-            and "배송방법" not in it["text"] and "픽업" not in it["text"]]
+    chgs = [it for it in _texts() if "변경" in it["text"]
+            and "배송방법" not in it["text"] and "픽업" not in it["text"] and "클릭" not in it["text"]]
     if not chgs:
+        _screen_debug("주소변경버튼-미발견")
         out["err"] = "주소 변경 버튼 미발견"; return out
     chg = max(chgs, key=lambda it: it["cx"])
     _adb().tap(chg["cx"], chg["cy"]); nap(2.0)
@@ -1488,6 +1492,14 @@ def _from_order_sheet(res: dict, idx: int, card: str | None = None,
     res["addr"] = set_address()
     if not res["addr"].get("ok"):
         res["status"] = f"ADDR_FAIL:{res['addr'].get('err')}"; return res
+    if os.environ.get("SKIP_COUPONS") == "1":
+        # ★사람이 폰에서 직접 쿠폰을 고른 뒤 이어받을 때 쓴다 (2026-08-25 #12).
+        #   자동 단계가 모달을 다시 열면 '선택완료' 과정에서 수동 선택이 초기화될 수 있다.
+        res["dc"] = {"applied": None, "skip": "SKIP_COUPONS=1 (수동 적용)", "ok": True}
+        res["pc"] = {"applied": None, "skip": "SKIP_COUPONS=1 (수동 적용)", "ok": True}
+        res["pts"] = use_all_points()
+        print(f"[#{idx}] 혜택 — 쿠폰은 수동 적용분 유지(SKIP_COUPONS=1) / 포인트 {res['pts']}", flush=True)
+        return _order_sheet_tail(res, idx, card, goods_no, combo_idx)
     res["dc"] = set_discount_coupons()
     # ★0장 + 에러면 한 번 더 (2026-08-25 #12: '할인쿠폰 변경 버튼 미발견'으로 10% 2장이 빠져
     #   606,181원이 될 뻔했다 — MAX_PAY 가드가 막았다). 이미 적용된 상태면 재실행이 무해하다
@@ -1503,6 +1515,11 @@ def _from_order_sheet(res: dict, idx: int, card: str | None = None,
     # ★주문서 혜택 적용 결과를 **숫자로** 남긴다 (2026-08-25 신설). 종전엔 res 에만 담고 안 찍어서,
     #   쿠폰이 안 걸린 채 결제가 시도돼도 로그만 보면 알 수 없었다(#8 승인시도 682,167원 vs 시트 기대치 괴리).
     print(f"[#{idx}] 혜택 적용 — 할인쿠폰 {res['dc']} / 플러스쿠폰 {res['pc']} / 포인트 {res['pts']}", flush=True)
+    return _order_sheet_tail(res, idx, card, goods_no, combo_idx)
+
+
+def _order_sheet_tail(res: dict, idx: int, card, goods_no, combo_idx) -> dict:
+    """혜택 적용 이후 — 카드선택 → 현금영수증 → 동의 → 결제 → 주문완료 뒷처리. (쿠폰 단계와 분리)"""
     # 당일 할인카드 자동감지 + 선택 (★하드코딩 제거 — 청구할인 배너 최고%). ★cash 보다 먼저(카드가 지출증빙 리셋).
     sc = select_card_lotte(day=card)
     res["card"] = sc
