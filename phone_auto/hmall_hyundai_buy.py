@@ -847,6 +847,18 @@ def _pick_hyundai_from_grid() -> bool:
     return _pick_card_from_grid("현대카드")
 
 
+def pay_button_amount() -> int | None:
+    """주문서 하단 'NNN원 결제하기' 버튼에서 최종 결제금액(원)을 읽는다. 못 읽으면 None.
+    ★버튼 행만 본다 — 카드할인 캐러셀에도 금액이 있어 그걸 잡으면 딴 값이 나온다."""
+    for it in sorted(_ocr_texts(cap()), key=lambda z: -z["cy"]):
+        if "결제하기" not in it["text"]:
+            continue
+        mo = re.search(r"([\d,]{4,})\s*원", it["text"])
+        if mo:
+            return int(mo.group(1).replace(",", ""))
+    return None
+
+
 def select_card_discount(grid_name: str = "현대카드") -> dict:
     """⚠️ LEGACY (2026-06-06부터 미사용) — 당일카드 선택 정본은 flow_runner
     `hmall_select_card_discount`(700px + 캐러셀금액==결제버튼금액 판정). 이 OCR 버전은 카드명
@@ -1953,6 +1965,17 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
     if not sc.get("ok"):
         res["status"] = f"SELECT_CARD_FAIL:{use_card}:{sc.get('err')}"; return res
     lap(f"카드 선택 ({use_card})")
+    # ★HMALL_STOP_BEFORE_PAY=1 — 결제 직전 정지, 최종금액만 읽는다 (사용자 지시 2026-08-24
+    #   "마지막 결제하기 버튼 누르기 전에 가격확인 — 15만원 넘는지"). 적립 tier 판정용이라
+    #   HMALL_NO_POINTS=1 과 같이 쓴다(포인트 차감 전 금액이 tier 기준).
+    if os.environ.get("HMALL_STOP_BEFORE_PAY") == "1":
+        amt = pay_button_amount()
+        res["amount"] = amt
+        res["status"] = (f"STOP_BEFORE_PAY(결제금액 {amt:,}원 — "
+                         f"{'15만원 이상' if amt >= 150000 else '15만원 미만'})"
+                         if amt else "STOP_BEFORE_PAY(금액 판독 실패)")
+        print(f"[#{idx}] ⏸ 결제 직전 정지 — {res['status']}", flush=True)
+        return res
     # 카드별 SDK ⚠️실돈
     print(f"[#{idx}] ⚠️ {use_card}카드 결제 실행", flush=True)
     if use_card == "현대":
