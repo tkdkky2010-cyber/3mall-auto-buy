@@ -1,200 +1,224 @@
 {
- "_comment": "2026-08-26. 롯데 #15·16·17·19·20 조합25(e탄력3 x2 + n탄력EX75 x2) 결제 완주 5/5, 각 499,538원(롯데카드 7%). #15 는 1차 PAY_FAIL@loca_app(SimpleNumberAuth 미도달) → PC 주문내역 실조회로 미결제 확인 후 재시도 완주. #19(ybkim9960) 뷰티포인트 = '일치하는 뷰티포인트 카드 등록 고객이 없습니다' → 계정에 뷰티 멤버십 없음. 재시도 무의미(구매사은 적립은 ✓). #18 은 사용자 지시로 제외(카트 없음). 현대 #1~9 석류젤리 x2 / #10~12 하루견과 초록색 x2 = 담기만 완료(카트 실조회 12/12 검증), 결제 전.",
- "date": "2026-08-26",
- "carts": [
-  {
-   "mall": "롯데",
-   "account": 15,
-   "combo": 25,
-   "items": [],
-   "amount": 499538,
-   "paid": true,
-   "order_no": "2026-08-26-B31965",
-   "reward_ok": true
-  },
-  {
-   "mall": "롯데",
-   "account": 16,
-   "combo": 25,
-   "items": [],
-   "amount": 499538,
-   "paid": true,
-   "order_no": "2026-08-26-B31294",
-   "reward_ok": true
-  },
-  {
-   "mall": "롯데",
-   "account": 17,
-   "combo": 25,
-   "items": [],
-   "amount": 499538,
-   "paid": true,
-   "order_no": "2026-08-26-B31357",
-   "reward_ok": true
-  },
-  {
-   "mall": "롯데",
-   "account": 19,
-   "combo": 25,
-   "items": [],
-   "amount": 499538,
-   "paid": true,
-   "order_no": "2026-08-26-B31812",
-   "reward_ok": false
-  },
-  {
-   "mall": "롯데",
-   "account": 20,
-   "combo": 25,
-   "items": [],
-   "amount": 499538,
-   "paid": true,
-   "order_no": "2026-08-26-B31882",
-   "reward_ok": true
-  },
-  {
-   "mall": "현대",
-   "account": 1,
-   "product": "25",
-   "items": [
-    [
-     "유기농 석류젤리 9박(90개)",
-     2
-    ]
-   ],
-   "paid": false
-  },
-  {
-   "mall": "현대",
-   "account": 2,
-   "product": "25",
-   "items": [
-    [
-     "유기농 석류젤리 9박(90개)",
-     2
-    ]
-   ],
-   "paid": false
-  },
-  {
-   "mall": "현대",
-   "account": 3,
-   "product": "25",
-   "items": [
-    [
-     "유기농 석류젤리 9박(90개)",
-     2
-    ]
-   ],
-   "paid": false
-  },
-  {
-   "mall": "현대",
-   "account": 4,
-   "product": "25",
-   "items": [
-    [
-     "유기농 석류젤리 9박(90개)",
-     2
-    ]
-   ],
-   "paid": false
-  },
-  {
-   "mall": "현대",
-   "account": 5,
-   "product": "25",
-   "items": [
-    [
-     "유기농 석류젤리 9박(90개)",
-     2
-    ]
-   ],
-   "paid": false
-  },
-  {
-   "mall": "현대",
-   "account": 6,
-   "product": "25",
-   "items": [
-    [
-     "유기농 석류젤리 9박(90개)",
-     2
-    ]
-   ],
-   "paid": false
-  },
-  {
-   "mall": "현대",
-   "account": 7,
-   "product": "25",
-   "items": [
-    [
-     "유기농 석류젤리 9박(90개)",
-     2
-    ]
-   ],
-   "paid": false
-  },
-  {
-   "mall": "현대",
-   "account": 8,
-   "product": "25",
-   "items": [
-    [
-     "유기농 석류젤리 9박(90개)",
-     2
-    ]
-   ],
-   "paid": false
-  },
-  {
-   "mall": "현대",
-   "account": 9,
-   "product": "25",
-   "items": [
-    [
-     "유기농 석류젤리 9박(90개)",
-     2
-    ]
-   ],
-   "paid": false
-  },
-  {
-   "mall": "현대",
-   "account": 10,
-   "product": "2",
-   "items": [
-    [
-     "하루견과 초록색 100봉",
-     2
-    ]
-   ],
-   "paid": false
-  },
-  {
-   "mall": "현대",
-   "account": 11,
-   "product": "2",
-   "items": [
-    [
-     "하루견과 초록색 100봉",
-     2
-    ]
-   ],
-   "paid": false
-  },
-  {
-   "mall": "현대",
-   "account": 12,
-   "product": "2",
-   "items": [
-    [
-     "하루견과 초록색 100봉",
-     2
-    ]
-   ],
-   "paid": false
-  }
- ]
+  "_comment": "2026-08-26. 롯데 #15·16·17·19·20 조합25(e탄력3 x2 + n탄력EX75 x2) 결제 완주 5/5, 각 499,538원(롯데카드 7%). #15 는 1차 PAY_FAIL@loca_app(SimpleNumberAuth 미도달) → PC 주문내역 실조회로 미결제 확인 후 재시도 완주. #19(ybkim9960) 뷰티포인트 = '일치하는 뷰티포인트 카드 등록 고객이 없습니다' → 계정에 뷰티 멤버십 없음. 재시도 무의미(구매사은 적립은 ✓). #18 은 사용자 지시로 제외(카트 없음). 현대 #1~9 석류젤리 x2 / #10~12 하루견과 초록색 x2 = 담기만 완료(카트 실조회 12/12 검증), 결제 전.",
+  "date": "2026-08-26",
+  "carts": [
+    {
+      "mall": "롯데",
+      "account": 15,
+      "combo": 25,
+      "items": [],
+      "amount": 499538,
+      "paid": true,
+      "order_no": "2026-08-26-B31965",
+      "reward_ok": true
+    },
+    {
+      "mall": "롯데",
+      "account": 16,
+      "combo": 25,
+      "items": [],
+      "amount": 499538,
+      "paid": true,
+      "order_no": "2026-08-26-B31294",
+      "reward_ok": true
+    },
+    {
+      "mall": "롯데",
+      "account": 17,
+      "combo": 25,
+      "items": [],
+      "amount": 499538,
+      "paid": true,
+      "order_no": "2026-08-26-B31357",
+      "reward_ok": true
+    },
+    {
+      "mall": "롯데",
+      "account": 19,
+      "combo": 25,
+      "items": [],
+      "amount": 499538,
+      "paid": true,
+      "order_no": "2026-08-26-B31812",
+      "reward_ok": false
+    },
+    {
+      "mall": "롯데",
+      "account": 20,
+      "combo": 25,
+      "items": [],
+      "amount": 499538,
+      "paid": true,
+      "order_no": "2026-08-26-B31882",
+      "reward_ok": true
+    },
+    {
+      "mall": "현대",
+      "account": 1,
+      "product": "25",
+      "items": [
+        {
+          "product": 25,
+          "name": "유기농 석류젤리 9박(90개)",
+          "qty": 2,
+          "amount": 110240
+        }
+      ],
+      "paid": true
+    },
+    {
+      "mall": "현대",
+      "account": 2,
+      "product": "25",
+      "items": [
+        {
+          "product": 25,
+          "name": "유기농 석류젤리 9박(90개)",
+          "qty": 2,
+          "amount": 110240
+        }
+      ],
+      "paid": true
+    },
+    {
+      "mall": "현대",
+      "account": 3,
+      "product": "25",
+      "items": [
+        {
+          "product": 25,
+          "name": "유기농 석류젤리 9박(90개)",
+          "qty": 2,
+          "amount": 110240
+        }
+      ],
+      "paid": false
+    },
+    {
+      "mall": "현대",
+      "account": 4,
+      "product": "25",
+      "items": [
+        {
+          "product": 25,
+          "name": "유기농 석류젤리 9박(90개)",
+          "qty": 2,
+          "amount": 110240
+        }
+      ],
+      "paid": false
+    },
+    {
+      "mall": "현대",
+      "account": 5,
+      "product": "25",
+      "items": [
+        {
+          "product": 25,
+          "name": "유기농 석류젤리 9박(90개)",
+          "qty": 2,
+          "amount": 110240
+        }
+      ],
+      "paid": false
+    },
+    {
+      "mall": "현대",
+      "account": 6,
+      "product": "25",
+      "items": [
+        {
+          "product": 25,
+          "name": "유기농 석류젤리 9박(90개)",
+          "qty": 2,
+          "amount": 110240
+        }
+      ],
+      "paid": false
+    },
+    {
+      "mall": "현대",
+      "account": 7,
+      "product": "25",
+      "items": [
+        {
+          "product": 25,
+          "name": "유기농 석류젤리 9박(90개)",
+          "qty": 2,
+          "amount": 110240
+        }
+      ],
+      "paid": false
+    },
+    {
+      "mall": "현대",
+      "account": 8,
+      "product": "25",
+      "items": [
+        {
+          "product": 25,
+          "name": "유기농 석류젤리 9박(90개)",
+          "qty": 2,
+          "amount": 110240
+        }
+      ],
+      "paid": false
+    },
+    {
+      "mall": "현대",
+      "account": 9,
+      "product": "25",
+      "items": [
+        {
+          "product": 25,
+          "name": "유기농 석류젤리 9박(90개)",
+          "qty": 2,
+          "amount": 110240
+        }
+      ],
+      "paid": false
+    },
+    {
+      "mall": "현대",
+      "account": 10,
+      "product": "2",
+      "items": [
+        {
+          "product": 2,
+          "name": "하루견과 초록색 100봉",
+          "qty": 2,
+          "amount": 161820
+        }
+      ],
+      "paid": false
+    },
+    {
+      "mall": "현대",
+      "account": 11,
+      "product": "2",
+      "items": [
+        {
+          "product": 2,
+          "name": "하루견과 초록색 100봉",
+          "qty": 2,
+          "amount": 161820
+        }
+      ],
+      "paid": false
+    },
+    {
+      "mall": "현대",
+      "account": 12,
+      "product": "2",
+      "items": [
+        {
+          "product": 2,
+          "name": "하루견과 초록색 100봉",
+          "qty": 2,
+          "amount": 161820
+        }
+      ],
+      "paid": false
+    }
+  ]
 }

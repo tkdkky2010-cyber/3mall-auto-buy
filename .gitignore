@@ -64,3 +64,4 @@ _backup_*.json
 buy/cart_plan*.json
 buy/_cart_plan*.json
 buy/_food_done.json*
+cart/.reward.lock

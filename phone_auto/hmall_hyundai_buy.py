@@ -127,6 +127,22 @@ def preflight_today_files() -> bool:
             continue
         if d != today:
             bad.append(f"{p.name}: {d} (오늘 {today})")
+    # ★스키마 검증 (2026-08-27): 8/26 에 items 가 [[이름,수량]] 리스트로 잘못 쓰여
+    #   대장 기록·적립이 통째로 죽었다('list' object has no attribute 'get').
+    #   items 는 [{"product":N,"name":..,"qty":N}] dict 리스트가 정본 — 아니면 시끄럽게 정지.
+    if not bad:
+        try:
+            mf = json.loads(TODAY_CARTS.read_text(encoding="utf-8"))
+            for c in mf.get("carts", []):
+                if c.get("mall") not in ("현대", "hmall") or c.get("paid"):
+                    continue
+                for it in c.get("items") or []:
+                    if not (isinstance(it, dict) and it.get("product") is not None and it.get("qty")):
+                        bad.append(f"today_carts.json: 계정#{c.get('account')} items 형식 오류 "
+                                   f"(dict+product/qty 필수): {str(it)[:60]}")
+                        break
+        except Exception as e:
+            bad.append(f"today_carts.json: 스키마 검사 실패({e})")
     if not bad:
         print(f"[preflight] ✓ 오늘자 데이터 확인 ({today})", flush=True)
         return True
@@ -2294,13 +2310,36 @@ def main() -> int:
     print(f"[serial] {hw._serial()}  plan={plan}  card={card_override or '당일 자동감지'}"
           f"{'  only=' + ','.join(only_kw) if only_kw else ''}", flush=True)
     summary = []
+    start_date = time.strftime("%Y-%m-%d")   # ★자정 가드 기준일 (preflight 통과 시점)
+    infra_fail = 0                            # ★SCREEN_LOCKED/adb offline 연속 카운터
     for n, idx in enumerate(plan):
+        # ★자정 가드 (2026-08-27 실사고): 자정을 넘으면 카드할인·카트·prmo 가 전부 어제 것 —
+        #   실제로 00시 직후 #3 이 당일카드=현대(어제 토스)로 감지됐다. 날짜 리셋 규칙대로 중단.
+        if time.strftime("%Y-%m-%d") != start_date:
+            print(f"\n{'='*54}\n★ 날짜가 바뀜({start_date} → {time.strftime('%Y-%m-%d')}) — "
+                  f"남은 계정 {plan[n:]} 중단. step1/step2 재실행 후 다시 결제할 것.\n{'='*54}", flush=True)
+            break
         try:
             r = buy_one(idx, card=card_override, combo_idx=combo_idx, only=only_kw)
         except Exception as e:
             r = {"idx": idx, "status": f"EXC:{e}"}
         print(f"[#{idx}] => {r.get('status')}", flush=True)
         summary.append(r)
+        # ★인프라 장애 연속 2회 = 폰이 죽은 것 (2026-08-27 실사고: device offline 후 #4~12 가
+        #   전부 SCREEN_LOCKED 로 헛돌며 로그만 오염). 계정별 재시도 무의미 → 루프 중단.
+        st = str(r.get("status", ""))
+        if st.startswith("SCREEN_LOCKED") or "offline" in st or "adb" in st.lower():
+            infra_fail += 1
+            if infra_fail >= 2:
+                _ov = f" {card_override}" if card_override else ""
+                _okw = f" only={','.join(only_kw)}" if only_kw else ""
+                _cb = f" combo={combo_idx}" if combo_idx is not None else ""
+                print(f"\n{'='*54}\n★ 폰 연결/화면 장애 연속 {infra_fail}회 — 남은 계정 {plan[n+1:]} 중단.\n"
+                      f"  무선 디버깅/화면 확인 후: python3 -u -m phone_auto.hmall_hyundai_buy"
+                      f"{_ov} {' '.join(str(i) for i in plan[n+1:])}{_okw}{_cb}\n{'='*54}", flush=True)
+                break
+        else:
+            infra_fail = 0
         # ★★핸드세이크면 **루프를 멈춘다.** buy_one 이 return 해도 루프가 다음 계정으로 넘어가면
         #   콜드런치가 **살아있는 결제화면을 날린다**(카드번호 입력 대기 중인 화면이 사라진다).
         #   인계 러너로 그 계정을 끝낸 뒤, 아래에 찍힌 명령으로 나머지 계정을 이어서 돌린다.

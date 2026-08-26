@@ -74,9 +74,14 @@ def _sh(serial: str, *args: str, timeout: float = 15) -> str:
     return subprocess.run([ADB, "-s", serial, *args], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout).stdout
 
 
+# ★네비 고정대기 임시 축소용 (사용자 지시 2026-08-26 "오늘만 줄여") — 기본 1.0=종전과 동일.
+#   카드앱 PIN 구간과 무관(여기는 몰 네비/콜드런치 대기만). 하한을 둬 0 으로는 못 내려간다.
+_NAV_SLEEP_SCALE = float(os.environ.get("HMALL_NAV_SLEEP_SCALE", "1.0"))
+
+
 def _tap(serial: str, xy: tuple[int, int], wait: float = 1.2) -> None:
     _sh(serial, "shell", "input", "tap", str(xy[0]), str(xy[1]))
-    time.sleep(wait)
+    time.sleep(max(0.5, wait * _NAV_SLEEP_SCALE))
 
 
 def _tap_text(serial: str, needle: str, wait: float = 1.5) -> bool:
@@ -109,28 +114,49 @@ def close_ad_popup(serial: str | None = None, max_iter: int = 4) -> int:
     """
     serial = serial or _serial()
     closed = 0
+    import re
     for _ in range(max_iter):
+        # ★dump 1회로 문구 전부 검사 (2026-08-26): 종전엔 키마다 _tap_text→_dump 를 새로 떠서
+        #   팝업이 없어도 dump 4회 ≈ 홈에서 ~15초 멍때림. 탭 좌표 로직은 _tap_text 와 동일.
+        xml = _dump(serial)
+        hit = None
         for key in POPUP_KEYS:
-            if _tap_text(serial, key, wait=1.5):
-                print(f"   [popup] 광고 닫기 '{key}'", flush=True)
-                closed += 1
+            m = re.search(r'text="[^"]*' + re.escape(key) + r'[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml)
+            if m:
+                hit = (key, m)
                 break
-        else:
+        if not hit:
             break
+        key, m = hit
+        x1, y1, x2, y2 = map(int, m.groups())
+        _tap(serial, ((x1 + x2) // 2, (y1 + y2) // 2), wait=1.5)
+        print(f"   [popup] 광고 닫기 '{key}'", flush=True)
+        closed += 1
     return closed
 
 
 def _launch(serial: str) -> None:
     _sh(serial, "shell", "monkey", "-p", HMALL_PKG, "-c", "android.intent.category.LAUNCHER", "1")
-    time.sleep(5)
+    time.sleep(max(2.0, 5 * _NAV_SLEEP_SCALE))
 
 
 def reset_to_main(serial: str) -> None:
     """force-stop → 콜드런치 → 클린 메인 홈 (쿠키=로그인 유지). 꼬인 화면상태 원천 제거."""
     _sh(serial, "shell", "am", "force-stop", HMALL_PKG)
-    time.sleep(2)
+    time.sleep(max(1.0, 2 * _NAV_SLEEP_SCALE))
     _sh(serial, "shell", "monkey", "-p", HMALL_PKG, "-c", "android.intent.category.LAUNCHER", "1")
-    time.sleep(8)   # 콜드 스타트 (스플래시 + 메인 로드)
+    # ★콜드 스타트: 고정 8s → 소켓 폴링 (2026-08-26). 4s 고정으로 줄였더니 #1 이
+    #   'webview_devtools 소켓 없음' → 재시도 'Remote end closed' 로 죽었다(실측).
+    #   webview devtools 소켓이 뜰 때까지 기다리면 빠른 날은 빨리, 느린 날은 안 죽는다.
+    time.sleep(2.5)                              # 스플래시 최소 안정화 (총 최소 4s — 사용자 지시 2026-08-26)
+    deadline = time.time() + 12
+    while time.time() < deadline:
+        try:
+            _webview_socket(serial)
+            break
+        except RuntimeError:
+            time.sleep(0.7)
+    time.sleep(1.5)                              # 소켓 직후 page target 준비 여유 (Remote end closed 방지)
 
 
 def _dump(serial: str) -> str:
@@ -331,10 +357,18 @@ _FILL_JS = (
     "if(!id)return 'NOID';id.focus();setN(id,idv);pw.focus();setN(pw,pwv);"
     "return 'FILLED:'+id.value.length+'/'+pw.value.length;})(%ID%,%PW%)"
 )
+# ★클릭 우선순위 (2026-08-26 — '로그인' contains 첫 요소를 누르던 탓에 소셜로그인/헤더 링크
+#   같은 엉뚱한 요소를 먼저 잡을 수 있었다. 사용자 "로그인 버튼 잘못 누르는 것 같다" 지적):
+#   ① 텍스트 정확일치 '로그인'/'로그인하기' ② pw 와 같은 form 안의 로그인 버튼/submit ③ 종전 contains 폴백
 _CLICK_JS = (
-    "(function(){var els=[].slice.call(document.querySelectorAll('button,a,input[type=submit],input[type=button]'));"
-    "var b=els.find(function(e){return ((e.innerText||e.value||'').trim()).indexOf('\\ub85c\\uadf8\\uc778')>=0;});"
-    "if(b){b.click();return 'CLICKED';}var pw=document.querySelector('input[type=password]');"
+    "(function(){function txt(e){return ((e.innerText||e.value||'').trim());}"
+    "var els=[].slice.call(document.querySelectorAll('button,a,input[type=submit],input[type=button]'));"
+    "var b=els.find(function(e){var t=txt(e);return t==='\\ub85c\\uadf8\\uc778'||t==='\\ub85c\\uadf8\\uc778\\ud558\\uae30';});"
+    "var pw=document.querySelector('input[type=password]');"
+    "if(!b&&pw&&pw.form){var fb=[].slice.call(pw.form.querySelectorAll('button,input[type=submit],input[type=button]'));"
+    "b=fb.find(function(e){return txt(e).indexOf('\\ub85c\\uadf8\\uc778')>=0;})||pw.form.querySelector('input[type=submit]');}"
+    "if(!b)b=els.find(function(e){return txt(e).indexOf('\\ub85c\\uadf8\\uc778')>=0;});"
+    "if(b){b.click();return 'CLICKED:'+txt(b);}"
     "if(pw&&pw.form){pw.form.submit();return 'SUBMIT';}return 'NOBTN';})()"
 )
 
@@ -394,12 +428,12 @@ def _open_login_form(serial: str) -> "CDP | None":
             if not (isinstance(clicked, str) and clicked.startswith("CLICKED")):
                 if not _tap_text(serial, "아이디로 로그인", wait=3):
                     _tap(serial, HMALL_LOGIN_LINK, wait=3)
-            time.sleep(2.0)
-            for _ in range(6):                # 폼 로드 폴링
+            time.sleep(1.0)
+            for _ in range(8):                # 폼 로드 폴링 (간격 축소 2026-08-26 — 폼 떠있는데 안 누른다는 지적)
                 f = _attach_login_form()
                 if f:
                     return f
-                time.sleep(1.5)
+                time.sleep(0.8)
         _tap(serial, HOME_TAB, wait=2.5)      # chooser 미도달 → 홈 리셋 후 재시도
     return None
 
@@ -421,10 +455,11 @@ def login(account_id: str, account_pw: str, serial: str | None = None) -> dict:
         fr = form.ev(fill)
         if not (isinstance(fr, str) and fr.startswith("FILLED")):
             return {"success": False, "error": f"fill 실패: {fr}"}
-        time.sleep(0.8)
+        time.sleep(0.3)
         cr = form.ev(_CLICK_JS)
-        if cr not in ("CLICKED", "SUBMIT"):
+        if not (isinstance(cr, str) and (cr.startswith("CLICKED") or cr == "SUBMIT")):
             return {"success": False, "error": f"로그인 클릭 실패: {cr}"}
+        print(f"   [login] 클릭 → {cr}", flush=True)
         # 4) 검증
         for _ in range(10):
             time.sleep(1.2)
