@@ -1,18 +1,29 @@
 {
-  "date": "2026-08-26",
+  "date": "2026-08-28",
   "account_used": "tkdkky2002",
   "products": [
     {
       "id": "1",
       "name": "이너플로라 유산균 60정",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2154750833",
-      "ten_percent": false,
-      "phrase": "더블위크 현대홈쇼핑 현대카드 7%적립",
+      "ten_percent": true,
+      "phrase": "건강은 金이다 최대 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202608196632",
+          "prmo": "P202608278652",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "8.28 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 30000,
+            "max_won": 2000000,
+            "pct": 10
+          }
+        },
+        {
+          "prmo": "P202608196634",
           "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
+          "event_end": "8.28 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 50000,
@@ -22,30 +33,133 @@
         }
       ],
       "tiers": [],
-      "max_reward": "30,000P (단순 7%)",
-      "event_end": "8.26 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "8.28 23:59 / 8.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
+          "min_won": 30000,
+          "max_won": 2000000,
+          "pct": 10
+        },
+        {
           "min_won": 50000,
           "max_won": 428571,
           "pct": 7
         }
-      ]
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": 122000,
+        "member_price": 115900,
+        "card_slides": [
+          {
+            "alt": "토스페이 최대 13,000원 혜택",
+            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
+            "percent": null,
+            "price": 13000
+          },
+          {
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
+          }
+        ],
+        "kakao_price": 115900,
+        "kakao_reward_pt": 19703,
+        "kakao_final_cost": 96197,
+        "paybacks": {},
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 30000,
+          "tier_reward": 3000,
+          "nominal_pct": 10.0,
+          "actual_total": 115900,
+          "actual_reward": 3500,
+          "effective_pct": 3.019844693701467
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 115900,
+        "options": [
+          {
+            "idx": 1,
+            "name": "[H] 유한건강생활 이너플로라 질유산균 3박스 총6개월분",
+            "list_price": 115900
+          },
+          {
+            "idx": 2,
+            "name": "[H] 유한건강생활 이너플로라 질유산균 2박스 총4개월분",
+            "list_price": 87970
+          },
+          {
+            "idx": 3,
+            "name": "[H] 유한건강생활 이너플로라 질유산균 1박스 2개월분",
+            "list_price": 49880
+          },
+          {
+            "idx": 4,
+            "name": "유한건강생활 식물성rTG알티지오메가 미니 1박스 1개월분",
+            "list_price": 23580
+          },
+          {
+            "idx": 5,
+            "name": "유한건강생활 식물성rTG알티지오메가 미니 3박스 총3개월분",
+            "list_price": 55350
+          },
+          {
+            "idx": 6,
+            "name": "유한건강생활 유한올인원종합비타민 이뮨 14일분",
+            "list_price": 32590
+          },
+          {
+            "idx": 7,
+            "name": "유한건강생활 유한올인원종합비타민 이뮨 7일분",
+            "list_price": 18430
+          },
+          {
+            "idx": 10,
+            "name": "유한건강생활 뉴오리진 당당 혈당유산균 HAC01 1박스 1개월분",
+            "list_price": 68400
+          },
+          {
+            "idx": 11,
+            "name": "[H] 뉴오리진 프로바이오틱스100억 30일분 6박스(총 6개월분)",
+            "list_price": 64030
+          },
+          {
+            "idx": 12,
+            "name": "[H] 뉴오리진 프로바이오틱스100억 30일분 3박스",
+            "list_price": 32210
+          }
+        ]
+      }
     },
     {
       "id": "1-1",
       "name": "이너플로라 유산균 30정",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2201017629&sectId=3060687",
-      "ten_percent": false,
-      "phrase": "더블위크 현대홈쇼핑 현대카드 7%적립",
+      "ten_percent": true,
+      "phrase": "건강은 金이다 최대 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202608196632",
+          "prmo": "P202608278652",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "8.28 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 30000,
+            "max_won": 2000000,
+            "pct": 10
+          }
+        },
+        {
+          "prmo": "P202608196634",
           "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
+          "event_end": "8.28 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 50000,
@@ -55,18 +169,90 @@
         }
       ],
       "tiers": [],
-      "max_reward": "30,000P (단순 7%)",
-      "event_end": "8.26 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "8.28 23:59 / 8.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
+          "min_won": 30000,
+          "max_won": 2000000,
+          "pct": 10
+        },
+        {
           "min_won": 50000,
           "max_won": 428571,
           "pct": 7
         }
-      ]
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": 63900,
+        "member_price": 51120,
+        "card_slides": [
+          {
+            "alt": "토스페이 최대 13,000원 혜택",
+            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
+            "percent": null,
+            "price": 13000
+          },
+          {
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
+          }
+        ],
+        "kakao_price": 51120,
+        "kakao_reward_pt": 8690,
+        "kakao_final_cost": 42430,
+        "paybacks": {},
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 30000,
+          "tier_reward": 3000,
+          "nominal_pct": 10.0,
+          "actual_total": 51120,
+          "actual_reward": 3500,
+          "effective_pct": 6.846635367762128
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 51120,
+        "options": [
+          {
+            "idx": 1,
+            "name": "유한건강생활 뉴오리진 이너플로라 질유산균 3박스 총3개월분",
+            "list_price": 63900
+          },
+          {
+            "idx": 3,
+            "name": "유한건강생활 여성갱년기 백수오 올인원(뼈+혈행건강+기억력개선) 1박스 1개월분",
+            "list_price": 66900
+          },
+          {
+            "idx": 4,
+            "name": "유한건강생활 여성갱년기 백수오 올인원(뼈+혈행건강+기억력개선) 2박스 총2개월분",
+            "list_price": 126900
+          },
+          {
+            "idx": 7,
+            "name": "유한건강생활 전홍삼스틱 홍삼즙 오리지널 1박스 1개월분",
+            "list_price": 58900
+          },
+          {
+            "idx": 9,
+            "name": "유한건강생활 수신비책(면역+피로+항산화) 1박스 4주분",
+            "list_price": 64900
+          },
+          {
+            "idx": 10,
+            "name": "유한건강생활 천수단 녹용홍삼 활력환 15환 1박스",
+            "list_price": 95900
+          }
+        ]
+      }
     },
     {
       "id": "2",
@@ -148,30 +334,22 @@
         "member_price": 161820,
         "card_slides": [
           {
-            "alt": "cardCd40",
-            "text": "토스페이 NH 7% 즉시할인 150,493원",
-            "percent": 7,
-            "price": 150493
+            "alt": "토스페이 최대 13,000원 혜택",
+            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
+            "percent": null,
+            "price": 13000
           },
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 153,729원",
-            "percent": 5,
-            "price": 153729
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
           }
         ],
         "kakao_price": 161820,
         "kakao_reward_pt": 15000,
         "kakao_final_cost": 146820,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 153729,
-            "payback_pct": 1.0,
-            "after_payback": 152192,
-            "reward_pt": 15000,
-            "final_cost": 137192
-          }
-        },
+        "paybacks": {},
         "optimal_tier": {
           "qty": 2,
           "tier_min": 100000,
@@ -273,30 +451,22 @@
         "member_price": 159300,
         "card_slides": [
           {
-            "alt": "cardCd40",
-            "text": "토스페이 NH 7% 즉시할인 148,149원",
-            "percent": 7,
-            "price": 148149
+            "alt": "토스페이 최대 13,000원 혜택",
+            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
+            "percent": null,
+            "price": 13000
           },
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 151,335원",
-            "percent": 5,
-            "price": 151335
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
           }
         ],
         "kakao_price": 159300,
         "kakao_reward_pt": 15000,
         "kakao_final_cost": 144300,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 151335,
-            "payback_pct": 1.0,
-            "after_payback": 149822,
-            "reward_pt": 15000,
-            "final_cost": 134822
-          }
-        },
+        "paybacks": {},
         "optimal_tier": {
           "qty": 2,
           "tier_min": 100000,
@@ -522,30 +692,22 @@
         "member_price": 131920,
         "card_slides": [
           {
-            "alt": "cardCd40",
-            "text": "토스페이 NH 7% 즉시할인 122,686원",
-            "percent": 7,
-            "price": 122686
+            "alt": "토스페이 최대 13,000원 혜택",
+            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
+            "percent": null,
+            "price": 13000
           },
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 125,324원",
-            "percent": 5,
-            "price": 125324
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
           }
         ],
         "kakao_price": 131920,
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 121920,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 125324,
-            "payback_pct": 1.0,
-            "after_payback": 124071,
-            "reward_pt": 10000,
-            "final_cost": 114071
-          }
-        },
+        "paybacks": {},
         "optimal_tier": {
           "qty": 4,
           "tier_min": 100000,
@@ -596,24 +758,13 @@
       "id": "11",
       "name": "라메종드미엘 프랑스 라벤더 천연꿀 8병",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2246845189&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "ten_percent": false,
+      "phrase": "더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202608217148",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.27 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        },
-        {
-          "prmo": "P202608196632",
+          "prmo": "P202608196634",
           "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
+          "event_end": "8.28 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 50000,
@@ -623,67 +774,18 @@
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.27 23:59 / 8.26 23:59",
+      "max_reward": "30,000P (단순 7%)",
+      "event_end": "8.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
           "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        },
-        {
-          "min_won": 50000,
           "max_won": 428571,
           "pct": 7
         }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 328000,
-        "member_price": 262400,
-        "card_slides": [
-          {
-            "alt": "cardCd40",
-            "text": "토스페이 NH 7% 즉시할인 244,032원",
-            "percent": 7,
-            "price": 244032
-          },
-          {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 249,280원",
-            "percent": 5,
-            "price": 249280
-          }
-        ],
-        "kakao_price": 262400,
-        "kakao_reward_pt": 44608,
-        "kakao_final_cost": 217792,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 249280,
-            "payback_pct": 1.0,
-            "after_payback": 246787,
-            "reward_pt": 42378,
-            "final_cost": 204409
-          }
-        },
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 262400,
-          "actual_reward": 5000,
-          "effective_pct": 1.9054878048780488
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 262400,
-        "options": []
-      }
+      ]
     },
     {
       "id": "16",
@@ -861,106 +963,13 @@
       "id": "17",
       "name": "데이즈온 원데이 알파 8개",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2247036059&sectId=3059445",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
-      "events": [
-        {
-          "prmo": "P202608217148",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.27 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        },
-        {
-          "prmo": "P202608196632",
-          "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 428571,
-            "pct": 7
-          }
-        }
-      ],
-      "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.27 23:59 / 8.26 23:59",
-      "has_coupon": false,
-      "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        },
-        {
-          "min_won": 50000,
-          "max_won": 428571,
-          "pct": 7
-        }
-      ],
-      "payment": {
-        "qty": 2,
-        "list_price": 119800,
-        "member_price": 95840,
-        "card_slides": [
-          {
-            "alt": "cardCd40",
-            "text": "토스페이 NH 7% 즉시할인 89,132원",
-            "percent": 7,
-            "price": 89132
-          },
-          {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 91,048원",
-            "percent": 5,
-            "price": 91048
-          }
-        ],
-        "kakao_price": 95840,
-        "kakao_reward_pt": 16293,
-        "kakao_final_cost": 79547,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 91048,
-            "payback_pct": 1.0,
-            "after_payback": 90138,
-            "reward_pt": 15478,
-            "final_cost": 74660
-          }
-        },
-        "optimal_tier": {
-          "qty": 2,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 95840,
-          "actual_reward": 5000,
-          "effective_pct": 5.217028380634391
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 47920,
-        "options": []
-      }
-    },
-    {
-      "id": "22",
-      "name": "올바른건강식품 와이 9박",
-      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244934734&sectId=3059445",
       "ten_percent": false,
       "phrase": "더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202608196632",
+          "prmo": "P202608196634",
           "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
+          "event_end": "8.28 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 50000,
@@ -971,7 +980,7 @@
       ],
       "tiers": [],
       "max_reward": "30,000P (단순 7%)",
-      "event_end": "8.26 23:59",
+      "event_end": "8.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -984,27 +993,27 @@
       ]
     },
     {
-      "id": "25",
-      "name": "유기농 석류젤리 9박(90개)",
-      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445",
+      "id": "22",
+      "name": "올바른건강식품 와이 9박",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244934734&sectId=3059445",
       "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "phrase": "건강은 金이다 최대 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202608217148",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.27 23:59",
+          "prmo": "P202608278652",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "8.28 23:59",
           "tiers": [],
           "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
+            "min_won": 30000,
+            "max_won": 2000000,
             "pct": 10
           }
         },
         {
-          "prmo": "P202608196632",
+          "prmo": "P202608196634",
           "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
+          "event_end": "8.28 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 50000,
@@ -1014,15 +1023,111 @@
         }
       ],
       "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.27 23:59 / 8.26 23:59",
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "8.28 23:59 / 8.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
       "simple_ranges": [
         {
+          "min_won": 30000,
+          "max_won": 2000000,
+          "pct": 10
+        },
+        {
           "min_won": 50000,
-          "max_won": 10000000,
+          "max_won": 428571,
+          "pct": 7
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": 73710,
+        "member_price": 66340,
+        "card_slides": [
+          {
+            "alt": "토스페이 최대 13,000원 혜택",
+            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
+            "percent": null,
+            "price": 13000
+          },
+          {
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
+          }
+        ],
+        "kakao_price": 66340,
+        "kakao_reward_pt": 11278,
+        "kakao_final_cost": 55062,
+        "paybacks": {},
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 30000,
+          "tier_reward": 3000,
+          "nominal_pct": 10.0,
+          "actual_total": 66340,
+          "actual_reward": 3500,
+          "effective_pct": 5.275851673198673
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 66340,
+        "options": [
+          {
+            "idx": 1,
+            "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 9박스 (총 27개월분)",
+            "list_price": 73710
+          },
+          {
+            "idx": 2,
+            "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 6박스 (총 18개월분)",
+            "list_price": 53910
+          }
+        ]
+      }
+    },
+    {
+      "id": "25",
+      "name": "유기농 석류젤리 9박(90개)",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2243971283&sectId=3059445",
+      "ten_percent": true,
+      "phrase": "건강은 金이다 최대 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "events": [
+        {
+          "prmo": "P202608278652",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "8.28 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 30000,
+            "max_won": 2000000,
+            "pct": 10
+          }
+        },
+        {
+          "prmo": "P202608196634",
+          "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
+          "event_end": "8.28 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 428571,
+            "pct": 7
+          }
+        }
+      ],
+      "tiers": [],
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "8.28 23:59 / 8.28 23:59",
+      "has_coupon": false,
+      "error": null,
+      "coupon_claimed": false,
+      "simple_ranges": [
+        {
+          "min_won": 30000,
+          "max_won": 2000000,
           "pct": 10
         },
         {
@@ -1037,38 +1142,30 @@
         "member_price": 55120,
         "card_slides": [
           {
-            "alt": "cardCd40",
-            "text": "토스페이 NH 7% 즉시할인 51,262원",
-            "percent": 7,
-            "price": 51262
+            "alt": "토스페이 최대 13,000원 혜택",
+            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
+            "percent": null,
+            "price": 13000
           },
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 52,364원",
-            "percent": 5,
-            "price": 52364
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
           }
         ],
         "kakao_price": 55120,
         "kakao_reward_pt": 9370,
         "kakao_final_cost": 45750,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 52364,
-            "payback_pct": 1.0,
-            "after_payback": 51840,
-            "reward_pt": 8901,
-            "final_cost": 42939
-          }
-        },
+        "paybacks": {},
         "optimal_tier": {
           "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
+          "tier_min": 30000,
+          "tier_reward": 3000,
           "nominal_pct": 10.0,
           "actual_total": 55120,
-          "actual_reward": 5000,
-          "effective_pct": 9.071117561683598
+          "actual_reward": 3500,
+          "effective_pct": 6.34978229317852
         },
         "effective_ten_percent": true,
         "error": null,
@@ -1093,13 +1190,109 @@
       "id": "33",
       "name": "GRN 붓기캔디",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2250831230&sectId=3060687",
+      "ten_percent": true,
+      "phrase": "건강은 金이다 최대 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
+      "events": [
+        {
+          "prmo": "P202608278652",
+          "name": "건강은 金이다 최대 10%적립",
+          "event_end": "8.28 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 30000,
+            "max_won": 2000000,
+            "pct": 10
+          }
+        },
+        {
+          "prmo": "P202608196634",
+          "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
+          "event_end": "8.28 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 428571,
+            "pct": 7
+          }
+        }
+      ],
+      "tiers": [],
+      "max_reward": "200,000P (단순 10%)",
+      "event_end": "8.28 23:59 / 8.28 23:59",
+      "has_coupon": false,
+      "error": null,
+      "coupon_claimed": false,
+      "simple_ranges": [
+        {
+          "min_won": 30000,
+          "max_won": 2000000,
+          "pct": 10
+        },
+        {
+          "min_won": 50000,
+          "max_won": 428571,
+          "pct": 7
+        }
+      ],
+      "payment": {
+        "qty": 1,
+        "list_price": 69900,
+        "member_price": 59420,
+        "card_slides": [
+          {
+            "alt": "토스페이 최대 13,000원 혜택",
+            "text": "토스페이 최대 13,000원 혜택 8/1~8/31, 선착순 혜택!",
+            "percent": null,
+            "price": 13000
+          },
+          {
+            "alt": "네이버페이 최대 2천원 혜택",
+            "text": "네이버페이 최대 2천원 혜택 8/1~8/31 동안, 선착순 혜택!",
+            "percent": null,
+            "price": null
+          }
+        ],
+        "kakao_price": 59420,
+        "kakao_reward_pt": 10101,
+        "kakao_final_cost": 49319,
+        "paybacks": {},
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 30000,
+          "tier_reward": 3000,
+          "nominal_pct": 10.0,
+          "actual_total": 59420,
+          "actual_reward": 3500,
+          "effective_pct": 5.890272635476271
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 59420,
+        "options": [
+          {
+            "idx": 1,
+            "name": "GRN 붓기 케어 리셋 브이 캔디 6박스 (타트체리맛)",
+            "list_price": 69900
+          },
+          {
+            "idx": 2,
+            "name": "GRN 붓기 케어 리셋 브이 캔디 3EA (타트체리맛)",
+            "list_price": 36900
+          }
+        ]
+      }
+    },
+    {
+      "id": "34",
+      "name": "데이즈온 파라다이스 버닝 9박스",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2250397383&sectId=3060687",
       "ten_percent": false,
       "phrase": "더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202608196632",
+          "prmo": "P202608196634",
           "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
+          "event_end": "8.28 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 50000,
@@ -1110,7 +1303,7 @@
       ],
       "tiers": [],
       "max_reward": "30,000P (단순 7%)",
-      "event_end": "8.26 23:59",
+      "event_end": "8.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -1123,202 +1316,16 @@
       ]
     },
     {
-      "id": "34",
-      "name": "데이즈온 파라다이스 버닝 9박스",
-      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2250397383&sectId=3060687",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
-      "events": [
-        {
-          "prmo": "P202608217148",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.27 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        },
-        {
-          "prmo": "P202608196632",
-          "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 428571,
-            "pct": 7
-          }
-        }
-      ],
-      "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.27 23:59 / 8.26 23:59",
-      "has_coupon": false,
-      "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        },
-        {
-          "min_won": 50000,
-          "max_won": 428571,
-          "pct": 7
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 248000,
-        "member_price": 198400,
-        "card_slides": [
-          {
-            "alt": "cardCd40",
-            "text": "토스페이 NH 7% 즉시할인 184,512원",
-            "percent": 7,
-            "price": 184512
-          },
-          {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 188,480원",
-            "percent": 5,
-            "price": 188480
-          }
-        ],
-        "kakao_price": 198400,
-        "kakao_reward_pt": 33728,
-        "kakao_final_cost": 164672,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 188480,
-            "payback_pct": 1.0,
-            "after_payback": 186595,
-            "reward_pt": 32042,
-            "final_cost": 154553
-          }
-        },
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 198400,
-          "actual_reward": 5000,
-          "effective_pct": 2.5201612903225805
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 198400,
-        "options": []
-      }
-    },
-    {
       "id": "35",
       "name": "데이즈온 프리바이오틱스 에프오에스 트리플",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2247305088",
-      "ten_percent": true,
-      "phrase": "건강식품 브랜드 특별전 10%적립 / 더블위크 현대홈쇼핑 현대카드 7%적립",
-      "events": [
-        {
-          "prmo": "P202608217148",
-          "name": "건강식품 브랜드 특별전 10%적립",
-          "event_end": "8.27 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 10000000,
-            "pct": 10
-          }
-        },
-        {
-          "prmo": "P202608196632",
-          "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
-          "tiers": [],
-          "simple_range": {
-            "min_won": 50000,
-            "max_won": 428571,
-            "pct": 7
-          }
-        }
-      ],
-      "tiers": [],
-      "max_reward": "1,000,000P (단순 10%)",
-      "event_end": "8.27 23:59 / 8.26 23:59",
-      "has_coupon": false,
-      "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [
-        {
-          "min_won": 50000,
-          "max_won": 10000000,
-          "pct": 10
-        },
-        {
-          "min_won": 50000,
-          "max_won": 428571,
-          "pct": 7
-        }
-      ],
-      "payment": {
-        "qty": 1,
-        "list_price": 92000,
-        "member_price": 82800,
-        "card_slides": [
-          {
-            "alt": "cardCd40",
-            "text": "토스페이 NH 7% 즉시할인 77,004원",
-            "percent": 7,
-            "price": 77004
-          },
-          {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 78,660원",
-            "percent": 5,
-            "price": 78660
-          }
-        ],
-        "kakao_price": 82800,
-        "kakao_reward_pt": 14076,
-        "kakao_final_cost": 68724,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 78660,
-            "payback_pct": 1.0,
-            "after_payback": 77873,
-            "reward_pt": 13372,
-            "final_cost": 64501
-          }
-        },
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 82800,
-          "actual_reward": 5000,
-          "effective_pct": 6.038647342995169
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 82800,
-        "options": []
-      }
-    },
-    {
-      "id": "36",
-      "name": "센텔리안24 더 마데카 크림 50ml 20개 (옵션3)",
-      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546",
       "ten_percent": false,
       "phrase": "더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202608196632",
+          "prmo": "P202608196634",
           "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
+          "event_end": "8.28 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 50000,
@@ -1329,7 +1336,40 @@
       ],
       "tiers": [],
       "max_reward": "30,000P (단순 7%)",
-      "event_end": "8.26 23:59",
+      "event_end": "8.28 23:59",
+      "has_coupon": false,
+      "error": null,
+      "coupon_claimed": false,
+      "simple_ranges": [
+        {
+          "min_won": 50000,
+          "max_won": 428571,
+          "pct": 7
+        }
+      ]
+    },
+    {
+      "id": "36",
+      "name": "센텔리안24 더 마데카 크림 50ml 20개 (옵션3)",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546",
+      "ten_percent": false,
+      "phrase": "더블위크 현대홈쇼핑 현대카드 7%적립",
+      "events": [
+        {
+          "prmo": "P202608196634",
+          "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
+          "event_end": "8.28 23:59",
+          "tiers": [],
+          "simple_range": {
+            "min_won": 50000,
+            "max_won": 428571,
+            "pct": 7
+          }
+        }
+      ],
+      "tiers": [],
+      "max_reward": "30,000P (단순 7%)",
+      "event_end": "8.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -1349,9 +1389,9 @@
       "phrase": "더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202608196632",
+          "prmo": "P202608196634",
           "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
+          "event_end": "8.28 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 50000,
@@ -1362,7 +1402,7 @@
       ],
       "tiers": [],
       "max_reward": "30,000P (단순 7%)",
-      "event_end": "8.26 23:59",
+      "event_end": "8.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -1382,9 +1422,9 @@
       "phrase": "더블위크 현대홈쇼핑 현대카드 7%적립",
       "events": [
         {
-          "prmo": "P202608196632",
+          "prmo": "P202608196634",
           "name": "더블위크 현대홈쇼핑 현대카드 7%적립",
-          "event_end": "8.26 23:59",
+          "event_end": "8.28 23:59",
           "tiers": [],
           "simple_range": {
             "min_won": 50000,
@@ -1395,7 +1435,7 @@
       ],
       "tiers": [],
       "max_reward": "30,000P (단순 7%)",
-      "event_end": "8.26 23:59",
+      "event_end": "8.28 23:59",
       "has_coupon": false,
       "error": null,
       "coupon_claimed": false,
@@ -1422,15 +1462,15 @@
     }
   ],
   "ten_percent_ids": [
+    "1",
+    "1-1",
     "2",
     "3",
     "8",
     "9",
-    "11",
     "16",
-    "17",
+    "22",
     "25",
-    "34",
-    "35"
+    "33"
   ]
 }

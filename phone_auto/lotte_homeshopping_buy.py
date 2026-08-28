@@ -52,6 +52,7 @@ from phone_auto.hmall_hyundai_buy import (
     card_digits_on_screen, next_button_enabled,   # 2026-08-02 공통 검증 헬퍼
     pay_samsung as _pay_samsung_shared,  # ★삼성 일반결제 = 3사 공용 정본 (몰별 복제 금지)
     pay_nh_general,                     # ★NH 일반결제 = 3사 공용 정본 (몰 무관, 항상 비전 핸드세이크)
+    HANA_FLOW,                          # 하나앱 결제 flow (카드앱 구간 몰 무관 — pay_lotte_hana 재사용)
     preflight_today_files,              # ★결제 전 오늘자 데이터 확인 (3사 공용)
     _dump_texts,                        # ★윈도우 OCR 이 놓치는 텍스트 보강 (OCR 과 겹쳐 읽기)
 )
@@ -468,16 +469,21 @@ def _coupon_enabled(gimg, cy: int, x0: int = 110, x1: int = 720, band: int = 16,
 
 
 def _scroll_to(text: str, contains: bool = True, max_scroll: int = 8, down: bool = True):
-    """text 가 보일 때까지 스크롤하며 탐색. 찾으면 OCR item 반환, 못 찾으면 None."""
-    for _ in range(max_scroll):
-        it = ocr_find(text, contains=contains)
-        if it:
-            return it
-        if down:
-            _adb().swipe(540, 1700, 540, 800, 400)
-        else:
-            _adb().swipe(540, 800, 540, 1700, 400)
-        nap(0.8)
+    """text 가 보일 때까지 스크롤하며 탐색. 찾으면 OCR item 반환, 못 찾으면 None.
+
+    ★한 방향만 훑으면 조용히 실패한다 (2026-08-28 #2·#3 실측): 할인쿠폰 '선택완료' 뒤 화면이
+      이미 플러스쿠폰 **아래**에 있으면 아래로 8회 헛스크롤 → '플러스쿠폰 섹션 없음' 으로 스킵돼
+      플러스쿠폰·포인트가 통째로 빠진 채 결제됐다(#2 630,000원). 못 찾으면 반대방향으로 한 번 더."""
+    for d in (down, not down):
+        for _ in range(max_scroll):
+            it = ocr_find(text, contains=contains)
+            if it:
+                return it
+            if d:
+                _adb().swipe(540, 1700, 540, 800, 400)
+            else:
+                _adb().swipe(540, 800, 540, 1700, 400)
+            nap(0.8)
     return None
 
 
@@ -490,6 +496,10 @@ def set_discount_coupons() -> dict:
         out["err"] = "할인쿠폰 섹션 미발견"; return out
     _adb().tap(sec["cx"], sec["cy"]); nap(1.0)        # 섹션 라디오 활성
     chg = _coupon_change_btn(sec)
+    if not chg:
+        sec = _scroll_to("할인쿠폰") or sec           # 라디오 탭 리플로우로 낡은 좌표 → 재탐색 (set_plus_coupons 와 같은 이유)
+        nap(0.6)
+        chg = _coupon_change_btn(sec)
     if not chg:
         out["err"] = "할인쿠폰 변경 버튼 미발견"; return out
     _adb().tap(chg["cx"], chg["cy"]); nap(1.8)        # 모달 '할인선택' 진입
@@ -522,6 +532,13 @@ def set_plus_coupons() -> dict:
         out["skip"] = "플러스쿠폰 섹션 없음"; out["ok"] = True; return out
     _adb().tap(sec["cx"], sec["cy"]); nap(1.0)
     chg = _coupon_change_btn(sec)
+    if not chg:
+        # ★섹션 라디오 탭이 화면을 리플로우시키면 sec 좌표가 낡아 '변경 >' 을 놓친다.
+        #   2026-08-28 #5 yr5326 실측: 플러스쿠폰 **26장 보유**인데 '받은 쿠폰 X' 로 스킵돼
+        #   627,197원(정상 543,xxx원)에 결제될 뻔했다 → 섹션을 다시 찾아 좌표 갱신 후 재시도.
+        sec = _scroll_to("플러스쿠폰") or sec
+        nap(0.6)
+        chg = _coupon_change_btn(sec)
     if not chg:
         out["skip"] = "플러스쿠폰 변경 없음(받은 쿠폰 X)"; out["ok"] = True; return out
     _adb().tap(chg["cx"], chg["cy"]); nap(1.8)
@@ -557,11 +574,17 @@ def use_all_points() -> dict:
     라벨 스크롤 의존(옛 버그: '적립혜택 L.POINT' 오매칭으로 L.POINT 사용 누락) 대신,
     포인트사용 섹션의 **모든 '전액사용' 버튼을 탭**(적립금·L.POINT). 탭하면 '적용취소'로 바뀌어 멱등."""
     out = {"used": 0}
-    # 포인트사용 섹션('전액사용' 버튼)까지 스크롤
-    for _ in range(8):
-        if any("전액사용" in it["text"].replace(" ", "") for it in _ocr_texts(cap())):
+    # 포인트사용 섹션('전액사용' 버튼)까지 스크롤. ★_scroll_to 와 같은 이유로 양방향 —
+    #   아래로만 훑으면 이미 지나친 섹션을 못 찾고 조용히 used:0 이 된다 (2026-08-28 #2·#3).
+    def _points_visible() -> bool:
+        return any("전액사용" in it["text"].replace(" ", "") for it in _ocr_texts(cap()))
+    for dy in (-700, 700):
+        for _ in range(8):
+            if _points_visible():
+                break
+            _adb().swipe(540, 1500, 540, 1500 + dy, 450); nap(0.8)
+        if _points_visible():
             break
-        _adb().swipe(540, 1500, 540, 800, 450); nap(0.8)
     # 보이는 '전액사용' 모두 탭 (위→아래). 탭 후 '적용취소'가 되어 다음 루프엔 남은 것(L.POINT)만 매칭.
     for _ in range(5):
         btns = [it for it in _ocr_texts(cap()) if "전액사용" in it["text"].replace(" ", "")]
@@ -935,6 +958,56 @@ def pay_lotte_kb() -> dict:
     return out
 
 
+def pay_lotte_hana() -> dict:
+    """하나카드 = 하나Pay 앱카드. hmall `pay_hana` 와 동일 — 카드앱 구간은 몰 무관이라 flow 재사용.
+    ⚠️ 롯데에선 **미검증**(2026-08-28 첫 시도). 실패해도 카드 인증 전에 멈추므로 재시도 안전.
+    경로: (원)결제하기 → 하나 SDK '하나Pay 하나카드 결제' 박스 → 하나앱(com.hanaskcard.paycla)
+      → '다음' → nFilter 키패드 pin6(source=sequential_logo: 로고칸 검출 순서매핑, 숫자 OCR 안 함)
+      → 롯데 복귀 주문완료 폴링. ⚠️실 결제."""
+    pin6 = _card_secrets().get("하나", {}).get("pin6")
+    if not pin6:
+        return {"step": "secrets", "err": "card_secrets['하나'].pin6 없음"}
+    # ★하나앱은 이전 결제 세션 잔재가 남으면 진입 즉시 '안정적인 이용을 위해 앱을 다시 실행해주세요'
+    #   경고를 띄우고, 그게 '다음' 버튼을 덮어 flow step3 이 timeout 한다
+    #   (2026-08-28 #5·#7 실측 — 연속 결제 2~3계정째부터 재현. 앞선 계정 결제 후 잔재가 원인).
+    #   결제 시작 **전에** 종료해 깨끗한 상태로 진입한다. 카드 인증 전이라 안전.
+    subprocess.run(["adb", "shell", "am", "force-stop", "com.hanaskcard.paycla"],
+                   capture_output=True)
+    time.sleep(1.0)
+    out = {"step": "order_sheet", "card": "하나"}
+    if screen_has("다음에도") or screen_has("사용할까요"):
+        ocr_tap("사용할게요", contains=True, retries=2)
+    pay = next((it for it in _ocr_texts(cap()) if "결제하기" in it["text"] and it["cy"] > 2000), None)
+    if pay:
+        _adb().tap(pay["cx"], pay["cy"])
+    elif not ocr_tap("결제하기", contains=True):
+        out["err"] = "원결제하기 실패"; return out
+    time.sleep(3.0)
+    # 2) 하나 SDK 결제방식 화면 → '하나Pay 하나카드 결제' 박스 (MG+/간편결제/SMS/일반 아님)
+    out["step"] = "hana_modal"
+    if not wait_text("하나카드 결제", timeout=15):
+        out["err"] = "하나 결제방식 화면 미도달"; return out
+    if not ocr_tap("하나카드 결제", contains=True):
+        out["err"] = "'하나Pay 하나카드 결제' 박스 실패"; return out
+    # 3) 하나앱 구간 = hmall 검증 flow 재사용 (16=앱대기 … 21=결제진행 대기). 22 이후는 hmall 전용이라 제외.
+    out["step"] = "hana_app"
+    flow = json.loads(HANA_FLOW.read_text(encoding="utf-8"))["flow_payment"]
+    try:
+        FlowRunner(use_camera=False).run(flow[16:22], {})
+    except Exception as e:
+        out["err"] = f"하나앱 SDK 실패: {e}"; return out
+    # 4) 롯데 복귀 + 주문완료 폴링
+    out["step"] = "order_complete"
+    if not _wait_app(PKG, timeout=20):
+        out["err"] = "롯데앱 복귀 실패(결제 미확정 가능)"; return out
+    time.sleep(3.0)
+    confirmed, order = _poll_order_complete(30)
+    if confirmed:
+        out["ok"] = True; out["order"] = order; return out
+    out["err"] = "주문완료 미확인(timeout)"
+    return out
+
+
 # ──────── D'''. 현대카드 결제 (앱카드 — 현대카드 앱 dump 셔플키패드) ────────
 
 def pay_lotte_hyundai() -> dict:
@@ -1274,6 +1347,8 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
         pay = pay_lotte_kb()                    # ✅ #13 G70658 라이브검증 (KB Pay 간편결제)
     elif use_card == "현대":
         pay = pay_lotte_hyundai()               # ✅ 2026-06-12 #1 B87302 라이브검증 (앱카드)
+    elif use_card == "하나":
+        pay = pay_lotte_hana()                  # ⚠️롯데 미검증 (2026-08-28 첫 시도, hmall pay_hana 재사용)
     elif use_card == "NH":
         # ✅ 2026-07-31 #9 wlstmdlsfk 라이브검증 (주문 2026-07-31-G83859 / 547,319원 / 뷰티 5,701P).
         # ★NH 는 **항상 에이전트 비전 핸드세이크**로 정지한다(3사 공용 정본, 환경변수 없음).
