@@ -29,7 +29,32 @@ MANIFEST = ROOT / "cart" / "today_carts.json"
 # phone_auto 인터프리터: pyobjc/Vision 필요. brew python3 심볼릭이 사라져(2026-07-10) 존재하는 것 폴백.
 PHONE_PY = os.environ.get("PHONE_PY") or next(
     (p for p in ("/opt/homebrew/bin/python3", "/usr/bin/python3") if Path(p).exists()), sys.executable)
-BROWSER_PY = os.environ.get("BROWSER_PY", "python3")                # sulwhasoo PC (playwright)
+def _resolve_browser_py() -> str:
+    """PC(playwright) 서브프로세스 인터프리터 — **실제로 실행되는 것**으로 고른다.
+
+    ★윈도우 함정 (2026-08-30 실사고): 종전 기본값 `"python3"` 은 윈도우에서 **Microsoft Store
+      스텁**(`.../WindowsApps/python3`)에 잡힌다. 스텁은 아무것도 실행하지 않고
+      "Python was not found" 한 줄만 찍고 끝난다 → 적립 서브프로세스가 `login True` 를 못 내고
+      **계정마다 3회 재시도 후 H.Point 적립 0건**이 됐다(#13 주문 20260830062103 에서 실측).
+      증상은 '적립 무응답'인데 원인은 인터프리터였다 — 8/25 인코딩 사고와 같은 계열의
+      "조용히 빈 결과" 다.
+    → **이름이 있다고 쓰지 않는다. 한 줄 실행해 보고 고른다.**
+    """
+    cands = [os.environ.get("BROWSER_PY"), "python3", sys.executable, "python"]
+    for c in cands:
+        if not c:
+            continue
+        try:
+            r = subprocess.run([c, "-c", "print('ok')"], capture_output=True, text=True, timeout=20)
+            if r.returncode == 0 and "ok" in (r.stdout or ""):
+                return c
+        except Exception:
+            continue
+        print(f"[WARN] BROWSER_PY 후보 '{c}' 실행 불가 — 다음 후보", flush=True)
+    return sys.executable
+
+
+BROWSER_PY = _resolve_browser_py()                                  # sulwhasoo PC (playwright)
 DELAY = int(os.environ.get("BUY_DELAY_SEC", "0"))                   # 결제 성공 사이 대기(추적회피 필요 시)
 
 # 몰 이름 정규화

@@ -933,7 +933,46 @@ def pay_lotte() -> dict:
         out["ok"] = True
     except Exception as e:
         out["err"] = f"롯데앱 SDK 실패: {e}"
+        out.update(_diagnose_loca())      # ★실패에 **이름**을 붙인다 (아래 함수 주석 참고)
     return out
+
+
+# LOCA 앱이 결제 대신 띄우는 차단 화면들 — 화면의 고유 문구로 판정한다.
+_LOCA_BLOCKERS = (
+    ("LOCA_APP_RESET_REQUIRED",
+     ("앱 재설정", "정보가 만료", "다시 인증이 필요"),
+     "LOCA 앱 등록정보가 만료됐다 — 앱에서 '초기화' → 본인인증 → 로카페이·간편번호 재등록이 필요하다. "
+     "재등록은 본인인증/비밀번호라 자동화 대상이 아니다(사람이 직접). 끝난 뒤 resume 으로 이어붙일 것."),
+    ("LOCA_APP_UPDATE_REQUIRED",
+     ("업데이트", "최신 버전"),
+     "LOCA 앱 업데이트 요구 화면 — 스토어에서 업데이트 후 재실행할 것."),
+    ("LOCA_LOGIN_REQUIRED",
+     ("로그인", "인증서"),
+     "LOCA 앱이 로그인/인증서를 요구한다 — 앱에서 로그인 후 재실행할 것."),
+)
+
+
+def _diagnose_loca() -> dict:
+    """롯데앱(LOCA) 결제 실패의 **진짜 원인에 이름을 붙인다.**
+
+    2026-08-30 실사고: `tap_dump_text '결제하기' 미발견 (timeout 8s)` 로 죽었는데, 실제 화면은
+      「앱 재설정 안내 — 앱에 등록된 정보가 만료되어, 안전한 이용을 위해 다시 인증이 필요합니다」
+    였다. 증상 이름('결제하기 미발견')만 보면 flow 좌표/타임아웃을 의심하게 된다 — 8/25 KB Pay
+    (USB 디버깅 차단이 'KB앱 미진입'으로 나타남)와 **똑같은 함정**이다.
+    → 실패한 그 자리에서 화면을 읽어 원인 코드와 해결법을 남긴다. 못 알아본 화면도
+      **텍스트를 그대로 첨부**해서, 다음 사람이 화면을 다시 재현하지 않아도 되게 한다.
+    """
+    try:
+        texts = [it["text"] for it in _dump_texts()]
+    except Exception as e:
+        return {"diag": f"화면 판독 실패({e})"}
+    joined = " ".join(texts)
+    for code, needles, howto in _LOCA_BLOCKERS:
+        if all(n in joined for n in needles):
+            print(f"   [LOCA] ⛔ {code} — {howto}", flush=True)
+            return {"blocked": code, "howto": howto}
+    print(f"   [LOCA] 화면 텍스트({len(texts)}개): {texts[:20]}", flush=True)
+    return {"screen_texts": texts[:20]}
 
 
 # ★카드앱 실행 차단 감지 — **3사 공용**(현대몰 식품·설화수 / 롯데몰 설화수 전부).
@@ -1008,9 +1047,17 @@ def wait_order_complete(timeout: float = 20, order_grace: float = 3.0) -> dict:
       같은 이유로 번호 잡힐 때까지 재OCR — 2026-06-08/06-22 번호 None 사고). 다만 hmall 주문완료는
       곧 home 으로 자동이동하고 뷰티 재인증이 뒤에 있어 **무한정 기다리면 안 된다** → 짧게 3초만.
     """
+    def _read() -> str:
+        # ★OCR + dump **병합** — OCR 단독은 이 화면을 놓친다 (2026-08-30 #14 johwajeong 실사고:
+        #   실제로는 결제 성공(마이페이지 '결제완료' 확인)인데 20s 타임아웃으로 ORDER_NOT_COMPLETE
+        #   판정 → 구매대장·H.Point 적립·paid 플래그가 통째로 누락됐다. 롯데 쪽엔 8/25 에 dump
+        #   폴백을 넣어놓고(5e7895f) **이 파일엔 같은 모양을 안 고쳤던 것** — READ_FIRST
+        #   「버그 하나를 고치면 같은 모양을 폴더 전체에서 찾는다」 위반).
+        return " ".join(it["text"] for it in (_ocr_texts(cap()) + _dump_texts()))
+
     end = time.time() + timeout
     while time.time() < end:
-        txt = " ".join(it["text"] for it in _ocr_texts(cap()))
+        txt = _read()
         for fm in ORDER_FAIL_MARKERS:
             if fm in txt:
                 return {"ok": False, "reason": f"결제거절:{fm}"}
@@ -1020,7 +1067,7 @@ def wait_order_complete(timeout: float = 20, order_grace: float = 3.0) -> dict:
             g_end = time.time() + order_grace
             while not order and time.time() < g_end:      # 번호만 늦게 뜨는 프레임 대비 (짧게)
                 time.sleep(0.6)
-                order = scan_order_no(" ".join(it["text"] for it in _ocr_texts(cap())))
+                order = scan_order_no(_read())
             print(f"   [order] {order or '✗판독실패 — 대장에 주문번호 없이 기록된다'}", flush=True)
             return {"ok": True, "reason": dm, "order": order}
         time.sleep(0.8)
@@ -1637,6 +1684,67 @@ def detect_card() -> str | None:
     return None
 
 
+_PAY_BTN_RE = re.compile(r"([\d,]{4,})\s*원\s*결제하기")
+
+
+def read_pay_amount() -> int | None:
+    """주문서 하단 'N원 결제하기' 버튼에서 **결제 예정 금액**을 읽는다 (OCR + dump 병합).
+
+    ★윈도우 OCR 단독은 이 버튼(검은 배경 흰 글씨)을 놓치거나 깨먹는다 → `_dump_texts()` 와
+      겹쳐 읽는다 (READ_FIRST 「판독은 OCR + dump 를 겹쳐 쓴다」).
+    ★OCR 이 '170,810원' 과 '결제하기' 를 **다른 item 으로 쪼개는** 경우가 있어, 한 덩어리 매칭이
+      실패하면 '결제하기' 행과 같은 줄(±60px)의 금액을 폴백으로 쓴다.
+    판독 실패는 None — 호출측이 '모르는 채 결제' 를 하지 않도록 그대로 드러낸다.
+    """
+    its = _ocr_texts(cap()) + _dump_texts()
+    for it in its:
+        m = _PAY_BTN_RE.search(it["text"].replace(" ", " "))
+        if m:
+            return int(m.group(1).replace(",", ""))
+    btn = next((it for it in its if "결제하기" in it["text"]), None)
+    if btn:
+        for it in its:
+            if abs(it["cy"] - btn["cy"]) > 60 or "결제하기" in it["text"]:
+                continue
+            m = re.search(r"(\d{1,3}(?:,\d{3})+)", it["text"])
+            if m:
+                return int(m.group(1).replace(",", ""))
+    return None
+
+
+def money_guard(idx: int, res: dict) -> bool:
+    """★결제 직전 금액 가드 — 통과하면 True, 막았으면 False(res['status'] 세팅됨).
+
+    2026-08-25 롯데에서 실제로 계정당 15만원을 막아낸 가드를 **현대몰에도 그대로** 옮긴 것
+    (사용자 지시: "롯데몰에서 kb카드쓰는거지만 현대몰에서도 kb카드 쓰는날있을거임, 그럼 그 때도
+    이지랄 안나게 동일하게 실수없이 잘 주문되게끔 코드수정잘해줘"). 혜택(즉시할인·쿠폰)이 조용히
+    0원으로 통과해도 **사람이 로그를 보는 것에 의존하지 않고 코드가** 막는다.
+
+    · `MAX_PAY=<원>` — 결제 예정 금액이 상한을 넘으면 결제하지 않는다.
+    · 금액 **판독 실패**도 MAX_PAY 가 걸려 있으면 정지 — 모르는 금액을 결제하지 않는다.
+    · `STOP_BEFORE_PAY=1` — 주문서까지만 만들고 결제 직전 정지(실돈 안 나감, 검증용).
+    """
+    amt = read_pay_amount()
+    res["pay_amount"] = amt
+    print(f"[#{idx}] 결제 예정 금액: {amt:,}원" if amt is not None
+          else f"[#{idx}] ⚠️ 결제 예정 금액 판독 실패", flush=True)
+    _max = os.environ.get("MAX_PAY")
+    if _max:
+        if amt is None:
+            res["status"] = (f"AMOUNT_UNREADABLE(MAX_PAY={_max} — 금액을 못 읽으면 결제 안 함)")
+            print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+            return False
+        if amt > int(_max):
+            res["status"] = f"AMOUNT_TOO_HIGH({amt} > MAX_PAY {_max}) — 혜택 미적용 의심, 결제 안 함"
+            print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+            return False
+    if os.environ.get("STOP_BEFORE_PAY") == "1":
+        res["status"] = f"STOP_BEFORE_PAY(금액={amt})"
+        print(f"[#{idx}] ⏹ STOP_BEFORE_PAY — 결제 직전 정지", flush=True)
+        return False
+    return True
+
+
 def _select_toss_card() -> dict:
     """주문서 '카드할인'에서 '토스페이' 카드 선택. 700px 캐러셀 정본은 토스 레이아웃 미지원
     (2026-07-15 실측: '캐러셀 None' → 검증 실패) → 토스 카드 박스 직접 탭 + 결제버튼 금액==토스카드 금액
@@ -1985,6 +2093,10 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
     if not sc.get("ok"):
         res["status"] = f"SELECT_CARD_FAIL:{use_card}:{sc.get('err')}"; return res
     lap(f"카드 선택 ({use_card})")
+    # ★PIN 직전 금액 확인 + 상한 가드 (READ_FIRST 「실결제는 PIN 직전 금액 확인」).
+    #   여기가 마지막 되돌릴 수 있는 지점이다 — 이 아래는 카드앱이라 실돈이 나간다.
+    if not money_guard(idx, res):
+        return res
     # 카드별 SDK ⚠️실돈
     print(f"[#{idx}] ⚠️ {use_card}카드 결제 실행", flush=True)
     if use_card == "현대":
@@ -2105,13 +2217,26 @@ def _record_after_done(res: dict, idx: int, combo_idx: int | None = None,
             mf = json.loads(mf_path.read_text(encoding="utf-8"))
             cart = next((c for c in mf.get("carts", [])
                          if c.get("mall") in ("현대", "hmall") and c.get("account") == idx), None)
-            for it in (cart or {}).get("items", []):
-                # ★부분선택 주문이면 **이번에 결제한 상품만** 기록 (안 그러면 나머지 상품까지
-                #   중복/선결제로 대장에 올라간다). 키워드는 카트 선택과 동일한 것을 쓴다.
-                if only and not any(k in (it.get("name") or "") for k in only):
-                    continue
-                PL.record_food("현대Hmall", res.get("id"), it.get("product"), qty=it.get("qty"),
-                               order_no=order_no, card=res.get("card"))
+            items = [it for it in (cart or {}).get("items", [])
+                     # ★부분선택 주문이면 **이번에 결제한 상품만** 기록 (안 그러면 나머지 상품까지
+                     #   중복/선결제로 대장에 올라간다). 키워드는 카트 선택과 동일한 것을 쓴다.
+                     if not (only and not any(k in (it.get("name") or "") for k in only))]
+            # ★금액은 **결제 직전 실측치**(money_guard 가 읽은 '원 결제하기' 버튼)를 우선한다.
+            #   종전엔 무조건 `cart/today.json` 의 즉시할인가를 썼는데, 그건 **포인트 사용 전** 금액이라
+            #   H.Point 를 쓰면 실제 청구액과 어긋난다 (2026-08-30 실측: #16 대장 144,229 vs 실청구
+            #   120,298 — 계정마다 포인트 잔액이 달라 오차도 제각각이었다). 대장의 '최종결제금액'은
+            #   카드에 실제로 청구된 값이어야 한다. 단일 상품 주문일 때만 안전하게 적용하고,
+            #   혼합 카트(2건 이상)는 상품별로 쪼갤 수 없으니 종전대로 today.json 기준을 쓴다.
+            amt = res.get("pay_amount") if len(items) == 1 else None
+            for it in items:
+                if amt is not None:
+                    name, _, t_qty = PL.food_info(it.get("product"))
+                    PL.record("현대Hmall", res.get("id"), name or f"식품#{it.get('product')}",
+                              it.get("qty") or t_qty or 1, amt,
+                              order_no=order_no, card=res.get("card"))
+                else:
+                    PL.record_food("현대Hmall", res.get("id"), it.get("product"), qty=it.get("qty"),
+                                   order_no=order_no, card=res.get("card"))
     except Exception as e:
         print(f"   [ledger] 기록 실패(무시): {e}", flush=True)
     res["reward"] = apply_reward_now(idx, only)   # ★H.Point 적립신청 (결제 직후 자동) — 결과를 요약까지 끌고 간다
@@ -2267,6 +2392,10 @@ def resume(idx=None, max_steps: int = 50) -> dict:
                 FlowRunner(use_camera=False).run_action({"action": "hmall_select_card_discount"})
             except Exception as e:
                 res["status"] = f"SELECT_CARD_FAIL(resume):{e}"; return res
+            # ★resume 도 같은 금액 가드를 통과해야 결제한다 — 한쪽에만 있는 가드는 곧 구멍이 된다
+            #   (READ_FIRST 「버그 하나를 고치면 같은 모양을 폴더 전체에서 찾는다」).
+            if not money_guard(idx if idx is not None else 0, res):
+                return res
             ocr_tap("결제하기", contains=True); wait_text("PIN번호 결제", timeout=15)
         elif s == "CART":
             cdp_select_all()

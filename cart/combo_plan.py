@@ -91,7 +91,9 @@ def main() -> int:
     if len(sys.argv) < 2:
         print(__doc__)
         return 1
-    ids = [int(x) for x in sys.argv[1].replace(" ", "").split(",") if x.strip().isdigit()]
+    # ★id 는 **문자열**로 다룬다 (2026-08-25 수정): today.json 의 상품 id 가 "17"·"1-1" 처럼
+    #   문자열이라 int 로 조회하면 전부 '미확보'로 떨어졌다(데이터는 멀쩡한데 계산 불가로 보였다).
+    ids = [x for x in sys.argv[1].replace(" ", "").split(",") if x.strip()]
     mx = LIMIT_PER_ID
     if "--max" in sys.argv:
         mx = int(sys.argv[sys.argv.index("--max") + 1])
@@ -107,7 +109,7 @@ def main() -> int:
 
     print(f"■ 대상 상품 (아이디당 최대 {mx}개, 카드할인 {sel[0]['card_pct']}% 후 단가 기준)")
     for p in sel:
-        print(f"   #{p['id']:>3} {p['name'][:30]:32s} 단가 {p['unit_card']:>8,}원   이벤트: {', '.join(p['events'])}")
+        print(f"   #{str(p['id']):>4} {p['name'][:30]:32s} 단가 {p['unit_card']:>8,}원   이벤트: {', '.join(p['events'])}")
 
     # 전 조합 (각 1..mx) 평가
     rows = []

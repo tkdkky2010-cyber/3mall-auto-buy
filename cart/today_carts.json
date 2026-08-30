@@ -1,13 +1,108 @@
 {
-  "_comment": "2026-08-24 담기 결과 — 롯데 #1~7 조합3(e 탄력3종 x2 + f 윤조에센스90 x2), 각 계정 '카트 2건' 검증 완료. 폰앱 결제 대기(LOTTE_CART_ONLY). 금액은 오늘 step1 미실행으로 미상(구매대장은 수량만 필요). 현대 식품 담기는 오늘 없음.",
-  "date": "2026-08-24",
+  "_comment": "2026-08-30 — 사용자가 현대몰 계정 13~19 장바구니를 미리 담아둠(이 세션은 결제만 한다). 카트 실측(#13 gcd0327, 폰 webview): '[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉' 옵션 '1.넛츠시그니처23gx100낱봉' x2 = 총 1건 179,800원 → 롯데 5% 즉시할인 170,810원. buy/products.json 기준 상품 id=2(하루견과 초록색 100봉). 당일 적립행사 = 릴레이푸드 최대 10%적립(P202608074038, ~8.30 23:59, 15만원↑ 15,000P). ★담기는 이 세션이 하지 않았다 — 계정별 실제 카트는 결제 시 금액 로그로 검증한다.",
+  "date": "2026-08-30",
   "carts": [
-    {"mall": "롯데", "account": 1, "combo": 3, "items": [], "paid": false},
-    {"mall": "롯데", "account": 2, "combo": 3, "items": [], "paid": false},
-    {"mall": "롯데", "account": 3, "combo": 3, "items": [], "paid": false},
-    {"mall": "롯데", "account": 4, "combo": 3, "items": [], "paid": false},
-    {"mall": "롯데", "account": 5, "combo": 3, "items": [], "paid": false},
-    {"mall": "롯데", "account": 6, "combo": 3, "items": [], "paid": false},
-    {"mall": "롯데", "account": 7, "combo": 3, "items": [], "paid": false}
+    {
+      "mall": "현대",
+      "account": 13,
+      "items": [
+        {
+          "product": "2",
+          "name": "하루견과 초록색 100봉",
+          "qty": 2,
+          "amount": 170810
+        }
+      ],
+      "amount": 170810,
+      "paid": true
+    },
+    {
+      "mall": "현대",
+      "account": 14,
+      "items": [
+        {
+          "product": "2",
+          "name": "하루견과 초록색 100봉",
+          "qty": 2,
+          "amount": 170810
+        }
+      ],
+      "amount": 170810,
+      "paid": true,
+      "note": "결제 성공했으나 buy_one 이 ORDER_NOT_COMPLETE 로 오판(OCR 단독 판독) → 주문내역 실측으로 대장 수동기록. 적립은 배치 종료 후 buy.py reward 로 별도 처리."
+    },
+    {
+      "mall": "현대",
+      "account": 15,
+      "items": [
+        {
+          "product": "2",
+          "name": "하루견과 초록색 100봉",
+          "qty": 2,
+          "amount": 170810
+        }
+      ],
+      "amount": 170810,
+      "paid": true,
+      "note": "결제 성공했으나 buy_one 이 ORDER_NOT_COMPLETE 로 오판(OCR 단독 판독) → 주문내역 실측으로 대장 수동기록. 적립은 배치 종료 후 buy.py reward 로 별도 처리."
+    },
+    {
+      "mall": "현대",
+      "account": 16,
+      "items": [
+        {
+          "product": "2",
+          "name": "하루견과 초록색 100봉",
+          "qty": 2,
+          "amount": 170810
+        }
+      ],
+      "amount": 170810,
+      "paid": true
+    },
+    {
+      "mall": "현대",
+      "account": 17,
+      "items": [
+        {
+          "product": "2",
+          "name": "하루견과 초록색 100봉",
+          "qty": 2,
+          "amount": 170810
+        }
+      ],
+      "amount": 170810,
+      "paid": true,
+      "note": "결제 성공했으나 wait_order_complete 20s 타임아웃으로 오판 → 주문내역 실측 수동기록"
+    },
+    {
+      "mall": "현대",
+      "account": 18,
+      "items": [
+        {
+          "product": "2",
+          "name": "하루견과 초록색 100봉",
+          "qty": 2,
+          "amount": 170810
+        }
+      ],
+      "amount": 170810,
+      "paid": true
+    },
+    {
+      "mall": "현대",
+      "account": 19,
+      "items": [
+        {
+          "product": "2",
+          "name": "하루견과 초록색 100봉",
+          "qty": 2,
+          "amount": 170810
+        }
+      ],
+      "amount": 170810,
+      "paid": true,
+      "note": "결제 성공했으나 wait_order_complete 타임아웃 오판 → 주문내역 실측 수동기록"
+    }
   ]
 }
