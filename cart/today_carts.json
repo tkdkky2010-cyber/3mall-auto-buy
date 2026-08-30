@@ -1,167 +1,191 @@
 {
-  "_comment": "2026-08-30 — 사용자가 현대몰 계정 13~19 장바구니를 미리 담아둠(이 세션은 결제만 한다). 카트 실측(#13 gcd0327, 폰 webview): '[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉' 옵션 '1.넛츠시그니처23gx100낱봉' x2 = 총 1건 179,800원 → 롯데 5% 즉시할인 170,810원. buy/products.json 기준 상품 id=2(하루견과 초록색 100봉). 당일 적립행사 = 릴레이푸드 최대 10%적립(P202608074038, ~8.30 23:59, 15만원↑ 15,000P). ★담기는 이 세션이 하지 않았다 — 계정별 실제 카트는 결제 시 금액 로그로 검증한다. / 롯데 조합25 계정 1~7 담기 추가(8/30).",
-  "date": "2026-08-30",
-  "carts": [
-    {
-      "mall": "현대",
-      "account": 13,
-      "items": [
+    "_comment": "2026-08-30 — 사용자가 현대몰 계정 13~19 장바구니를 미리 담아둠(이 세션은 결제만 한다). 카트 실측(#13 gcd0327, 폰 webview): '[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉' 옵션 '1.넛츠시그니처23gx100낱봉' x2 = 총 1건 179,800원 → 롯데 5% 즉시할인 170,810원. buy/products.json 기준 상품 id=2(하루견과 초록색 100봉). 당일 적립행사 = 릴레이푸드 최대 10%적립(P202608074038, ~8.30 23:59, 15만원↑ 15,000P). ★담기는 이 세션이 하지 않았다 — 계정별 실제 카트는 결제 시 금액 로그로 검증한다. / 롯데 조합25 계정 1~7 담기 추가(8/30). / ★8/30 야간(맥): 롯데 #2~#7 조합25 결제 6/6 완주, 각 523,740원(NH). 할인쿠폰이 10%가 아니라 13%라 #1(541,800)보다 낮다.",
+    "date": "2026-08-30",
+    "carts": [
         {
-          "product": "2",
-          "name": "하루견과 초록색 100봉",
-          "qty": 2,
-          "amount": 170810
-        }
-      ],
-      "amount": 170810,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 14,
-      "items": [
+            "mall": "현대",
+            "account": 13,
+            "items": [
+                {
+                    "product": "2",
+                    "name": "하루견과 초록색 100봉",
+                    "qty": 2,
+                    "amount": 170810
+                }
+            ],
+            "amount": 170810,
+            "paid": true
+        },
         {
-          "product": "2",
-          "name": "하루견과 초록색 100봉",
-          "qty": 2,
-          "amount": 170810
-        }
-      ],
-      "amount": 170810,
-      "paid": true,
-      "note": "결제 성공했으나 buy_one 이 ORDER_NOT_COMPLETE 로 오판(OCR 단독 판독) → 주문내역 실측으로 대장 수동기록. 적립은 배치 종료 후 buy.py reward 로 별도 처리."
-    },
-    {
-      "mall": "현대",
-      "account": 15,
-      "items": [
+            "mall": "현대",
+            "account": 14,
+            "items": [
+                {
+                    "product": "2",
+                    "name": "하루견과 초록색 100봉",
+                    "qty": 2,
+                    "amount": 170810
+                }
+            ],
+            "amount": 170810,
+            "paid": true,
+            "note": "결제 성공했으나 buy_one 이 ORDER_NOT_COMPLETE 로 오판(OCR 단독 판독) → 주문내역 실측으로 대장 수동기록. 적립은 배치 종료 후 buy.py reward 로 별도 처리."
+        },
         {
-          "product": "2",
-          "name": "하루견과 초록색 100봉",
-          "qty": 2,
-          "amount": 170810
-        }
-      ],
-      "amount": 170810,
-      "paid": true,
-      "note": "결제 성공했으나 buy_one 이 ORDER_NOT_COMPLETE 로 오판(OCR 단독 판독) → 주문내역 실측으로 대장 수동기록. 적립은 배치 종료 후 buy.py reward 로 별도 처리."
-    },
-    {
-      "mall": "현대",
-      "account": 16,
-      "items": [
+            "mall": "현대",
+            "account": 15,
+            "items": [
+                {
+                    "product": "2",
+                    "name": "하루견과 초록색 100봉",
+                    "qty": 2,
+                    "amount": 170810
+                }
+            ],
+            "amount": 170810,
+            "paid": true,
+            "note": "결제 성공했으나 buy_one 이 ORDER_NOT_COMPLETE 로 오판(OCR 단독 판독) → 주문내역 실측으로 대장 수동기록. 적립은 배치 종료 후 buy.py reward 로 별도 처리."
+        },
         {
-          "product": "2",
-          "name": "하루견과 초록색 100봉",
-          "qty": 2,
-          "amount": 170810
-        }
-      ],
-      "amount": 170810,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 17,
-      "items": [
+            "mall": "현대",
+            "account": 16,
+            "items": [
+                {
+                    "product": "2",
+                    "name": "하루견과 초록색 100봉",
+                    "qty": 2,
+                    "amount": 170810
+                }
+            ],
+            "amount": 170810,
+            "paid": true
+        },
         {
-          "product": "2",
-          "name": "하루견과 초록색 100봉",
-          "qty": 2,
-          "amount": 170810
-        }
-      ],
-      "amount": 170810,
-      "paid": true,
-      "note": "결제 성공했으나 wait_order_complete 20s 타임아웃으로 오판 → 주문내역 실측 수동기록"
-    },
-    {
-      "mall": "현대",
-      "account": 18,
-      "items": [
+            "mall": "현대",
+            "account": 17,
+            "items": [
+                {
+                    "product": "2",
+                    "name": "하루견과 초록색 100봉",
+                    "qty": 2,
+                    "amount": 170810
+                }
+            ],
+            "amount": 170810,
+            "paid": true,
+            "note": "결제 성공했으나 wait_order_complete 20s 타임아웃으로 오판 → 주문내역 실측 수동기록"
+        },
         {
-          "product": "2",
-          "name": "하루견과 초록색 100봉",
-          "qty": 2,
-          "amount": 170810
-        }
-      ],
-      "amount": 170810,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 19,
-      "items": [
+            "mall": "현대",
+            "account": 18,
+            "items": [
+                {
+                    "product": "2",
+                    "name": "하루견과 초록색 100봉",
+                    "qty": 2,
+                    "amount": 170810
+                }
+            ],
+            "amount": 170810,
+            "paid": true
+        },
         {
-          "product": "2",
-          "name": "하루견과 초록색 100봉",
-          "qty": 2,
-          "amount": 170810
+            "mall": "현대",
+            "account": 19,
+            "items": [
+                {
+                    "product": "2",
+                    "name": "하루견과 초록색 100봉",
+                    "qty": 2,
+                    "amount": 170810
+                }
+            ],
+            "amount": 170810,
+            "paid": true,
+            "note": "결제 성공했으나 wait_order_complete 타임아웃 오판 → 주문내역 실측 수동기록"
+        },
+        {
+            "mall": "롯데",
+            "account": 1,
+            "combo": 25,
+            "items": [],
+            "paid": true,
+            "note": "2026-08-30 결제완료 541,800원(NH농협 5% 청구할인 → 514,710 예상). 뷰티포인트=사용자가 수동 적립. 구매사은 적립금 15,000원 최대 신청완료.",
+            "order": "2026-08-30-D57689",
+            "card": "NH",
+            "amount": 541800
+        },
+        {
+            "mall": "롯데",
+            "account": 2,
+            "combo": 25,
+            "items": [],
+            "paid": true,
+            "note": "2026-08-30 결제완료 523,740원(NH농협 5% 청구할인). 할인쿠폰=즉석쿠폰 13%×2(91,000) + 플러스쿠폰 14%×2(85,260). 뷰티포인트 ✓ / 구매사은 적립 ✓",
+            "order": "2026-08-30-D61524",
+            "card": "NH",
+            "amount": 523740,
+            "reward_ok": true
+        },
+        {
+            "mall": "롯데",
+            "account": 3,
+            "combo": 25,
+            "items": [],
+            "paid": true,
+            "note": "2026-08-30 결제완료 523,740원(NH농협 5% 청구할인). 할인쿠폰=즉석쿠폰 13%×2(91,000) + 플러스쿠폰 14%×2(85,260). 뷰티포인트 ✓ / 구매사은 적립 ✓ (goods_no 재시도)",
+            "order": "2026-08-30-D61952",
+            "card": "NH",
+            "amount": 523740,
+            "reward_ok": true
+        },
+        {
+            "mall": "롯데",
+            "account": 4,
+            "combo": 25,
+            "items": [],
+            "paid": true,
+            "note": "2026-08-30 결제완료 523,740원(NH농협 5% 청구할인). 할인쿠폰=즉석쿠폰 13%×2(91,000) + 플러스쿠폰 14%×2(85,260). 뷰티포인트 ✓ / 구매사은 적립 ✓",
+            "order": "2026-08-30-D62733",
+            "card": "NH",
+            "amount": 523740,
+            "reward_ok": true
+        },
+        {
+            "mall": "롯데",
+            "account": 5,
+            "combo": 25,
+            "items": [],
+            "paid": true,
+            "note": "2026-08-30 결제완료 523,740원(NH농협 5% 청구할인). 할인쿠폰=즉석쿠폰 13%×2(91,000) + 플러스쿠폰 14%×2(85,260). 뷰티포인트 ✓ / 구매사은 적립 ✓ (goods_no 재시도)",
+            "order": "2026-08-30-D64087",
+            "card": "NH",
+            "amount": 523740,
+            "reward_ok": true
+        },
+        {
+            "mall": "롯데",
+            "account": 6,
+            "combo": 25,
+            "items": [],
+            "paid": true,
+            "note": "2026-08-30 결제완료 523,740원(NH농협 5% 청구할인). 할인쿠폰=즉석쿠폰 13%×2(91,000) + 플러스쿠폰 14%×2(85,260). 뷰티포인트 ✓ / 구매사은 적립 ✓ (goods_no 재시도)",
+            "order": "2026-08-30-D65318",
+            "card": "NH",
+            "amount": 523740,
+            "reward_ok": true
+        },
+        {
+            "mall": "롯데",
+            "account": 7,
+            "combo": 25,
+            "items": [],
+            "paid": true,
+            "note": "2026-08-30 결제완료 523,740원(NH농협 5% 청구할인). 할인쿠폰=즉석쿠폰 13%×2(91,000) + 플러스쿠폰 14%×2(85,260). 뷰티포인트 ✓ / 구매사은 적립 ✓ (goods_no 재시도)",
+            "order": "2026-08-30-D66320",
+            "card": "NH",
+            "amount": 523740,
+            "reward_ok": true
         }
-      ],
-      "amount": 170810,
-      "paid": true,
-      "note": "결제 성공했으나 wait_order_complete 타임아웃 오판 → 주문내역 실측 수동기록"
-    },
-    {
-      "mall": "롯데",
-      "account": 1,
-      "combo": 25,
-      "items": [],
-      "paid": true,
-      "note": "2026-08-30 결제완료 541,800원(NH농협 5% 청구할인 → 514,710 예상). 뷰티포인트=사용자가 수동 적립. 구매사은 적립금 15,000원 최대 신청완료.",
-      "order": "2026-08-30-D57689",
-      "card": "NH",
-      "amount": 541800
-    },
-    {
-      "mall": "롯데",
-      "account": 2,
-      "combo": 25,
-      "items": [],
-      "paid": false,
-      "note": "2026-08-30 담기(buy/_lotte_cart_fill.py 25 1 7) — 계정별 '카트 2건' 검증 로그 확인분"
-    },
-    {
-      "mall": "롯데",
-      "account": 3,
-      "combo": 25,
-      "items": [],
-      "paid": false,
-      "note": "2026-08-30 담기(buy/_lotte_cart_fill.py 25 1 7) — 계정별 '카트 2건' 검증 로그 확인분"
-    },
-    {
-      "mall": "롯데",
-      "account": 4,
-      "combo": 25,
-      "items": [],
-      "paid": false,
-      "note": "2026-08-30 담기(buy/_lotte_cart_fill.py 25 1 7) — 계정별 '카트 2건' 검증 로그 확인분"
-    },
-    {
-      "mall": "롯데",
-      "account": 5,
-      "combo": 25,
-      "items": [],
-      "paid": false,
-      "note": "2026-08-30 담기(buy/_lotte_cart_fill.py 25 1 7) — 계정별 '카트 2건' 검증 로그 확인분"
-    },
-    {
-      "mall": "롯데",
-      "account": 6,
-      "combo": 25,
-      "items": [],
-      "paid": false,
-      "note": "2026-08-30 담기(buy/_lotte_cart_fill.py 25 1 7) — 계정별 '카트 2건' 검증 로그 확인분"
-    },
-    {
-      "mall": "롯데",
-      "account": 7,
-      "combo": 25,
-      "items": [],
-      "paid": false,
-      "note": "2026-08-30 담기(buy/_lotte_cart_fill.py 25 1 7) — 계정별 '카트 2건' 검증 로그 확인분"
-    }
-  ]
+    ]
 }

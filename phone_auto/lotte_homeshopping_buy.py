@@ -75,6 +75,14 @@ BIZ_NO = ("507", "18", "15504")       # 현금영수증 지출증빙 사업자�
 #   → 맥 동작을 바꾸지 않으려고 전부 이 플래그로 분기한다.
 WIN_ONLY_FIX = sys.platform.startswith("win")
 
+# ★쿠폰 구간만은 **플랫폼 무관**으로 엄격 검증한다 (2026-08-30 맥 실사고).
+#   8/30 윈도우 세션이 고친 쿠폰 결함들이 WIN_ONLY_FIX 뒤에 갇혀 있어 맥에선 그대로 재발했다:
+#   #2 kms3945 — 할인쿠폰(2) 라디오가 안 켜진 상태에서 `_coupon_change_btn` 이 cy 상한 없이
+#   350px 아래 **플러스쿠폰 행의 '변경'** 을 잡아 그 모달을 열었고, 할인쿠폰 `applied:0` 이
+#   **에러 없이** 통과해 602,000원(정상 541,800원, 70,000원 누락)이 됐다. MAX_PAY 가 막았다.
+#   이 세 가지는 좌표 왜곡(dump 가장자리)과 무관한 **판독·검증 로직**이라 양 플랫폼에 동일하게 옳다.
+COUPON_STRICT = True
+
 ADDR_KEY = "203호"                    # 배송지 (화곡동 890 / 203호)
 
 NAV_MY = (755, 2225)                  # 하단 네비 '마이' (1080x2400, OCR 실측)
@@ -463,7 +471,7 @@ def _coupon_change_btn(sec, band: int = 220):
     #   할인쿠폰 `applied:0` 이 **에러 없이** 통과(#1 602,000원, 할인쿠폰 약 7만원 누락).
     #   8/25 #12 를 "이 계정만 행에 버튼이 없다"고 적어둔 것의 진짜 정체가 이것이다.
     #   선택된 행의 버튼은 라벨 바로 아래(실측 +79px)에 뜬다 → 밴드 220px 로 충분하다.
-    hi = (sec["cy"] + band) if WIN_ONLY_FIX else float("inf")    # 맥은 종전대로 상한 없음
+    hi = (sec["cy"] + band) if COUPON_STRICT else float("inf")    # ★상한 없으면 아래 섹션 버튼을 집는다
     chgs = [it for it in _texts()
             if _ok(it["text"]) and sec["cy"] - 60 < it["cy"] < hi]
     return max(chgs, key=lambda it: it["cx"]) if chgs else None
@@ -518,7 +526,7 @@ def _select_coupon_radio(sec, tries: int = 3, key: str | None = None):
     ★판정은 **'변경/선택 버튼이 그 행에 생겼는가'** 로 한다 — 라디오는 webview 라
       uiautomator dump 에 노드가 아예 안 잡혀(실측 0개) checked 속성을 쓸 수 없다.
     """
-    if not WIN_ONLY_FIX:                      # ★맥: 종전 동작 그대로 (라벨 중앙 1회 탭 후 재탐색)
+    if not COUPON_STRICT:                     # (구 맥 경로 — 라벨 중앙 1회 탭. 라디오가 안 켜져 폐기)
         _adb().tap(sec["cx"], sec["cy"]); nap(1.0)
         return _scroll_to(sec["text"][:6], max_cy=1900) or sec
     for _ in range(tries):
@@ -790,11 +798,11 @@ def set_discount_coupons() -> dict:
     sec = _scroll_to("할인쿠폰", max_cy=1500)   # 헤더 아래 '변경'·상품행이 같이 보여야 한다
     if not sec:
         out["err"] = "할인쿠폰 섹션 미발견"; return out
-    avail = _coupon_count(sec) if WIN_ONLY_FIX else 0   # 헤더 '할인쿠폰(N)' 의 N (윈도우 전용 검증)
+    avail = _coupon_count(sec) if COUPON_STRICT else 0   # 헤더 '할인쿠폰(N)' 의 N
     out["available"] = avail
     # ★**이미 적용된 행은 건드리지 않는다** — 라디오를 누르면 적용이 풀린다(토글).
     #   적용완료 행은 '변경' 버튼이 없어서 '라디오 꺼짐' 과 겉모습이 같다 → 금액으로 구분한다.
-    already = _coupon_row_amount(sec) if WIN_ONLY_FIX else None
+    already = _coupon_row_amount(sec) if COUPON_STRICT else None
     if already:
         out["already"] = already; out["applied"] = 0; out["ok"] = True
         print(f"   [쿠폰] 할인쿠폰 이미 {already:,}원 적용됨 — 그대로 둔다", flush=True)
@@ -820,11 +828,20 @@ def set_discount_coupons() -> dict:
         _adb().tap(985, ph["cy"]); nap(1.5)           # dropdown 열기
         # ★비활성(회색) 쿠폰 제외 — 같은 쿠폰을 다른 제품이 이미 점유하면 회색 처리됨(밝기로 판별).
         shot = cap(); gimg = Image.open(shot).convert("L")
-        cands = [it for it in _submodal_items(shot)
-                 if "10%" in it["text"] and "할인" in it["text"] and _coupon_enabled(gimg, it["cy"])]
+        # ★'10%' 하드코딩을 버리고 **활성 중 최고%** 를 고른다 (플러스쿠폰과 같은 규칙).
+        #   2026-08-30 #2 kms3945 실측: 이 계정의 즉석쿠폰은 10% 가 아니라
+        #   '즉석쿠폰55,900원 즉석쿠폰 13% 할인' 이라 "10%" 필터가 0장을 잡고 조용히 닫았다
+        #   (→ 602,000원. 정상 13% 적용 시 91,000원 할인). 즉석쿠폰 %는 계정·상품마다 다르다.
+        #   ⚠️'번호쿠폰'(코드 입력 필요)·플레이스홀더는 % 가 없어 자동으로 걸러진다.
+        cands = []
+        for it in _submodal_items(shot):
+            m = re.search(r"(\d+)\s*%", it["text"])
+            if m and "할인" in it["text"] and _coupon_enabled(gimg, it["cy"]):
+                cands.append((int(m.group(1)), it))
         if not cands:
             ocr_or_dump_tap("닫기", retries=1); break
-        opt = min(cands, key=lambda it: it["cy"])            # 활성 중 가장 위
+        cands.sort(key=lambda x: (-x[0], x[1]["cy"]))        # 활성 중 최고% → 같은%면 최상단
+        opt = cands[0][1]
         _adb().tap(opt["cx"], opt["cy"]); nap(1.3)
         out["applied"] += 1
     ocr_or_dump_tap("선택완료", retries=2) or ocr_or_dump_tap("적용", retries=1) or ocr_or_dump_tap("확인", retries=1)
@@ -859,7 +876,7 @@ def set_plus_coupons() -> dict:
     sec = _scroll_to("플러스쿠폰", max_cy=1500)     # (윈도우) 방향은 _scroll_to 가 판정
     if not sec:
         out["skip"] = "플러스쿠폰 섹션 없음"; out["ok"] = True; return out
-    already = _coupon_row_amount(sec) if WIN_ONLY_FIX else None   # 적용된 행은 손대지 않는다
+    already = _coupon_row_amount(sec) if COUPON_STRICT else None   # 적용된 행은 손대지 않는다
     if already:
         out["already"] = already; out["ok"] = True
         print(f"   [쿠폰] 플러스쿠폰 이미 {already:,}원 적용됨 — 그대로 둔다", flush=True)
