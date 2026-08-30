@@ -707,6 +707,9 @@ def _scroll_to_legacy(text, contains=True, max_scroll=8, down=True, max_cy=None)
 
 
 MIN_USABLE_CY = 250      # 앵커가 이보다 위면 행이 상단 가장자리에 잘려 그 행 버튼을 못 쓴다
+# 주문서 하단의 **고정** '…원 결제하기' 버튼 상단 (실측 버튼중심 cy=2170, 높이≈140).
+# 이보다 아래로 밀린 행은 버튼에 덮여 OCR 목록에서 사라진다 → 앵커는 반드시 이 위에 세운다.
+PAY_BTN_TOP_CY = 1950
 
 
 def _scroll_to(text: str, contains: bool = True, max_scroll: int = 8, down: bool = True,
@@ -1145,10 +1148,14 @@ def select_card_lotte(day: str | None = None) -> dict:
             break
         db = ocr_find("다른 결제수단", contains=True)     # ★OCR 전용 — 오탭 방지
         if not db:
-            if attempt < 2:
-                _adb().swipe(540, 1700, 540, 800, 400)     # 아래로
-            else:
-                _adb().swipe(540, 800, 540, 1700, 400)     # 위로
+            # ★고정방향 폴백(아래2회→위2회)을 _scroll_to 로 교체 (2026-08-30 #1 실측 CARD_FAIL).
+            #   실패 원인은 **판독이 아니라 위치**였다 — OCR 은 '다른 결제수단' 을 (230,1610) 에
+            #   멀쩡히 읽는다(윈도우에서 실측). 그런데 폴백이 멈춘 자리에선 그 행이 cy≈2141,
+            #   즉 화면 하단에 **고정된 '…원 결제하기' 버튼 뒤에 깔려** OCR 목록에서 사라졌다.
+            #   → 쿠폰 단계와 같은 처방: **max_cy 로 버튼 위에 오게** 데려온다.
+            #   (플랫폼 분기 없음 — _scroll_to 가 맥=legacy / 윈도우=신규로 내부에서 갈린다.)
+            if _scroll_to("다른 결제수단", contains=True, max_scroll=8, max_cy=PAY_BTN_TOP_CY):
+                continue                                   # 다음 회전의 ocr_find 가 잡는다
             nap(0.8)
             continue
         _adb().tap(db["cx"], db["cy"]); nap(2.5)           # 라디오(멱등) — 그리드 렌더 대기
