@@ -67,6 +67,14 @@ ACCOUNTS_FILE = ROOT / "lotte.json"
 
 # (참조) 로카페이 간편번호 = 137601 — 실입력은 lotte_card.json flow_payment[19] 의 dump 셔플로 처리.
 BIZ_NO = ("507", "18", "15504")       # 현금영수증 지출증빙 사업자번호 (3칸)
+# ★★2026-08-30 이후의 판독/스크롤 보정은 **윈도우에서만** 적용한다 (사용자 지시).
+#   맥은 Apple Vision OCR 이 화면을 직접 읽어 종전 경로로 잘 돌아간다. 문제는 윈도우 전용이다:
+#   윈도우 OCR 은 쿠폰 '변경' 버튼을 한 건도 못 읽어(실측 0건) **항상 uiautomator dump 로 넘어가는데**,
+#   롯데 webview 는 화면 밖 노드를 컨테이너 가장자리 한 점으로 접는다(위 cy≈75 / 아래 cy≈2265).
+#   그래서 dump 를 주 경로로 쓰는 윈도우에서만 좌표가 왜곡되고, 맥은 이 결함을 밟지 않는다.
+#   → 맥 동작을 바꾸지 않으려고 전부 이 플래그로 분기한다.
+WIN_ONLY_FIX = sys.platform.startswith("win")
+
 ADDR_KEY = "203호"                    # 배송지 (화곡동 890 / 203호)
 
 NAV_MY = (755, 2225)                  # 하단 네비 '마이' (1080x2400, OCR 실측)
@@ -437,7 +445,7 @@ def goto_cart_select_all() -> dict:
 
 # ──────────────────────────── C. 결제설정 ────────────────────────────
 
-def _coupon_change_btn(sec):
+def _coupon_change_btn(sec, band: int = 220):
     """쿠폰 섹션의 '변경 >' (⚠️'배송방법 변경'/픽업 제외, 섹션 아래 우측)."""
     # ★'변경' 뿐 아니라 **'선택'** 도 받는다 (2026-08-25 실측): 쿠폰을 한 번도 고른 적 없는 행은
     #   버튼 라벨이 '선택' 이고, 그 행 안내문이 '변경 버튼을 클릭하여 할인을 선택해 주세요.' 라
@@ -449,8 +457,90 @@ def _coupon_change_btn(sec):
             return False
         return t in ("변경", "선택") or (("변경" in t or "선택" in t) and len(t) <= 4)
 
-    chgs = [it for it in _texts() if _ok(it["text"]) and it["cy"] > sec["cy"] - 60]
+    # ★★cy **상한**이 없으면 아래 섹션 버튼을 가져온다 (2026-08-30 근본원인 확정).
+    #   실측: 할인쿠폰(2) 행 cy=651 은 라디오가 꺼져 있어 버튼이 없는데, 상한이 없으니
+    #   350px 아래 **플러스쿠폰 행의 '변경'(cy≈997)** 을 잡아 그 모달을 열었다 →
+    #   할인쿠폰 `applied:0` 이 **에러 없이** 통과(#1 602,000원, 할인쿠폰 약 7만원 누락).
+    #   8/25 #12 를 "이 계정만 행에 버튼이 없다"고 적어둔 것의 진짜 정체가 이것이다.
+    #   선택된 행의 버튼은 라벨 바로 아래(실측 +79px)에 뜬다 → 밴드 220px 로 충분하다.
+    hi = (sec["cy"] + band) if WIN_ONLY_FIX else float("inf")    # 맥은 종전대로 상한 없음
+    chgs = [it for it in _texts()
+            if _ok(it["text"]) and sec["cy"] - 60 < it["cy"] < hi]
     return max(chgs, key=lambda it: it["cx"]) if chgs else None
+
+
+COUPON_RADIO_X = 100          # 쿠폰 섹션 라디오 x (1080폭 실측: 라벨은 cx≈193, 라디오는 x≈100)
+
+
+def _coupon_row_amount(sec) -> int | None:
+    """쿠폰 섹션 행에 **이미 적용된 금액**(예: 70,000원). 없으면 None.
+
+    ★이게 '적용완료' 와 '라디오 꺼짐' 을 가르는 **유일한 신호**다 (2026-08-30 실사고):
+      적용이 끝난 행은 금액만 남고 '변경' 버튼이 사라진다. 그런데 라디오가 꺼진 행도 버튼이 없다 —
+      버튼 유무 하나로 판정하면 **적용완료를 미선택으로 오판**해 라디오를 눌러(토글) **적용을 해제**한다.
+      실측: 할인쿠폰 70,000원 적용 상태에서 '라디오 활성 실패' 로 판정 → 재시도 루프 → 쿠폰 풀림.
+    ⚠️ 헤더의 보유 장수 '(2)' 를 금액으로 오독하지 않도록 **천단위 콤마가 있는 수**만 인정한다.
+    """
+    for it in _texts():
+        if abs(it["cy"] - sec["cy"]) > 45:
+            continue
+        m = re.search(r"(\d{1,3}(?:,\d{3})+)\s*원", it["text"])
+        if m:
+            return int(m.group(1).replace(",", ""))
+    return None
+
+
+def _anchor_key(text: str) -> str:
+    """앵커 텍스트에서 **라디오 글리프를 뺀** 재탐색용 검색어. (윈도우 전용 경로에서만 쓴다)
+
+    ★OCR 은 쿠폰 행 맨 앞의 라디오 동그라미를 **글자로 읽는다** — 그리고 그 글자는
+      **라디오 상태에 따라 바뀐다.** 2026-08-30 같은 스크린샷 한 장 실측:
+          라디오 ON  '㉧ 할인쿠폰(2)'      (할인쿠폰 70,000원 적용 상태)
+          라디오 OFF '㉠ 플러스쿠폰(20)'   (미적용 상태)
+      그래서 `sec['text'][:6]`('㉠ 할인쿠폰')을 검색어로 쓰면 **라디오를 켠 직후 그 검색어가
+      화면에서 사라진다.** 게다가 이 글리프는 dump 텍스트('할인쿠폰(')에 **아예 없어서**
+      dump 폴백으로도 못 찾는다 → `_scroll_to` 가 앵커도 못 찾고 가장자리 방향신호도 못 잡아
+      기본값 'below' 로 **8회 무작정 아래로 스와이프**했다(tries=3 이므로 최대 24회 =
+      "폰이 끝까지 내려간다"고 사용자가 지적한 동작, 2026-08-30 2차 세션 실측).
+    ⚠️ 8/30 1차 수정(밴드 220 / 라디오 x=100 / min_cy=250)은 옳았고 그대로다. 이 결함은
+      **라디오가 실제로 켜지게 된 뒤에야** 드러나는 후속 결함이다(그전엔 켜지질 않아 못 봤다).
+    """
+    m = re.search(r"[가-힣]{2,}", text)        # 글리프·괄호·숫자를 버리고 한글 낱말만
+    return m.group(0) if m else text.strip()[:6]
+
+
+def _select_coupon_radio(sec, tries: int = 3, key: str | None = None):
+    """쿠폰 섹션 **라디오를 실제로 켠다.** 켜지면 갱신된 sec 를, 실패하면 None.
+
+    ★라벨 중앙(`sec['cx']`)을 누르면 안 켜진다 (2026-08-30 실측): 라디오는 x≈100 인데
+      OCR 앵커 '㉠ 할인쿠폰(2)' 의 중앙은 cx≈193 이라 **글자를 누르고 있었다.**
+      화면상 라디오는 계속 ○ 인 채였고, 그래서 그 행에 '변경' 버튼이 안 생겼다.
+    ★판정은 **'변경/선택 버튼이 그 행에 생겼는가'** 로 한다 — 라디오는 webview 라
+      uiautomator dump 에 노드가 아예 안 잡혀(실측 0개) checked 속성을 쓸 수 없다.
+    """
+    if not WIN_ONLY_FIX:                      # ★맥: 종전 동작 그대로 (라벨 중앙 1회 탭 후 재탐색)
+        _adb().tap(sec["cx"], sec["cy"]); nap(1.0)
+        return _scroll_to(sec["text"][:6], max_cy=1900) or sec
+    for _ in range(tries):
+        # ★★**이미 켜져 있으면 절대 누르지 않는다.** 라디오는 토글이라 한 번 더 누르면 꺼진다.
+        #   2026-08-30 실사고: 이 함수가 상태 확인 없이 먼저 탭해서 **이미 적용돼 있던
+        #   플러스쿠폰 98,000원을 꺼버렸다** — 사용자가 폰 화면을 보고 중단시켰다.
+        #   READ_FIRST 「토글 UI: 상태 확인 없이 무조건 탭 금지」를 정면으로 어긴 것이다.
+        if _coupon_change_btn(sec):
+            return sec
+        x = COUPON_RADIO_X
+        if sec.get("w"):                       # OCR 앵커면 좌측 끝에서 라디오 위치를 계산
+            x = max(COUPON_RADIO_X, sec["cx"] - sec["w"] // 2 + 25)
+        _adb().tap(x, sec["cy"]); nap(1.2)
+        # ★검색어는 **라디오 글리프를 뺀 한글 낱말**로 (위 _anchor_key 참조). 종전 `sec['text'][:6]`
+        #   은 라디오를 켠 순간 안 맞게 돼 매 회차 8회 헛스와이프를 만들었다.
+        fresh = _scroll_to(key or _anchor_key(sec["text"]), max_cy=1900)
+        # ★못 찾으면 **낡은 좌표로 계속 두드리지 않는다.** 종전 `or sec` 는 이미 맨 아래까지
+        #   스크롤된 화면에서 진입 시점의 cy 를 그대로 눌러, 결제 페이지의 엉뚱한 행을 탭했다.
+        if not fresh:
+            return None
+        sec = fresh
+    return sec if _coupon_change_btn(sec) else None
 
 
 def _submodal_items(shot=None):
@@ -525,18 +615,79 @@ def _find_text(text: str, contains: bool = True, shot=None, pick: str = "bottom"
     return _pick([t for t in dts if cnt[t["cy"]] < 8])
 
 
-def _scroll_to(text: str, contains: bool = True, max_scroll: int = 8, down: bool = True,
-               max_cy: int | None = None):
-    """text 가 보일 때까지 스크롤하며 탐색. 찾으면 item 반환, 못 찾으면 None. (OCR+dump 병합)
+EDGE_TOP_CY = 100        # 이보다 위로 접힌 dump 노드 = 화면 **위쪽** 밖
+EDGE_BOT_CY = 2250       # 이보다 아래로 접힌 dump 노드 = 화면 **아래쪽** 밖
 
-    ★max_cy: 앵커가 화면 **맨 아래 가장자리**에 걸친 상태로 멈추지 않게 하는 상한 (2026-08-25).
-      쿠폰 섹션은 헤더만 보이고 그 아래 '변경' 버튼이 화면 밖이면 아무것도 못 누른다
-      (실측: '할인쿠폰(' cy=2118 에서 멈춰 '할인쿠폰 변경 버튼 미발견' → 쿠폰 0장 적용).
-      더 밀어도 위치가 안 변하면 페이지 끝이므로 있는 그대로 돌려준다.
-    ★한 방향만 훑으면 조용히 실패한다 (2026-08-28 #2·#3 실측, 다른 PC): 할인쿠폰 '선택완료' 뒤
-      화면이 이미 플러스쿠폰 **아래**에 있으면 아래로 8회 헛스크롤 → '플러스쿠폰 섹션 없음' 으로
-      스킵돼 플러스쿠폰·포인트가 통째로 빠진 채 결제됐다(#2 630,000원). 못 찾으면 반대방향으로 한 번 더.
+
+def _offscreen_dir(text: str, contains: bool = True) -> str | None:
+    """토큰이 화면 밖이면 **어느 쪽인지** 돌려준다: 'above' / 'below' / None(신호없음).
+
+    ★★근본원인 수정 (2026-08-30, 사용자 지시 "8+8회 하지마. 못 찾는 원인을 찾아서 해결해").
+      종전 `_scroll_to` 는 **방향을 몰라서** 한쪽으로 8번 훑고 반대로 8번 훑었다(최대 16 스와이프
+      × 0.8s). 원인은 판독이 아니라 **정보를 버리고 있었던 것**이다 —
+      롯데 webview 는 화면 밖 노드를 컨테이너 **가장자리 한 점으로 접는데**(위=cy≈75, 아래=cy≈2265),
+      `_texts()` 가 그걸 '유령 노드'로 필터링해 없애 버렸다. 그 좌표는 탭에는 못 쓰지만
+      **방향으로는 정확하다.**
+      실측(2026-08-30 #1 주문서): 배송정보·배송방법변경 = cy 75(위), 34개 클러스터 = cy 2265(아래),
+      할인쿠폰 658 / 플러스쿠폰 923 / 포인트사용 1254 / 결제하기 2171 = 화면 안 실좌표.
+    ⚠️ 롯데 앱은 webview 디버깅을 안 켠다(devtools 소켓 없음 — 실측) → 현대몰처럼 CDP 로 DOM 을
+       읽는 방법이 **없다**. 그래서 dump 의 이 신호가 유일한 위치 정보다.
     """
+    hit = lambda t: (text in t) if contains else (t.strip() == text)
+    above = below = False
+    for t in _dump_texts():
+        if not hit(t["text"]):
+            continue
+        if t["cy"] <= EDGE_TOP_CY:
+            above = True
+        elif t["cy"] >= EDGE_BOT_CY:
+            below = True
+    if above and not below:
+        return "above"
+    if below and not above:
+        return "below"
+    return None
+
+
+AIM_CY = 700             # 앵커를 여기로 데려온다 (행 + 그 아래 버튼이 같이 보이는 여유 위치)
+
+
+def _swipe_delta(dy: int) -> None:
+    """화면 내용을 **정확히 dy 만큼** 민다 (dy>0 = 내용이 위로 = 아래쪽을 본다).
+
+    ★고정거리(900px) 스와이프는 목표를 지나쳤다가 되돌아오는 **왕복**을 만든다 — 사용자가
+      "폰에서 위아래로 계속 왔다갔다한다" 고 지적한 그 동작이다. 앵커가 보이는 순간엔
+      얼마나 밀어야 하는지 **정확히 알 수 있으므로** 한 번에 맞춘다.
+    """
+    dy = max(-1400, min(1400, dy))
+    if abs(dy) < 40:                       # 이미 충분히 가깝다 — 괜히 밀면 그게 왕복이 된다
+        return
+    y0 = 1750 if dy > 0 else 700
+    _adb().swipe(540, y0, 540, y0 - dy, 350)
+    nap(0.7)
+
+
+def _swipe_toward(direction: str) -> None:
+    """'below'=페이지 아래쪽을 보려고 손가락을 위로 / 'above'=그 반대."""
+    if direction == "below":
+        _adb().swipe(540, 1700, 540, 800, 400)
+    else:
+        _adb().swipe(540, 800, 540, 1700, 400)
+    nap(0.8)
+
+
+def _visible_dump(dts):
+    """dump 노드 중 **화면 안**인 것만 (가장자리로 접힌 유령 노드 제거).
+    ⚠️ 화면 밖 노드는 컨테이너 가장자리 한 점에 뭉친다(실측 cy=75 / cy=2265 에 수십 개) →
+       같은 cy 에 8개 이상 몰린 클러스터는 버린다. 실제 보이는 행도 cy 를 2~3개 공유하므로 임계는 8."""
+    from collections import Counter
+    ins = [t for t in dts if EDGE_TOP_CY < t["cy"] < EDGE_BOT_CY]
+    cnt = Counter(t["cy"] for t in ins)
+    return [t for t in ins if cnt[t["cy"]] < 8]
+
+
+def _scroll_to_legacy(text, contains=True, max_scroll=8, down=True, max_cy=None):
+    """★맥 경로 — 2026-08-30 이전 구현 그대로 (양방향 훑기). 손대지 않는다."""
     for d in (down, not down):
         prev_cy = None
         for _ in range(max_scroll):
@@ -552,6 +703,57 @@ def _scroll_to(text: str, contains: bool = True, max_scroll: int = 8, down: bool
             else:
                 _adb().swipe(540, 800, 540, 1700, 400)
             nap(0.8)
+    return None
+
+
+MIN_USABLE_CY = 250      # 앵커가 이보다 위면 행이 상단 가장자리에 잘려 그 행 버튼을 못 쓴다
+
+
+def _scroll_to(text: str, contains: bool = True, max_scroll: int = 8, down: bool = True,
+               max_cy: int | None = None, min_cy: int = MIN_USABLE_CY):
+    """text 가 쓸 수 있는 위치에 올 때까지 **방향을 알고** 스크롤. 찾으면 item, 못 찾으면 None.
+
+    ★max_cy: 앵커가 화면 **맨 아래 가장자리**에 걸친 상태로 멈추지 않게 하는 상한 (2026-08-25).
+      쿠폰 섹션은 헤더만 보이고 그 아래 '변경' 버튼이 화면 밖이면 아무것도 못 누른다
+      (실측: '할인쿠폰(' cy=2118 에서 멈춰 '할인쿠폰 변경 버튼 미발견' → 쿠폰 0장 적용).
+    ★방향은 `_offscreen_dir` 과 같은 가장자리 신호로 판정 — 종전의 양방향 무작정 훑기(8+8회)를 대체.
+    ★한 바퀴에 **판독은 OCR 1회 + dump 1회**만 한다: 종전엔 `_find_text` 와 `_offscreen_dir` 이
+      각각 dump 를 떠서 2.8s×2 를 매 회전 버렸다(실측 3스와이프에 22초).
+    """
+    def _pick(items):
+        m = [it for it in items
+             if ((text in it["text"]) if contains else (it["text"].strip() == text))]
+        if not m:
+            return None
+        m.sort(key=lambda it: it["cy"], reverse=True)
+        return m[0]
+
+    hit = lambda t: (text in t) if contains else (t.strip() == text)
+    if not WIN_ONLY_FIX:
+        return _scroll_to_legacy(text, contains, max_scroll, down, max_cy)
+    for _ in range(max_scroll):          # ★상한 16 → 8 (사용자 지시: 무작정 훑기 금지)
+        dts = _dump_texts()
+        # ★OCR 우선 — dump 와 한 통에 섞어 정렬하면 유령 노드가 이긴다(2026-08-25 실측).
+        it = _pick(_ocr_texts(cap())) or _pick(_visible_dump(dts))
+        if it and it["cy"] >= min_cy and (max_cy is None or it["cy"] <= max_cy):
+            return it
+        if it is not None:
+            # ★★위/아래 **양쪽 가장자리**를 다 피한다.
+            #   `max_cy`(아래 가장자리)는 2026-08-25 에 고쳤지만 **위 가장자리는 안 고쳤다** →
+            #   플러스쿠폰 앵커가 cy=102 에 걸려(유령 판정 경계 cy≤100 에서 **2px**) 실행마다
+            #   되기도 하고 안 되기도 했다. 그 상태에선 행 전체가 잘려 '변경' 버튼을 못 쓴다.
+            #   (실측 2026-08-30: 앵커 cy=102, 그 행 '변경' cy=184 — 조금만 더 밀리면 둘 다 유령.)
+            _swipe_delta(it["cy"] - AIM_CY)      # 보이면 **정확히** 필요한 만큼만 (왕복 제거)
+            continue
+        above = any(hit(t["text"]) and t["cy"] <= EDGE_TOP_CY for t in dts)
+        below = any(hit(t["text"]) and t["cy"] >= EDGE_BOT_CY for t in dts)
+        if above and not below:
+            d = "above"
+        elif below and not above:
+            d = "below"
+        else:
+            d = "below" if down else "above"     # 신호 없음 → 지정 방향
+        _swipe_toward(d)
     return None
 
 
@@ -578,16 +780,32 @@ def set_discount_coupons() -> dict:
     """할인쿠폰: 섹션 라디오 → '변경' → 상품별 dropdown → 모달서 '10% 할인' 탭 → 선택완료.
     상품 수 가변 → dropdown 반복. (★쿠폰이 포인트 리셋 → 반드시 포인트보다 먼저.)"""
     out = {"applied": 0}
-    _scroll_top()                              # ★위에 있는 섹션은 아래로만 훑어선 못 찾는다
+    # ★윈도우: `_scroll_top()` 8스와이프 선행을 **제거**했다 — `_scroll_to` 가 dump 가장자리 신호로
+    #   방향을 알아 어느 위치에서 진입해도 바로 찾아간다. 맥은 종전대로 맨 위로 되돌린다.
+    if not WIN_ONLY_FIX:
+        _scroll_top()
     sec = _scroll_to("할인쿠폰", max_cy=1500)   # 헤더 아래 '변경'·상품행이 같이 보여야 한다
     if not sec:
         out["err"] = "할인쿠폰 섹션 미발견"; return out
-    _adb().tap(sec["cx"], sec["cy"]); nap(1.0)        # 섹션 라디오 활성
+    avail = _coupon_count(sec) if WIN_ONLY_FIX else 0   # 헤더 '할인쿠폰(N)' 의 N (윈도우 전용 검증)
+    out["available"] = avail
+    # ★**이미 적용된 행은 건드리지 않는다** — 라디오를 누르면 적용이 풀린다(토글).
+    #   적용완료 행은 '변경' 버튼이 없어서 '라디오 꺼짐' 과 겉모습이 같다 → 금액으로 구분한다.
+    already = _coupon_row_amount(sec) if WIN_ONLY_FIX else None
+    if already:
+        out["already"] = already; out["applied"] = 0; out["ok"] = True
+        print(f"   [쿠폰] 할인쿠폰 이미 {already:,}원 적용됨 — 그대로 둔다", flush=True)
+        return out
+    # ★라디오를 **실제로** 켠다 (라벨 아닌 라디오 좌표). key 는 섹션 리터럴을 그대로 넘긴다 —
+    #   앵커 텍스트에서 잘라 쓰면 라디오 글리프(㉠/㉧)가 섞여 켠 직후 재탐색이 깨진다.
+    sec2 = _select_coupon_radio(sec, key="할인쿠폰")
+    if not sec2:
+        out["err"] = ("할인쿠폰 라디오 활성 실패(변경 버튼 안 생김) — 라디오 좌표/화면 확인 필요"
+                      if avail else "할인쿠폰 섹션 비활성(보유 0장)")
+        out["ok"] = not avail                         # 보유 0장이면 정상 skip, 있는데 못 켜면 **실패**
+        return out
+    sec = sec2
     chg = _coupon_change_btn(sec)
-    if not chg:
-        sec = _scroll_to("할인쿠폰") or sec           # 라디오 탭 리플로우로 낡은 좌표 → 재탐색 (set_plus_coupons 와 같은 이유)
-        nap(0.6)
-        chg = _coupon_change_btn(sec)
     if not chg:
         out["err"] = "할인쿠폰 변경 버튼 미발견"; return out
     _adb().tap(chg["cx"], chg["cy"]); nap(1.8)        # 모달 '할인선택' 진입
@@ -608,26 +826,46 @@ def set_discount_coupons() -> dict:
         out["applied"] += 1
     ocr_or_dump_tap("선택완료", retries=2) or ocr_or_dump_tap("적용", retries=1) or ocr_or_dump_tap("확인", retries=1)
     nap(1.5)
-    out["ok"] = True
+    # ★**보유 쿠폰이 있는데 0장 적용이면 실패다.** 종전엔 여기서 무조건 ok:True 라
+    #   할인쿠폰 0장이 조용히 통과했다(2026-08-30 #1: 602,000원, 8/25 #12 도 같은 자리).
+    #   "0을 반환하는 자리는 정상 0인지 고장난 0인지 구분해 로그로 남긴다"(8/25 교훈).
+    out["ok"] = bool(out["applied"]) or bool(out.get("already")) or not avail
+    if not out["ok"]:
+        out["err"] = f"할인쿠폰 {avail}장 보유인데 0장 적용 — 결제 금액이 그만큼 비싸진다"
     return out
+
+
+def _coupon_count(sec) -> int:
+    """쿠폰 섹션 헤더 '할인쿠폰(2)' 의 보유 장수. 못 읽으면 0이 아니라 **-1**(=모름)이 아니라
+    보수적으로 0 을 주면 실패를 정상 skip 으로 오인하므로, **판독 실패는 1 이상으로 본다**.
+    OCR 이 '할인쿠폰(' · '2' · ')' 로 쪼개는 프레임이 있어 같은 행 숫자도 훑는다."""
+    m = re.search(r"\((\d+)\)", sec.get("text", ""))
+    if m:
+        return int(m.group(1))
+    for it in _texts():
+        if abs(it["cy"] - sec["cy"]) < 30 and it["text"].strip().isdigit():
+            return int(it["text"].strip())
+    return 1          # 못 읽었으면 "있다"고 보고 검증을 강제한다 (조용한 skip 방지)
 
 
 def set_plus_coupons() -> dict:
     """플러스쿠폰: 활성(받은) 상품만, 최고 할인율 선택. 받은 게 없으면 패스."""
     out = {"applied": 0, "pcts": []}
-    _scroll_top()
-    sec = _scroll_to("플러스쿠폰", max_cy=1500)
+    if not WIN_ONLY_FIX:
+        _scroll_top()
+    sec = _scroll_to("플러스쿠폰", max_cy=1500)     # (윈도우) 방향은 _scroll_to 가 판정
     if not sec:
         out["skip"] = "플러스쿠폰 섹션 없음"; out["ok"] = True; return out
-    _adb().tap(sec["cx"], sec["cy"]); nap(1.0)
+    already = _coupon_row_amount(sec) if WIN_ONLY_FIX else None   # 적용된 행은 손대지 않는다
+    if already:
+        out["already"] = already; out["ok"] = True
+        print(f"   [쿠폰] 플러스쿠폰 이미 {already:,}원 적용됨 — 그대로 둔다", flush=True)
+        return out
+    # ★라디오는 **라디오 좌표**로 켠다 (할인쿠폰과 같은 함정 — 라벨 중앙을 누르면 안 켜진다).
+    #   2026-08-28 #5 yr5326 실측: 플러스쿠폰 26장 보유인데 '받은 쿠폰 X' 로 스킵돼
+    #   627,197원(정상 543,xxx원)에 결제될 뻔했다. 리플로우로 낡은 좌표도 안에서 갱신한다.
+    sec = _select_coupon_radio(sec, key="플러스쿠폰") or sec
     chg = _coupon_change_btn(sec)
-    if not chg:
-        # ★섹션 라디오 탭이 화면을 리플로우시키면 sec 좌표가 낡아 '변경 >' 을 놓친다.
-        #   2026-08-28 #5 yr5326 실측: 플러스쿠폰 **26장 보유**인데 '받은 쿠폰 X' 로 스킵돼
-        #   627,197원(정상 543,xxx원)에 결제될 뻔했다 → 섹션을 다시 찾아 좌표 갱신 후 재시도.
-        sec = _scroll_to("플러스쿠폰") or sec
-        nap(0.6)
-        chg = _coupon_change_btn(sec)
     if not chg:
         out["skip"] = "플러스쿠폰 변경 없음(받은 쿠폰 X)"; out["ok"] = True; return out
     _adb().tap(chg["cx"], chg["cy"]); nap(1.8)
@@ -764,6 +1002,21 @@ def set_cash_receipt() -> dict:
     return out
 
 
+def _selected_addr_text() -> str | None:
+    """주문서 최상단에 **현재 선택된** 배송지 한 줄. 못 읽으면 None.
+
+    ★'배송정보'/수령인 줄 바로 아래 밴드만 본다 — 화면 전체를 긁으면 주소 **목록**이 섞여
+      틀린 주소인데도 맞다고 오판한다(2026-08-30 실사고).
+    """
+    its = _texts()
+    anchor = next((it for it in its if it["text"].strip() in ("배송정보", "배송지")), None)
+    band = [it for it in its if (anchor["cy"] - 20 < it["cy"] < anchor["cy"] + 320)] if anchor else            [it for it in its if it["cy"] < 700]
+    addr = [it["text"].strip() for it in sorted(band, key=lambda z: z["cy"])
+            if any(k in it["text"] for k in ("호", "동", "로", "길", "번지"))
+            and "배송방법" not in it["text"] and "변경" not in it["text"]]
+    return " / ".join(addr) if addr else None
+
+
 def set_address() -> dict:
     """배송지 확인/변경. 선택된 배송지가 이미 ADDR_KEY(203호)면 skip(#5). 아니면(#6=경남 창녕군 등)
     배송정보 펼치기(chevron) → '변경 >' → 주소목록서 203호 탭(자동선택+복귀).
@@ -778,8 +1031,25 @@ def set_address() -> dict:
             break
         _adb().swipe(540, 700, 540, 1700, 400); nap(0.6)
     # 접힌 상태서 선택된 주소가 이미 203호면 변경 불필요
-    if ADDR_KEY in _all_text():
-        out["skip"] = f"기본배송지 이미 '{ADDR_KEY}'"; out["ok"] = True; return out
+    # ★★판정 범위를 **선택된 배송지 줄**로 좁힌다 (2026-08-30 실사고).
+    #   종전 `ADDR_KEY in _all_text()` 는 **화면 전체**를 봤다 — 주소 목록·최근배송지·화면 밖
+    #   접힌 노드에 '203호' 가 하나라도 있으면 "이미 203호" 로 skip 했다. 그 결과 실제 선택된
+    #   배송지가 **'화곡동 424-1 동선하우징 402호 선물포장'** 인데도 그대로 결제 직전까지 갔다.
+    #   배송지는 틀리면 물건이 다른 데로 간다 — 화면 어딘가가 아니라 **선택된 그 줄**을 봐야 한다.
+    if not WIN_ONLY_FIX:                     # ★맥: 종전 판정 그대로
+        if ADDR_KEY in _all_text():
+            out["skip"] = f"기본배송지 이미 '{ADDR_KEY}'"; out["ok"] = True; return out
+        sel = None
+    else:
+        sel = _selected_addr_text()
+    if WIN_ONLY_FIX and sel is None:
+        print(f"   [addr] ⚠️ 선택 배송지 줄 판독 실패 — 변경 절차로 진행", flush=True)
+    elif sel and ADDR_KEY in sel:
+        out["skip"] = f"기본배송지 이미 '{ADDR_KEY}'"; out["selected"] = sel; out["ok"] = True
+        return out
+    elif sel:
+        print(f"   [addr] 선택 배송지가 '{sel[:40]}' — '{ADDR_KEY}' 로 변경한다", flush=True)
+        out["was"] = sel
     # 배송정보 펼치기 (우측 chevron) → 주소 '변경 >' 노출 (#6 검증: 접힘 상태선 변경버튼 숨김)
     bi = _find("배송정보", contains=True)
     if bi:
