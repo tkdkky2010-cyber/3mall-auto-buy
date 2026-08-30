@@ -195,6 +195,22 @@ def apply_reward(cart: dict) -> dict:
         print("  [적립] 10% prmo 없음 (쿠폰만/적립없음) — 적립단계 skip", flush=True)
         return {"prmos": [], "results": {}, "ok": True, "skip": "prmo 없음"}
     acct = cart["account"]
+    # ★동시실행 락 (2026-08-27 실사고): 수동 `buy.py reward 1` 과 결제루프의 자동 적립(#2)이
+    #   **같은 9222 Chrome** 을 동시에 조종 → 로그인 세션이 섞여 #2 적립이 #1 계정으로 들어갔다.
+    #   적립은 PC Chrome 한 대를 쓰는 전역 자원 — flock 으로 한 번에 하나만. 앞선 건이 끝날 때까지 대기.
+    import fcntl, signal
+    _lock_f = open(ROOT / "cart" / ".reward.lock", "w")
+    try:
+        fcntl.flock(_lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print("  [적립] 다른 적립 프로세스 실행 중 — 끝날 때까지 대기(최대 10분)…", flush=True)
+        signal.alarm(600)                         # 무한대기 방지 — 10분 넘으면 SIGALRM 으로 죽는 게 낫다
+        try:
+            fcntl.flock(_lock_f, fcntl.LOCK_EX)   # blocking — 앞선 적립이 끝나면 즉시 진행
+        finally:
+            signal.alarm(0)
+        print("  [적립] 락 획득 — 진행", flush=True)
+    globals().setdefault("_REWARD_LOCKS", []).append(_lock_f)   # fd 생존 보장(닫히면/GC되면 락 풀림)
     # ★9222 Chrome 창이 전부 닫혀 페이지 타깃 0개면 connect_over_cdp 가
     #   'Browser context management is not supported'로 실패(2026-07-13 실측) → 탭 1개 보장 후 연결.
     # 포트 체인: 9222 막히면 9223→9224 (같은 로그인된 CFT) — 2026-07-16

@@ -334,6 +334,11 @@ def clear_cart(page: Page) -> None:
             if delete_btn.count() == 0:
                 delete_btn = page.locator("button").filter(has_text="선택삭제").first
             if delete_btn.count() == 0:
+                # ★품절/구매불가 상품은 체크박스가 disabled 라 전체선택에 안 걸리고,
+                #   '선택삭제' 대신 '품절/불가 삭제' 버튼만 뜬다 (2026-08-26 실측: 품절된 스키니랩 1건이
+                #   Hmall 27조합 전부를 clear_cart 실패로 중단시켜 공급률이 통째로 안 나왔다).
+                delete_btn = page.locator("button").filter(has_text="품절/불가 삭제").first
+            if delete_btn.count() == 0:
                 print(f"    [cart] ⚠️ 선택삭제 버튼 없음 — 잔여 {len(rows)}건 {rows}")
                 return
             delete_btn.click()

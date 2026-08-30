@@ -127,6 +127,22 @@ def preflight_today_files() -> bool:
             continue
         if d != today:
             bad.append(f"{p.name}: {d} (오늘 {today})")
+    # ★스키마 검증 (2026-08-27): 8/26 에 items 가 [[이름,수량]] 리스트로 잘못 쓰여
+    #   대장 기록·적립이 통째로 죽었다('list' object has no attribute 'get').
+    #   items 는 [{"product":N,"name":..,"qty":N}] dict 리스트가 정본 — 아니면 시끄럽게 정지.
+    if not bad:
+        try:
+            mf = json.loads(TODAY_CARTS.read_text(encoding="utf-8"))
+            for c in mf.get("carts", []):
+                if c.get("mall") not in ("현대", "hmall") or c.get("paid"):
+                    continue
+                for it in c.get("items") or []:
+                    if not (isinstance(it, dict) and it.get("product") is not None and it.get("qty")):
+                        bad.append(f"today_carts.json: 계정#{c.get('account')} items 형식 오류 "
+                                   f"(dict+product/qty 필수): {str(it)[:60]}")
+                        break
+        except Exception as e:
+            bad.append(f"today_carts.json: 스키마 검사 실패({e})")
     if not bad:
         print(f"[preflight] ✓ 오늘자 데이터 확인 ({today})", flush=True)
         return True
@@ -845,6 +861,31 @@ def _pick_card_from_grid(grid_name: str = "현대카드") -> bool:
 
 def _pick_hyundai_from_grid() -> bool:
     return _pick_card_from_grid("현대카드")
+
+
+def pay_button_amount() -> int | None:
+    """주문서 하단 'NNN원 결제하기' 버튼에서 최종 결제금액(원)을 읽는다. 못 읽으면 None.
+    ★버튼 행만 본다 — 카드할인 캐러셀에도 금액이 있어 그걸 잡으면 딴 값이 나온다.
+    ★**OCR + dump 병합** (2026-08-30): 윈도우 OCR 은 이 버튼(검은 배경 흰 글씨)을 놓치거나
+      글자를 깨먹는다. 자동메모리 `windows-ocr-needs-dump-merge` 가 지시하는 겹쳐읽기.
+    ★금액과 '결제하기' 가 **다른 item 으로 쪼개지는** OCR 프레임이 있어, 한 덩어리 매칭이
+      실패하면 '결제하기' 행과 같은 줄(±60px)의 금액을 폴백으로 쓴다."""
+    its = _ocr_texts(cap()) + _dump_texts()
+    for it in sorted(its, key=lambda z: -z["cy"]):
+        if "결제하기" not in it["text"]:
+            continue
+        mo = re.search(r"([\d,]{4,})\s*원", it["text"])
+        if mo:
+            return int(mo.group(1).replace(",", ""))
+    btn = next((it for it in its if "결제하기" in it["text"]), None)
+    if btn:
+        for it in its:
+            if abs(it["cy"] - btn["cy"]) > 60 or "결제하기" in it["text"]:
+                continue
+            mo = re.search(r"(\d{1,3}(?:,\d{3})+)", it["text"])
+            if mo:
+                return int(mo.group(1).replace(",", ""))
+    return None
 
 
 def select_card_discount(grid_name: str = "현대카드") -> dict:
@@ -1684,63 +1725,38 @@ def detect_card() -> str | None:
     return None
 
 
-_PAY_BTN_RE = re.compile(r"([\d,]{4,})\s*원\s*결제하기")
-
-
-def read_pay_amount() -> int | None:
-    """주문서 하단 'N원 결제하기' 버튼에서 **결제 예정 금액**을 읽는다 (OCR + dump 병합).
-
-    ★윈도우 OCR 단독은 이 버튼(검은 배경 흰 글씨)을 놓치거나 깨먹는다 → `_dump_texts()` 와
-      겹쳐 읽는다 (READ_FIRST 「판독은 OCR + dump 를 겹쳐 쓴다」).
-    ★OCR 이 '170,810원' 과 '결제하기' 를 **다른 item 으로 쪼개는** 경우가 있어, 한 덩어리 매칭이
-      실패하면 '결제하기' 행과 같은 줄(±60px)의 금액을 폴백으로 쓴다.
-    판독 실패는 None — 호출측이 '모르는 채 결제' 를 하지 않도록 그대로 드러낸다.
-    """
-    its = _ocr_texts(cap()) + _dump_texts()
-    for it in its:
-        m = _PAY_BTN_RE.search(it["text"].replace(" ", " "))
-        if m:
-            return int(m.group(1).replace(",", ""))
-    btn = next((it for it in its if "결제하기" in it["text"]), None)
-    if btn:
-        for it in its:
-            if abs(it["cy"] - btn["cy"]) > 60 or "결제하기" in it["text"]:
-                continue
-            m = re.search(r"(\d{1,3}(?:,\d{3})+)", it["text"])
-            if m:
-                return int(m.group(1).replace(",", ""))
-    return None
-
-
 def money_guard(idx: int, res: dict) -> bool:
     """★결제 직전 금액 가드 — 통과하면 True, 막았으면 False(res['status'] 세팅됨).
 
-    2026-08-25 롯데에서 실제로 계정당 15만원을 막아낸 가드를 **현대몰에도 그대로** 옮긴 것
-    (사용자 지시: "롯데몰에서 kb카드쓰는거지만 현대몰에서도 kb카드 쓰는날있을거임, 그럼 그 때도
-    이지랄 안나게 동일하게 실수없이 잘 주문되게끔 코드수정잘해줘"). 혜택(즉시할인·쿠폰)이 조용히
-    0원으로 통과해도 **사람이 로그를 보는 것에 의존하지 않고 코드가** 막는다.
-
-    · `MAX_PAY=<원>` — 결제 예정 금액이 상한을 넘으면 결제하지 않는다.
-    · 금액 **판독 실패**도 MAX_PAY 가 걸려 있으면 정지 — 모르는 금액을 결제하지 않는다.
-    · `STOP_BEFORE_PAY=1` — 주문서까지만 만들고 결제 직전 정지(실돈 안 나감, 검증용).
+    두 세션에서 따로 만든 것을 하나로 합친 것이다(2026-08-30 merge):
+      · `HMALL_STOP_BEFORE_PAY=1` (8/26) — 사용자 지시 2026-08-24 "마지막 결제하기 버튼 누르기 전에
+        가격확인 — 15만원 넘는지". 적립 tier 판정용이라 **포인트 차감 전** 금액을 봐야 하므로
+        `HMALL_NO_POINTS=1` 과 같이 쓴다.
+      · `MAX_PAY=<원>` (8/30) — 8/25 롯데에서 계정당 15만원을 막아낸 상한 가드를 현대몰에 이식
+        (사용자 지시: "현대몰에서도 kb카드 쓰는날있을거임, 그럼 그 때도 이지랄 안나게").
+        혜택(즉시할인·쿠폰)이 조용히 0원으로 통과해도 **사람이 로그를 보는 것에 의존하지 않고 코드가** 막는다.
+      · 금액 **판독 실패**도 MAX_PAY 가 걸려 있으면 정지 — 모르는 금액을 결제하지 않는다.
+    `STOP_BEFORE_PAY=1` 은 롯데 모듈과 같은 이름이라 둘 다 받는다.
     """
-    amt = read_pay_amount()
-    res["pay_amount"] = amt
+    amt = pay_button_amount()
+    res["pay_amount"] = res["amount"] = amt
     print(f"[#{idx}] 결제 예정 금액: {amt:,}원" if amt is not None
           else f"[#{idx}] ⚠️ 결제 예정 금액 판독 실패", flush=True)
     _max = os.environ.get("MAX_PAY")
     if _max:
         if amt is None:
-            res["status"] = (f"AMOUNT_UNREADABLE(MAX_PAY={_max} — 금액을 못 읽으면 결제 안 함)")
+            res["status"] = f"AMOUNT_UNREADABLE(MAX_PAY={_max} — 금액을 못 읽으면 결제 안 함)"
             print(f"[#{idx}] ⛔ {res['status']}", flush=True)
             return False
         if amt > int(_max):
             res["status"] = f"AMOUNT_TOO_HIGH({amt} > MAX_PAY {_max}) — 혜택 미적용 의심, 결제 안 함"
             print(f"[#{idx}] ⛔ {res['status']}", flush=True)
             return False
-    if os.environ.get("STOP_BEFORE_PAY") == "1":
-        res["status"] = f"STOP_BEFORE_PAY(금액={amt})"
-        print(f"[#{idx}] ⏹ STOP_BEFORE_PAY — 결제 직전 정지", flush=True)
+    if os.environ.get("HMALL_STOP_BEFORE_PAY") == "1" or os.environ.get("STOP_BEFORE_PAY") == "1":
+        res["status"] = (f"STOP_BEFORE_PAY(결제금액 {amt:,}원 — "
+                         f"{'15만원 이상' if amt >= 150000 else '15만원 미만'})"
+                         if amt else "STOP_BEFORE_PAY(금액 판독 실패)")
+        print(f"[#{idx}] ⏸ 결제 직전 정지 — {res['status']}", flush=True)
         return False
     return True
 
@@ -2095,6 +2111,7 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
     lap(f"카드 선택 ({use_card})")
     # ★PIN 직전 금액 확인 + 상한 가드 (READ_FIRST 「실결제는 PIN 직전 금액 확인」).
     #   여기가 마지막 되돌릴 수 있는 지점이다 — 이 아래는 카드앱이라 실돈이 나간다.
+    #   `HMALL_STOP_BEFORE_PAY`(8/26 다른 PC 신설) 와 `MAX_PAY`(오늘 신설) 를 money_guard 하나로 합쳤다.
     if not money_guard(idx, res):
         return res
     # 카드별 SDK ⚠️실돈
@@ -2432,13 +2449,36 @@ def main() -> int:
     print(f"[serial] {hw._serial()}  plan={plan}  card={card_override or '당일 자동감지'}"
           f"{'  only=' + ','.join(only_kw) if only_kw else ''}", flush=True)
     summary = []
+    start_date = time.strftime("%Y-%m-%d")   # ★자정 가드 기준일 (preflight 통과 시점)
+    infra_fail = 0                            # ★SCREEN_LOCKED/adb offline 연속 카운터
     for n, idx in enumerate(plan):
+        # ★자정 가드 (2026-08-27 실사고): 자정을 넘으면 카드할인·카트·prmo 가 전부 어제 것 —
+        #   실제로 00시 직후 #3 이 당일카드=현대(어제 토스)로 감지됐다. 날짜 리셋 규칙대로 중단.
+        if time.strftime("%Y-%m-%d") != start_date:
+            print(f"\n{'='*54}\n★ 날짜가 바뀜({start_date} → {time.strftime('%Y-%m-%d')}) — "
+                  f"남은 계정 {plan[n:]} 중단. step1/step2 재실행 후 다시 결제할 것.\n{'='*54}", flush=True)
+            break
         try:
             r = buy_one(idx, card=card_override, combo_idx=combo_idx, only=only_kw)
         except Exception as e:
             r = {"idx": idx, "status": f"EXC:{e}"}
         print(f"[#{idx}] => {r.get('status')}", flush=True)
         summary.append(r)
+        # ★인프라 장애 연속 2회 = 폰이 죽은 것 (2026-08-27 실사고: device offline 후 #4~12 가
+        #   전부 SCREEN_LOCKED 로 헛돌며 로그만 오염). 계정별 재시도 무의미 → 루프 중단.
+        st = str(r.get("status", ""))
+        if st.startswith("SCREEN_LOCKED") or "offline" in st or "adb" in st.lower():
+            infra_fail += 1
+            if infra_fail >= 2:
+                _ov = f" {card_override}" if card_override else ""
+                _okw = f" only={','.join(only_kw)}" if only_kw else ""
+                _cb = f" combo={combo_idx}" if combo_idx is not None else ""
+                print(f"\n{'='*54}\n★ 폰 연결/화면 장애 연속 {infra_fail}회 — 남은 계정 {plan[n+1:]} 중단.\n"
+                      f"  무선 디버깅/화면 확인 후: python3 -u -m phone_auto.hmall_hyundai_buy"
+                      f"{_ov} {' '.join(str(i) for i in plan[n+1:])}{_okw}{_cb}\n{'='*54}", flush=True)
+                break
+        else:
+            infra_fail = 0
         # ★★핸드세이크면 **루프를 멈춘다.** buy_one 이 return 해도 루프가 다음 계정으로 넘어가면
         #   콜드런치가 **살아있는 결제화면을 날린다**(카드번호 입력 대기 중인 화면이 사라진다).
         #   인계 러너로 그 계정을 끝낸 뒤, 아래에 찍힌 명령으로 나머지 계정을 이어서 돌린다.
