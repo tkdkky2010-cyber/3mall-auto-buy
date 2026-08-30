@@ -1115,6 +1115,88 @@ def wait_order_complete(timeout: float = 20, order_grace: float = 3.0) -> dict:
     return {"ok": False, "reason": "주문완료 미확인(timeout — 거절/지연 가능)"}
 
 
+MYPAGE_URL = "https://www.hmall.com/mo/mpf/selectMyPageMain"
+_ORD_NO_RE = re.compile(r"ordNo=(\d{10,})")
+# 마이페이지 '주문/배송 상세' 는 <a href> 가 아니라 JS 요소다 (href 목록에 안 잡힌다 — 실측).
+#   → 텍스트로 찾아 click() 한 뒤 location.href 의 ordNo 를 읽는다.
+_CLICK_ORDER_DETAIL_JS = """
+(() => {
+  const els = [...document.querySelectorAll('*')]
+      .filter(e => !e.children.length && (e.innerText || '').trim() === '주문/배송 상세');
+  if (!els.length) return 'NO_ELEMENT';
+  els[0].click();
+  return 'CLICKED';
+})()
+"""
+
+
+def confirm_order_via_cdp(expect_amount: int | None = None, timeout: float = 30) -> dict:
+    """★주문완료 **화면 판독에 실패했을 때** 앱 webview 를 직접 조회해 주문을 확인한다 (CDP 폴백).
+
+    2026-08-30 실사고: 계정 13~19 결제 중 **4계정(#14·#15·#17·#19)** 이
+    `ORDER_NOT_COMPLETE(timeout)` 으로 떨어졌는데 **전부 실제로는 결제 완료**였다.
+    그 결과 구매대장·H.Point 적립·paid 플래그가 통째로 누락돼 사람이 주문내역을 뒤져 메꿨다.
+    `wait_order_complete` 에 dump 병합을 넣어 절반은 살렸지만(#16·#18), 카드앱 구간이 40초를
+    넘긴 계정은 주문완료 화면이 **20초 창을 벗어나 home 으로 자동이동**해 화면 판독으로는 못 잡는다.
+    → **화면을 읽지 말고 서버에 묻는다.** 타이밍과 무관해진다.
+
+    경로(실측 2026-08-30): 마이페이지 → '주문/배송 상세' 클릭 → `/mo/mpa/selectOrdPTCPup?ordNo=NNN`.
+    ★`expect_amount` 를 주면 상세 화면에 그 금액(카드 청구액)이 있는지까지 확인한다 —
+      계정에 오늘 주문이 여러 건일 때 **엉뚱한 주문번호를 대장에 넣지 않기 위한** 양성검증이다.
+      확인 실패면 `ok:False` — 추측해서 기록하지 않는다(READ_FIRST 「관측과 추정을 구분」).
+    """
+    out = {"via": "cdp"}
+    try:
+        serial = hw._serial()
+        hw._forward(serial)
+        cdp = hw._attach_any()
+    except Exception as e:
+        out["err"] = f"CDP attach 실패: {e}"
+        return out
+    try:
+        cdp.navigate(MYPAGE_URL)
+        time.sleep(2.5)
+        r = cdp.ev(_CLICK_ORDER_DETAIL_JS, timeout=15)
+        if r != "CLICKED":
+            out["err"] = f"'주문/배송 상세' 미발견({r}) — 오늘 주문이 없거나 마이페이지 미도달"
+            return out
+        end = time.time() + timeout
+        order = None
+        while time.time() < end:
+            time.sleep(1.0)
+            url = cdp.ev("location.href", timeout=8) or ""
+            m = _ORD_NO_RE.search(url)
+            if m:
+                order = m.group(1)
+                break
+        if not order:
+            out["err"] = "상세 URL 에서 ordNo 미검출"
+            return out
+        out["order"] = order
+        body = cdp.ev("document.body?document.body.innerText:''", timeout=10) or ""
+        out["paid_marker"] = "결제완료" in body
+        if expect_amount is not None:
+            want = f"{expect_amount:,}원"
+            if want not in body:
+                out["err"] = (f"주문 {order} 상세에 결제액 {want} 없음 — 다른 주문일 수 있어 "
+                              f"기록하지 않는다")
+                return out
+            out["amount_verified"] = True
+        out["ok"] = True
+        print(f"   [order-cdp] ✓ 주문 {order} 확인"
+              f"{' (금액 %s 일치)' % f'{expect_amount:,}원' if expect_amount is not None else ''}",
+              flush=True)
+        return out
+    except Exception as e:
+        out["err"] = f"CDP 조회 실패: {e}"
+        return out
+    finally:
+        try:
+            cdp.close()
+        except Exception:
+            pass
+
+
 def pay_kb() -> dict:
     """KB국민카드 SDK (라이브검증 2026-05-31 #1, 주문 20260531079448). KB국민카드 선택된 주문서에서.
     원결제하기(OCR) → 'KB Pay 결제' 박스(OCR, 노란 앱카드) → KB앱(com.kbcard.cxh.appcard) 결제하기(dump)
@@ -2179,7 +2261,19 @@ def buy_one(idx: int, card: str | None = None, combo_idx: int | None = None,
     oc = wait_order_complete(timeout=20)
     res["order_complete"] = oc
     if not oc.get("ok"):
-        res["status"] = f"ORDER_NOT_COMPLETE:{use_card}:{oc.get('reason')}"; return res
+        # ★화면 판독 실패면 **서버에 묻는다** (CDP 폴백, 2026-08-30 신설).
+        #   '결제거절' 은 폴백 대상이 아니다 — 진짜 실패는 실패로 남아야 이중결제를 막는다.
+        if str(oc.get("reason", "")).startswith("결제거절"):
+            res["status"] = f"ORDER_REJECTED:{use_card}:{oc.get('reason')}"; return res
+        print(f"[#{idx}] 주문완료 화면 판독 실패 → webview 조회로 확인 시도", flush=True)
+        cf = confirm_order_via_cdp(expect_amount=res.get("pay_amount"))
+        res["order_confirm"] = cf
+        if not cf.get("ok"):
+            res["status"] = (f"ORDER_NOT_COMPLETE:{use_card}:{oc.get('reason')}"
+                             f" / cdp:{cf.get('err')}")
+            return res
+        oc = {"ok": True, "reason": "cdp_confirm", "order": cf.get("order")}
+        res["order_complete"] = oc
     # ★계정 간 7분 간격의 **기산점**. 뒤따르는 뷰티·대장·적립은 이 대기시간 안에서 소비된다
     #   (사용자 지시 2026-08-06: "결제 완료후 7분, 그 쉬는 시간 사이에 해당 계정 적립").
     res["paid_at"] = time.time()
