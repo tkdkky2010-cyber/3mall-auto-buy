@@ -247,15 +247,60 @@ def _dump_find(nodes: list[dict], key: str, cls: str = "") -> dict | None:
 
 # ──────────────────────────── A. 앱 초기화 + 로그인 ────────────────────────────
 
+# 결제 도중 죽으면 **앞에 떠서** 다음 계정을 막는 카드앱들 (2026-08-31 실사고).
+from phone_auto import fail_audit as _FA        # 실패 검수(2026-08-31)
+
+CARD_APPS = ("com.hanaskcard.paycla", "com.kbcard.kbkookmincard", "com.hanaskcard.rocomo.potal",
+             "com.lcacApp", "com.shcard.smartpay", "kvp.jjy.MispAndroid320",
+             "com.samsung.android.spay", "com.nh.cashcardapp", "nh.smart.card",
+             "com.hyundaicard.appcard",          # ★현대카드 (2026-08-31 #14 실측 — 빠져 있었다)
+             "com.kbstar.kbbank", "com.wooricard.smartapp", "com.citibank.cardapp",
+             "com.hanaskcard.jayoung", "com.lotte.lottecard")
+
+
 def reset_lotte_app() -> None:
-    """force-stop + 콜드런치 + 안정화. (hmall reset_to_main 의 lotte 판)."""
+    """force-stop + 콜드런치 + 안정화. (hmall reset_to_main 의 lotte 판).
+
+    ★카드앱도 같이 죽인다 (2026-08-31 실사고): #8 이 하나앱 '다음' 미발견으로 죽자 폰이
+      `com.hanaskcard.paycla/OnlinePaymentActivity` 화면에 **갇힌 채** 남았다. 종전 코드는
+      롯데앱만 force-stop 해서, 다음 계정은 롯데 화면에 닿지도 못하고 `LOGOUT_FAIL` 이 났다
+      (#9·#11 연달아). 한 계정의 실패가 **뒤 계정 전부를 무너뜨리는** 연쇄였다.
+      카드앱 종료는 결제 인증 전 단계에선 무해하고, 하나 보안모듈의 '앱을 다시 실행해주세요'
+      경고(연속 호출 차단)도 같이 털어낸다.
+    """
     serial = hw._serial()
+    for pkg in CARD_APPS:
+        subprocess.run([hw.ADB, "-s", serial, "shell", "am", "force-stop", pkg],
+                       capture_output=True)
+    subprocess.run([hw.ADB, "-s", serial, "shell", "input", "keyevent", "3"],   # HOME
+                   capture_output=True)
+    time.sleep(1.0)
     subprocess.run([hw.ADB, "-s", serial, "shell", "am", "force-stop", PKG])
     time.sleep(1.0)
-    subprocess.run([hw.ADB, "-s", serial, "shell", "monkey", "-p", PKG,
-                    "-c", "android.intent.category.LAUNCHER", "1"],
-                   capture_output=True)
-    time.sleep(8.0)
+    # ★롯데앱이 **실제로 앞에 왔는지 확인**하고 아니면 다시 띄운다 (2026-08-31 #14 실사고).
+    #   패키지 목록만으로는 못 막는다 — 그날 앞을 막은 건 목록에 없던 `com.hyundaicard.appcard`
+    #   였다(카드 결제 알림에서 열린 것으로 보인다). 앱은 얼마든지 새로 생기므로
+    #   '무엇을 죽일까' 대신 **'롯데가 앞에 있나'** 로 판정한다. 아니면 그 앱을 접고 재시도.
+    for attempt in range(3):
+        subprocess.run([hw.ADB, "-s", serial, "shell", "monkey", "-p", PKG,
+                        "-c", "android.intent.category.LAUNCHER", "1"],
+                       capture_output=True)
+        time.sleep(8.0)
+        try:
+            w = subprocess.run([hw.ADB, "-s", serial, "shell", "dumpsys", "window"],
+                               capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", timeout=15).stdout or ""
+            fg = next((ln for ln in w.splitlines() if "mCurrentFocus" in ln), "")
+        except Exception:
+            fg = ""
+        if PKG in fg:
+            return
+        print(f"   [reset] 롯데앱이 앞에 없다(시도 {attempt + 1}/3) — 포그라운드: "
+              f"{fg.strip()[:120]}", flush=True)
+        subprocess.run([hw.ADB, "-s", serial, "shell", "input", "keyevent", "3"],
+                       capture_output=True)      # HOME 으로 접고 다시 띄운다
+        time.sleep(1.5)
+    print("   [reset] ⚠️ 3회 시도에도 롯데앱 포그라운드 실패 — 이후 단계가 깨질 수 있다", flush=True)
 
 
 # 비번변경 캠페인 흰버튼(좌) — ⚠️ 검정 '지금 변경하기'(우) 절대 금지
@@ -394,6 +439,13 @@ def goto_cart_select_all() -> dict:
     #   장바구니 아이콘은 마이/홈/기획전 모두 동일 (1002,148) (dump 실측). 옛 (960,150) 은 stale → 빗나감(CART_FAIL).
     _adb().tap(*NAV_MY); nap(2.0)
     dismiss_popups(2)
+    # ★상단 알림 배너를 걷어낸다 (2026-08-31 실사고, 검수로 확인).
+    #   카트 아이콘 (1002,148) 은 화면 **맨 위**라 heads-up 알림 배너와 같은 자리다.
+    #   실제 카드 결제 알림('김건엽 님, 현대 대한항공060 승인 / 8,400원 ... 뚜레쥬르')이 떠서
+    #   탭이 알림에 먹혔고 `CART_FAIL:장바구니 미도달` 이 났다(#13). 알림은 언제든 뜬다.
+    subprocess.run([hw.ADB, "-s", hw._serial(), "shell", "cmd", "statusbar", "collapse"],
+                   capture_output=True)
+    nap(0.6)
     _adb().tap(1002, 148); nap(2.5)   # 카트 아이콘 (마이 상단바, 2026-06-08 dump 실측)
     if not (wait_text("주문하기", timeout=8) or screen_has("장바구니")):
         out["err"] = "장바구니 미도달"; return out
@@ -710,6 +762,10 @@ MIN_USABLE_CY = 250      # 앵커가 이보다 위면 행이 상단 가장자리
 # 주문서 하단의 **고정** '…원 결제하기' 버튼 상단 (실측 버튼중심 cy=2170, 높이≈140).
 # 이보다 아래로 밀린 행은 버튼에 덮여 OCR 목록에서 사라진다 → 앵커는 반드시 이 위에 세운다.
 PAY_BTN_TOP_CY = 1950
+# 사업자 등록번호 **입력칸**은 '사업자' 라벨보다 95~150px 아래에 있다(테두리만 있어 OCR 미검출).
+# 라벨이 여기보다 아래면 칸 자체가 결제하기 버튼에 가려져 **탭해도 포커스가 안 잡힌다**
+# (2026-08-31 #8 실측: '키패드 미등장' → entered False). 라벨을 이 위로 올려놓고 탭한다.
+BIZ_LABEL_MAX_CY = 1750
 
 
 def _scroll_to(text: str, contains: bool = True, max_scroll: int = 8, down: bool = True,
@@ -935,16 +991,51 @@ def use_all_points() -> dict:
     return out
 
 
-def set_cash_receipt() -> dict:
-    """[조건부] 현금영수증 지출증빙 사업자번호 507/18/15504. L.POINT 사용 시 활성. 비활성이면 skip."""
+def set_cash_receipt(points_used: int = 0) -> dict:
+    """[조건부] 현금영수증 지출증빙 사업자번호 507/18/15504. L.POINT 사용 시 활성. 비활성이면 skip.
+
+    ★points_used = 직전 `use_all_points()` 의 used (사용자 지시 2026-08-31:
+      "포인트 사용/미사용에 따라 현금영수증 발부하고 안하고 차이나는 건데").
+      **포인트를 썼으면 현금영수증은 필수**다 — 그때 '섹션 없음' 은 판독 실패지 부재가 아니다.
+      종전엔 화면에서 '현금영수증' 글자를 못 찾으면 무조건 `L.POINT 0` 으로 단정해 skip 했고,
+      윈도우에서 판독이 흔들리면 그대로 오판했다. 그 결과 결제하기에서
+      '현금영수증 발급방식을 선택해 주세요' 팝업에 막혀 카드 모달이 안 뜨고
+      `PAY_FAIL@hana_modal` 로 **엉뚱하게** 보고됐다(2026-08-31 #9·#10 실측:
+      같은 로그에 `포인트 {'used': 1}` 과 `현금영수증 섹션 없음(L.POINT 0)` 이 나란히 찍혔다).
+    """
     out = {}
     # ⚠️ 현금영수증 = 결제수단 섹션 안에 있음 (별 섹션 아님). L.POINT 사용 시 활성.
+    # ★섹션을 **충분히 위로** 올려놓고 시작한다 (2026-08-31 실사고).
+    #   '지출증빙' 을 누르면 그 아래로 '사업자 등록번호' 라벨(+약 406px)과 빈칸 3개(+약 524px)가
+    #   펼쳐진다. 헤더가 화면 아래쪽에 있으면 그 칸들이 하단 고정 '…원 결제하기' 버튼에 가려져
+    #   **탭해도 포커스가 안 잡히고**(키패드 미등장) entered=False 로 끝난다(#8 실측).
+    #   실측: 헤더 cy=568 일 때 라벨 974 / 칸 1092 → 헤더를 1100 위로만 올리면 칸이 안전권.
+    #   ⚠️ 여기에 max_cy 를 걸면 안 된다 (2026-08-31 회귀): 상한을 못 맞추면 _scroll_to 가 None 을
+    #      돌려주고, 그걸 '섹션 없음(L.POINT 0)' 으로 **오해**해 건너뛴다. 그러면 결제하기에서
+    #      '현금영수증 발급방식을 선택해 주세요' 팝업에 막혀 카드 모달이 안 뜬다
+    #      (#10 실측 → PAY_FAIL@hana_modal 로 오표시). 칸 위치 보정은 아래 '사업자' 스크롤에서 한다.
     sec = _scroll_to("현금영수증", max_scroll=8)
     if not sec:
-        out["skip"] = "현금영수증 섹션 없음(L.POINT 0)"; out["ok"] = True; return out
-    if not ocr_or_dump_tap("지출증빙", contains=True, retries=3):
+        if points_used:
+            # 포인트를 썼으면 섹션은 **반드시 있다** → 판독 실패다. 조용히 넘기면 결제가 막힌다.
+            out["err"] = (f"현금영수증 섹션 미발견인데 포인트 {points_used}건 사용됨 "
+                          f"— 발급방식 미선택이면 결제가 막힌다(판독 실패 의심)")
+            return out
+        out["skip"] = "현금영수증 섹션 없음(포인트 미사용)"; out["ok"] = True; return out
+    # ★라벨 글자를 누르면 라디오가 **안 켜진다** (2026-08-31 실측: '지출증빙' 텍스트를 탭해도
+    #   `㉧ 소득공제` 가 그대로 남고 '휴대폰번호' 칸이 유지된다 → 사업자 라벨이 아예 안 생겨
+    #   '사업자 등록번호 라벨 미발견' 으로 끝났다). 라디오 원은 라벨 **왼쪽**에 있다
+    #   (실측: 라벨 cx=733 / 라디오 cx=624 → 약 -109). 누른 뒤 **'사업자' 등장으로 검증**한다.
+    lab = _find_text("지출증빙")
+    if not lab:
         out["skip"] = "지출증빙 비활성"; out["ok"] = True; return out
-    nap(1.5)
+    for dx in (-109, -95, -125, 0):
+        _adb().tap(lab["cx"] + dx, lab["cy"]); nap(1.5)
+        if _find_text("사업자") or _find_text("등록번호"):
+            break
+        lab = _find_text("지출증빙") or lab
+    else:
+        out["err"] = "지출증빙 라디오 선택 실패(사업자 라벨 미등장)"; return out
     # ★칸1 포커스 = 키패드 등장까지 보장 (6/2 #10: 단일 탭으론 포커스 실패 → entered=False + '입력해주세요' 팝업).
     #   '사업자 등록번호' 라벨 아래 빈칸 3개(테두리만, OCR 미검출). 후보 오프셋 재시도 + 팝업이 오히려 포커스 유발.
     def _keypad_up() -> bool:
@@ -960,7 +1051,7 @@ def set_cash_receipt() -> dict:
                              errors="replace", timeout=10).stdout or ""
         return "mInputShown=true" in out
     # ★카드 뒤 위치에선 지출증빙이 화면 하단 → 사업자 라벨이 뷰 밖. 먼저 스크롤로 노출 (2026-06-02 #11 재정렬).
-    if not _scroll_to("사업자", max_scroll=4):
+    if not _scroll_to("사업자", max_scroll=4, max_cy=BIZ_LABEL_MAX_CY):
         out["err"] = "사업자 등록번호 라벨 미발견"; return out
     # ★2026-08-25: 입력 검증까지 하고 **실패하면 한 번 더** 시도한다. 종전엔 entered=False 여도
     #   조용히 ok 로 통과해서, 결제하기를 누른 뒤에야 '사업자 등록번호를 입력해주세요' 팝업으로
@@ -973,7 +1064,7 @@ def set_cash_receipt() -> dict:
         for dy in (122, 95, 150):
             lab = _find_text("사업자") or _find_text("등록번호")
             if not lab:
-                if not _scroll_to("사업자", max_scroll=3):
+                if not _scroll_to("사업자", max_scroll=3, max_cy=BIZ_LABEL_MAX_CY):
                     out["err"] = "사업자 등록번호 라벨 사라짐"; return out
                 lab = _find_text("사업자") or _find_text("등록번호")
                 if not lab:
@@ -1001,7 +1092,13 @@ def set_cash_receipt() -> dict:
             out.pop("err", None)
             break
         out["err"] = f"사업자번호 입력 검증 실패({attempt}차)"
-    out["ok"] = True
+    # ★entered=False 를 ok:True 로 통과시키면 안 된다 (2026-08-31 실사고 — 사용자 지적
+    #   "지출증빙 선택하고 사업자번호 안썼음"). 지출증빙을 **선택해 놓고** 번호가 비면
+    #   결제하기가 검증에 막혀 카드 모달이 아예 안 뜬다 → `PAY_FAIL@hana_modal` 처럼
+    #   **엉뚱한 지점**의 실패로 보고돼 원인을 못 찾는다(#8 실측: entered False → hana_modal 미도달).
+    #   위 964/977/981 의 조기 return 들은 ok 를 안 넣으므로 그대로 실패로 잡힌다.
+    #   (섹션 없음/지출증빙 비활성 = 정상 skip 은 앞에서 ok:True 로 이미 return 된다.)
+    out["ok"] = bool(out.get("entered"))
     return out
 
 
@@ -1493,15 +1590,20 @@ def pay_lotte_hana() -> dict:
     out = {"step": "order_sheet", "card": "하나"}
     if screen_has("다음에도") or screen_has("사용할까요"):
         ocr_tap("사용할게요", contains=True, retries=2)
-    pay = next((it for it in _ocr_texts(cap()) if "결제하기" in it["text"] and it["cy"] > 2000), None)
-    if pay:
-        _adb().tap(pay["cx"], pay["cy"])
-    elif not ocr_tap("결제하기", contains=True):
+    # ★_tap_pay_button 을 쓴다 (2026-08-31). 좌표(cy>2000) 기준은 하단 고정바가 cy≈1968/1777 로
+    #   올라와 있을 때 조용히 빗나가고, 폴백 `ocr_tap` 은 pick="bottom" 이라 **화면 중간의 다른
+    #   '결제하기'**를 누른다 → 모달이 안 떠서 `PAY_FAIL@hana_modal` 처럼 엉뚱한 이름으로 죽는다
+    #   (#8 실측: `ocr_tap '결제하기' @(540,1968)` → 하나 모달 미도달. 같은 사고가 KB 에서도 있었고
+    #   그래서 _tap_pay_button 이 만들어졌는데 하나·삼성 경로만 안 쓰고 있었다).
+    if not _tap_pay_button():
         out["err"] = "원결제하기 실패"; return out
     time.sleep(3.0)
     # 2) 하나 SDK 결제방식 화면 → '하나Pay 하나카드 결제' 박스 (MG+/간편결제/SMS/일반 아님)
     out["step"] = "hana_modal"
     if not wait_text("하나카드 결제", timeout=15):
+        # ★실패 순간의 화면을 남긴다 (2026-08-31): '미도달'만으론 결제하기 탭이 안 먹은 건지,
+        #   다른 SDK 화면이 뜬 건지, 팝업에 막힌 건지 구분이 안 돼 원인을 못 찾았다.
+        _screen_debug("하나모달-미도달")
         out["err"] = "하나 결제방식 화면 미도달"; return out
     if not ocr_tap("하나카드 결제", contains=True):
         out["err"] = "'하나Pay 하나카드 결제' 박스 실패"; return out
@@ -1548,10 +1650,12 @@ def pay_lotte_hyundai() -> dict:
     if screen_has("다음에도") or screen_has("사용할까요"):
         ocr_tap("사용할게요", contains=True, retries=2)
     # 1) (원)결제하기 — 하단 'NNN원 결제하기'
-    pay = next((it for it in _ocr_texts(cap()) if "결제하기" in it["text"] and it["cy"] > 2000), None)
-    if pay:
-        _adb().tap(pay["cx"], pay["cy"])
-    elif not ocr_tap("결제하기", contains=True):
+    # ★_tap_pay_button 을 쓴다 (2026-08-31). 좌표(cy>2000) 기준은 하단 고정바가 cy≈1968/1777 로
+    #   올라와 있을 때 조용히 빗나가고, 폴백 `ocr_tap` 은 pick="bottom" 이라 **화면 중간의 다른
+    #   '결제하기'**를 누른다 → 모달이 안 떠서 `PAY_FAIL@hana_modal` 처럼 엉뚱한 이름으로 죽는다
+    #   (#8 실측: `ocr_tap '결제하기' @(540,1968)` → 하나 모달 미도달. 같은 사고가 KB 에서도 있었고
+    #   그래서 _tap_pay_button 이 만들어졌는데 하나·삼성 경로만 안 쓰고 있었다).
+    if not _tap_pay_button():
         out["err"] = "원결제하기 실패"; return out
     time.sleep(3.0)
     # 2) 현대 SDK 화면 → '앱카드 결제' (XMPI 연결 로딩 포함 폴링)
@@ -1876,8 +1980,16 @@ def _order_sheet_tail(res: dict, idx: int, card, goods_no, combo_idx) -> dict:
         res["status"] = f"CARD_FAIL:{sc.get('err')}"; return res
     use_card = sc["card"]
     print(f"[#{idx}] 당일카드 감지/선택 = {use_card} ({sc.get('pct')}%) via {sc.get('via')}", flush=True)
-    res["cash"] = set_cash_receipt()        # ★카드 선택 직후 (카드가 현금영수증 지출증빙을 리셋하므로 여기서)
+    # ★포인트 사용량을 넘긴다 — 현금영수증 필수 여부는 **화면 판독이 아니라 포인트 사용 여부**로 갈린다.
+    res["cash"] = set_cash_receipt(int((res.get("pts") or {}).get("used") or 0))
     print(f"[#{idx}] 현금영수증 — {res['cash']}", flush=True)
+    if not res["cash"].get("ok"):
+        # ★결제 시도 전에 **여기서** 멈춘다 — 지출증빙만 켜지고 사업자번호가 비면 결제하기가
+        #   막혀서, 그 다음 카드 모달 단계가 `PAY_FAIL@*_modal` 로 오표시된다(2026-08-31 #8).
+        res["status"] = (f"CASH_RECEIPT_FAIL:{res['cash'].get('err')} — 지출증빙 선택됐는데 "
+                         f"사업자번호 미입력. 이 상태로는 결제가 막힌다. 결제 안 함")
+        print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+        return res
     if _close_ime():                         # ★키보드가 남아 있으면 동의·결제하기가 가려진다
         print(f"[#{idx}] 키보드 닫음(IME) — 동의/결제하기 노출", flush=True)
     if not agree_required():                 # ★미체크면 결제 시 '동의하셔야' 팝업으로 막힘 → 결제 시도 전 abort
@@ -1895,6 +2007,15 @@ def _order_sheet_tail(res: dict, idx: int, card, goods_no, combo_idx) -> dict:
     #   실측 — 쿠폰 0장이면 700,000원, 정상 적용이면 530,247원. 사람이 로그를 봐야만 알 수 있으면
     #   무인 실행에서 조용히 15만원을 더 낸다. MAX_PAY 넘으면 결제하지 않고 그 계정을 실패시킨다.
     _max = os.environ.get("MAX_PAY")
+    # ★금액을 못 읽으면 **가드가 통째로 사라진다** (2026-08-31 실측: '결제 예정 금액: (판독실패)'
+    #   인데도 그대로 결제 실행됨). 종전 조건 `if _max and _amt:` 은 _amt=None 이면 검사를 건너뛰어
+    #   MAX_PAY 를 준 의미가 없어진다 — 쿠폰 누락분을 막으라고 켠 가드가 정작 판독이 흔들릴 때
+    #   조용히 열린다. 가드를 켰으면 **못 읽는 것도 실패**로 취급한다.
+    if _max and not _amt:
+        res["status"] = ("AMOUNT_UNREADABLE — 결제 예정 금액 판독 실패. MAX_PAY 가드가 "
+                         "무력화되므로 결제하지 않는다")
+        print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+        return res
     if _max and _amt:
         _n = re.sub(r"[^0-9]", "", _amt.split("원")[0])
         if _n and int(_n) > int(_max):
@@ -2113,6 +2234,14 @@ def main() -> int:
         r = buy_one(i, card=card, combo_idx=combo_idx)
         results.append(r)
         print(f"[#{i}] → {r['status']}", flush=True)
+        # ★실패면 **그 자리에서** 증거를 남긴다 (사용자 지시 2026-08-31 — 윈도우는 전 카드사 최초라
+        #   실패 원인 검수가 필수). 다음 계정 콜드런치가 화면을 날리기 전이어야 의미가 있다.
+        if _FA.is_failure(r.get("status")):
+            try:
+                _FA.audit(i, r.get("status"), "롯데", serial=hw._serial(), acc_id=r.get("id"),
+                          texts_fn=_texts, cap_fn=cap)
+            except Exception as _e:
+                print(f"   [검수] 실패(무시): {_e}", flush=True)
         if str(r["status"]).startswith("SCREEN_LOCKED"):   # 잠긴 폰에 나머지 계정 헛돌기 금지
             print("[STOP] 폰 잠김 — 잠금해제 후 재실행 (나머지 계정 중단)", flush=True)
             break

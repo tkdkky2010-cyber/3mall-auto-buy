@@ -164,6 +164,8 @@ KB_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "kb_kbpay.json"        # KB 
 HANA_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "hana_card.json"     # 하나 결제흐름(5/29 nFilter검증, flow[16:]=하나앱)
 BC_FLOW = ROOT / "phone_auto" / "coords" / "apps" / "bc_paybook_isp.json"  # BC(페이북) 결제흐름(드래프트, flow[6:]=KCP다음~페이북앱)
 # 카드사 → '카드 선택' 그리드 표기명 (카드할인 행 토큰은 키, 그리드명은 값). 결제 SDK 있는 카드만 활성.
+from phone_auto import fail_audit as _FA        # 실패 검수(2026-08-31)
+
 CARD_GRID_NAME = {"현대": "현대카드", "롯데": "롯데카드", "하나": "하나카드", "KB": "KB국민카드",
                   "삼성": "삼성카드", "NH": "NH농협카드", "BC": "비씨카드"}
 CARDS_SUPPORTED = ("현대", "롯데", "KB", "하나", "BC", "삼성", "NH", "토스")   # +토스페이(2026-07-15, 토스앱 로그인 전제 PIN)
@@ -2558,6 +2560,13 @@ def main() -> int:
             r = {"idx": idx, "status": f"EXC:{e}"}
         print(f"[#{idx}] => {r.get('status')}", flush=True)
         summary.append(r)
+        # ★실패면 그 자리에서 증거를 남긴다 (사용자 지시 2026-08-31 — 롯데·현대 공통).
+        if _FA.is_failure(r.get("status")):
+            try:
+                _FA.audit(idx, r.get("status"), "현대", serial=hw._serial(), acc_id=r.get("id"),
+                          texts_fn=_texts, cap_fn=cap)
+            except Exception as _e:
+                print(f"   [검수] 실패(무시): {_e}", flush=True)
         # ★인프라 장애 연속 2회 = 폰이 죽은 것 (2026-08-27 실사고: device offline 후 #4~12 가
         #   전부 SCREEN_LOCKED 로 헛돌며 로그만 오염). 계정별 재시도 무의미 → 루프 중단.
         st = str(r.get("status", ""))

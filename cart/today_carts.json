@@ -1,6 +1,6 @@
 {
   "_comment": "2026-08-30 — 사용자가 현대몰 계정 13~19 장바구니를 미리 담아둠(이 세션은 결제만 한다). 카트 실측(#13 gcd0327, 폰 webview): '[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉' 옵션 '1.넛츠시그니처23gx100낱봉' x2 = 총 1건 179,800원 → 롯데 5% 즉시할인 170,810원. buy/products.json 기준 상품 id=2(하루견과 초록색 100봉). 당일 적립행사 = 릴레이푸드 최대 10%적립(P202608074038, ~8.30 23:59, 15만원↑ 15,000P). ★담기는 이 세션이 하지 않았다 — 계정별 실제 카트는 결제 시 금액 로그로 검증한다. / 롯데 조합25 계정 1~7 담기 추가(8/30).",
-  "date": "2026-08-30",
+  "date": "2026-08-31",
   "carts": [
     {
       "mall": "현대",
@@ -162,6 +162,62 @@
       "items": [],
       "paid": false,
       "note": "2026-08-30 담기(buy/_lotte_cart_fill.py 25 1 7) — 계정별 '카트 2건' 검증 로그 확인분"
+    },
+    {
+      "mall": "롯데",
+      "account": 8,
+      "combo": 25,
+      "items": [],
+      "paid": false,
+      "note": "2026-08-31 PC 담기 (buy/sulwhasoo.py lotte <i> 25) — 카트 2건 검증됨"
+    },
+    {
+      "mall": "롯데",
+      "account": 9,
+      "combo": 25,
+      "items": [],
+      "paid": false,
+      "note": "2026-08-31 PC 담기 (buy/sulwhasoo.py lotte <i> 25) — 카트 2건 검증됨"
+    },
+    {
+      "mall": "롯데",
+      "account": 10,
+      "combo": 25,
+      "items": [],
+      "paid": false,
+      "note": "2026-08-31 PC 담기 (buy/sulwhasoo.py lotte <i> 25) — 카트 2건 검증됨"
+    },
+    {
+      "mall": "롯데",
+      "account": 11,
+      "combo": 25,
+      "items": [],
+      "paid": false,
+      "note": "2026-08-31 PC 담기 (buy/sulwhasoo.py lotte <i> 25) — 카트 2건 검증됨"
+    },
+    {
+      "mall": "롯데",
+      "account": 12,
+      "combo": 25,
+      "items": [],
+      "paid": false,
+      "note": "2026-08-31 PC 담기 (buy/sulwhasoo.py lotte <i> 25) — 카트 2건 검증됨"
+    },
+    {
+      "mall": "롯데",
+      "account": 13,
+      "combo": 25,
+      "items": [],
+      "paid": false,
+      "note": "2026-08-31 PC 담기 (buy/sulwhasoo.py lotte <i> 25) — 카트 2건 검증됨"
+    },
+    {
+      "mall": "롯데",
+      "account": 14,
+      "combo": 25,
+      "items": [],
+      "paid": false,
+      "note": "2026-08-31 PC 담기 (buy/sulwhasoo.py lotte <i> 25) — 카트 2건 검증됨"
     }
   ]
 }

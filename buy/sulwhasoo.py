@@ -950,13 +950,61 @@ def lotte_add_product_by_url(page: Page, goods_no: str, qty: int) -> bool:
         except Exception as opt_e:
             print(f"      [option] 선택 실패({type(opt_e).__name__}): {str(opt_e).splitlines()[0][:120]}")
 
-        # 수량 (qty - 1) 번 + 클릭
-        for _ in range(qty - 1):
+        # 수량 = qty. ★'+' 를 눌러놓고 **확인하지 않으면 조용히 1개가 담긴다.**
+        #   2026-08-31 실사고: 조합25 의 e(탄력3종)가 **7계정 전부 1개**로 담겼는데 로그는
+        #   `× 2` 로 찍혔다. 종전 코드는 `except: break` 로 클릭 실패를 통째로 삼켰고(로그도 없음),
+        #   최종 '담기 검증'은 줄 수만 세서 아무도 못 잡았다 → 폰 결제 금액이 436,500원(정상 630,000).
+        #   ★실제 수량 필드는 `#cal_ord_qty` 가 아니라 **`#order_count`** 다(2026-08-31 실측:
+        #     '+' 클릭 시 cal_ord_qty 는 1 그대로, order_count 만 1→2→3 으로 올라간다).
+        #     order_count 는 **옵션(세트) 선택 후에야 DOM 에 생긴다** → 0이면 옵션 단계가 깨진 것.
+        #   ⚠️ order_count 는 **같은 id 가 3개** 있다(중복 id — 옵션마다 행이 복제된다).
+        #      `querySelector('#order_count')` 는 그중 **숨겨진 템플릿 행**(opt_..._0)을 집는데
+        #      그건 영원히 1이다 → 클릭이 먹었는데도 '수량 1' 로 오판한다(2026-08-31 실측).
+        #      실제로 움직이는 건 **보이는** 행(opt_..._1) 이므로 offsetParent 로 걸러 읽는다.
+        def _order_count() -> int:
             try:
-                page.get_by_role("button", name="+").first.click(timeout=2000)
-                page.wait_for_timeout(300)
+                v = page.evaluate(
+                    "() => { const i = Array.from(document.querySelectorAll("
+                    "'#order_count, [name=order_count]')).filter(x => !!x.offsetParent);"
+                    " return i.length ? (parseInt(i[0].value) || 0) : 0; }")
+                return int(v or 0)
             except Exception:
+                return 0
+
+        # ★`get_by_role("button", name="+").first` 를 쓰면 안 된다 — 화면엔 '+' 가 여러 개고
+        #   그중 **수량과 무관한 것**이 먼저 잡힌다. 클릭은 성공(에러 없음)하는데 order_count 는
+        #   그대로라, 종전 코드가 "눌렀으니 됐다"고 믿고 1개인 채 담았다 (2026-08-31 실측).
+        #   → 보이는 '+' 를 차례로 눌러보고 **값이 실제로 오른 버튼**만 계속 쓴다.
+        def _visible_plus() -> int:
+            return page.evaluate(
+                "() => Array.from(document.querySelectorAll('button'))"
+                ".filter(x => (x.innerText||'').trim() === '+' && !!x.offsetParent).length")
+
+        def _click_plus(i: int) -> None:
+            page.evaluate(
+                "(i) => { const b = Array.from(document.querySelectorAll('button'))"
+                ".filter(x => (x.innerText||'').trim() === '+' && !!x.offsetParent);"
+                " if (b[i]) b[i].click(); }", i)
+
+        hit = None                                  # 값을 올리는 '+' 의 인덱스 (한 번 찾으면 재사용)
+        for _ in range(max(1, (qty - 1) * 4)):
+            cur = _order_count()
+            if cur >= qty:
                 break
+            idxs = [hit] if hit is not None else range(_visible_plus())
+            for i in idxs:
+                _click_plus(i)
+                page.wait_for_timeout(350)
+                if _order_count() > cur:
+                    hit = i
+                    break
+        got = _order_count()
+        if got != qty:
+            # ★조용히 담지 않는다 — 틀린 수량으로 담는 것보다 시끄럽게 실패하는 게 낫다.
+            print(f"      [qty] ✗ 수량 {got} ≠ 기대 {qty} "
+                  f"({'옵션 미선택(order_count 없음)' if got == 0 else '+ 클릭 미반영'}) — 담기 중단")
+            return False
+        print(f"      [qty] ✓ {got}개")
 
         # 쿠폰 레이어(#layer_down_coupon)가 안 닫히면(이미 다운로드 등) 장바구니 클릭을 가로챔 → 강제 숨김
         try:
@@ -1007,7 +1055,21 @@ def lotte_add_combo(page: Page, combo_no: int) -> bool:
         if n < len(combo):
             print(f"    [ERR] 담기 검증 실패 — 카트 {n}건 (기대 {len(combo)}건)")
             return False
-        print(f"    [OK] 담기 검증 — 카트 {n}건")
+        # ★줄 수만 세면 수량 오류를 못 잡는다 (2026-08-31: e 가 1개인데 '카트 2건 ✓' 로 통과).
+        #   카트 각 줄의 'N개' 를 읽어 조합 수량 합과 대조한다. 못 읽으면 **크게 남기고** 넘어간다
+        #   (PC 카트 DOM 변경 시 오탐으로 담기를 막지 않기 위해 — 대신 조용히 지나가지 않는다).
+        want = sorted(q for _, q in combo)
+        qtys = page.evaluate("""() => (document.body.innerText || '')
+            .split('\\n').map(s => (s.match(/^\\s*(?:세트\\s*[|｜]\\s*)?(\\d+)개\\s*$/) || [])[1])
+            .filter(Boolean).map(Number)""")
+        if not qtys:
+            print(f"    [WARN] 담기 검증 — 카트 {n}건 확인, 그러나 **수량을 읽지 못했다** "
+                  f"(기대 {want}). 폰 결제 전 금액으로 반드시 확인할 것")
+        elif sorted(qtys) != want:
+            print(f"    [ERR] 담기 검증 실패 — 수량 {sorted(qtys)} ≠ 기대 {want}")
+            return False
+        else:
+            print(f"    [OK] 담기 검증 — 카트 {n}건, 수량 {sorted(qtys)}")
     except Exception as e:
         print(f"    [ERR] 담기 검증 예외: {e}")
         return False
