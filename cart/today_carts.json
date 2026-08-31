@@ -32,7 +32,13 @@
         }
       ],
       "amount": 535837,
-      "paid": false
+      "paid": true,
+      "note": "사용자가 직접 결제(2026-08-31 야간). 주문내역 실측으로 사후 기록.",
+      "order_no": "20260831119419",
+      "paid_amount": 535837,
+      "card": "KB",
+      "card_charged": 535837,
+      "points_used": 0
     },
     {
       "mall": "현대",
@@ -64,7 +70,13 @@
         }
       ],
       "amount": 535837,
-      "paid": false
+      "paid": true,
+      "note": "사용자가 직접 결제(2026-08-31 야간). 주문내역 실측으로 사후 기록.",
+      "order_no": "20260831119625",
+      "paid_amount": 535859,
+      "card": "KB",
+      "card_charged": 535859,
+      "points_used": 0
     },
     {
       "mall": "현대",
@@ -96,7 +108,13 @@
         }
       ],
       "amount": 535837,
-      "paid": false
+      "paid": true,
+      "note": "사용자가 직접 결제(2026-08-31 야간). 주문내역 실측으로 사후 기록.",
+      "order_no": "20260831119719",
+      "paid_amount": 535837,
+      "card": "KB",
+      "card_charged": 535837,
+      "points_used": 0
     },
     {
       "mall": "현대",
@@ -128,7 +146,12 @@
         }
       ],
       "amount": 535837,
-      "paid": true
+      "paid": true,
+      "order_no": "20260831123467",
+      "paid_amount": 537255,
+      "card_charged": 508895,
+      "points_used": 28360,
+      "card": "KB"
     },
     {
       "mall": "현대",
@@ -160,7 +183,12 @@
         }
       ],
       "amount": 535837,
-      "paid": false
+      "paid": true,
+      "order_no": "20260831123992",
+      "paid_amount": 537742,
+      "card_charged": 499632,
+      "points_used": 38110,
+      "card": "KB"
     }
   ]
 }
