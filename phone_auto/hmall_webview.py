@@ -149,12 +149,27 @@ def reset_to_main(serial: str) -> None:
     #   'webview_devtools 소켓 없음' → 재시도 'Remote end closed' 로 죽었다(실측).
     #   webview devtools 소켓이 뜰 때까지 기다리면 빠른 날은 빨리, 느린 날은 안 죽는다.
     time.sleep(2.5)                              # 스플래시 최소 안정화 (총 최소 4s — 사용자 지시 2026-08-26)
-    deadline = time.time() + 12
+    # ★2026-08-31: 상한 12s → 120s. 앱 업데이트 안내가 **플레이스토어를 띄워** 포그라운드를
+    #   뺏는 날이 있다(실측: 30~70s 동안 com.android.vending, 소켓은 80s 에야 생성).
+    #   12s 상한이면 #4·#5 가 'webview_devtools 소켓 없음' 으로 연속 실패한다.
+    deadline = time.time() + 120
     while time.time() < deadline:
         try:
             _webview_socket(serial)
             break
         except RuntimeError:
+            # 플레이스토어가 앞에 있으면 back 으로 빠져나와 앱을 다시 앞으로 보낸다.
+            try:
+                foc = _sh(serial, "shell", "dumpsys activity activities | grep -m1 topResumedActivity")
+                if "com.android.vending" in foc:
+                    _sh(serial, "shell", "input", "keyevent", "4")
+                    time.sleep(1.2)
+                elif HMALL_PKG not in foc:
+                    _sh(serial, "shell", "monkey", "-p", HMALL_PKG,
+                        "-c", "android.intent.category.LAUNCHER", "1")
+                    time.sleep(1.2)
+            except Exception:
+                pass
             time.sleep(0.7)
     time.sleep(1.5)                              # 소켓 직후 page target 준비 여유 (Remote end closed 방지)
 

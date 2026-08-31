@@ -2563,8 +2563,11 @@ def main() -> int:
         # ★실패면 그 자리에서 증거를 남긴다 (사용자 지시 2026-08-31 — 롯데·현대 공통).
         if _FA.is_failure(r.get("status")):
             try:
+                # ★이 모듈엔 `_texts` 가 없다 — 롯데에서 호출부를 복사해 와 매 실패마다
+                #   NameError 로 검수가 통째로 죽었다(2026-08-31 실측). 현대는 OCR+dump 를
+                #   합쳐 읽는 게 정본이라(위 _ocr_texts(cap()) + _dump_texts()) 그대로 넘긴다.
                 _FA.audit(idx, r.get("status"), "현대", serial=hw._serial(), acc_id=r.get("id"),
-                          texts_fn=_texts, cap_fn=cap)
+                          texts_fn=lambda: _ocr_texts(cap()) + _dump_texts(), cap_fn=cap)
             except Exception as _e:
                 print(f"   [검수] 실패(무시): {_e}", flush=True)
         # ★인프라 장애 연속 2회 = 폰이 죽은 것 (2026-08-27 실사고: device offline 후 #4~12 가
