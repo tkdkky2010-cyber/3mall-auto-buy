@@ -1059,9 +1059,28 @@ def lotte_add_combo(page: Page, combo_no: int) -> bool:
         #   카트 각 줄의 'N개' 를 읽어 조합 수량 합과 대조한다. 못 읽으면 **크게 남기고** 넘어간다
         #   (PC 카트 DOM 변경 시 오탐으로 담기를 막지 않기 위해 — 대신 조용히 지나가지 않는다).
         want = sorted(q for _, q in combo)
-        qtys = page.evaluate("""() => (document.body.innerText || '')
-            .split('\\n').map(s => (s.match(/^\\s*(?:세트\\s*[|｜]\\s*)?(\\d+)개\\s*$/) || [])[1])
-            .filter(Boolean).map(Number)""")
+        # ★수량은 innerText 에 없다 — 롯데 PC 카트의 수량은 `<input name="ord_qty">` **값**이라
+        #   화면 텍스트로만 찾으면 **항상** 못 읽고 '수량 미검증' 으로 조용히 통과한다
+        #   (2026-09-01 실측: #15~#20 여섯 계정이 전부 이 WARN 을 달고 지나갔다. 그날 카트는
+        #    정상이었지만, 수량이 틀린 날에도 똑같이 통과했을 것이다 — 8/31 에 막으려던 바로 그
+        #    구멍이 판독 경로만 바뀐 채 남아 있었다).
+        #   → 행(input[name=goods_no] 보유) 단위로 ord_qty 를 읽는다. innerText 는 폴백.
+        rows = page.evaluate("""() => {
+            const all = Array.from(document.querySelectorAll('tr, li, div'))
+                .filter(el => el.querySelector('input[name=goods_no]'));
+            const leaf = all.filter(el => !all.some(o => o !== el && el.contains(o)));
+            return leaf.map(el => ({
+                goods_no: (el.querySelector('input[name=goods_no]') || {}).value,
+                qty: parseInt((el.querySelector('input[name=ord_qty]') || {}).value || '0'),
+            })).filter(r => r.goods_no && r.qty > 0);
+        }""") or []
+        qtys = [r["qty"] for r in rows]
+        if rows:
+            print("    [cart] " + ", ".join(f"{r['goods_no']}x{r['qty']}" for r in rows))
+        if not qtys:   # 폴백 — 옛 DOM(텍스트에 'N개')
+            qtys = page.evaluate("""() => (document.body.innerText || '')
+                .split('\\n').map(s => (s.match(/^\\s*(?:세트\\s*[|｜]\\s*)?(\\d+)개\\s*$/) || [])[1])
+                .filter(Boolean).map(Number)""")
         if not qtys:
             print(f"    [WARN] 담기 검증 — 카트 {n}건 확인, 그러나 **수량을 읽지 못했다** "
                   f"(기대 {want}). 폰 결제 전 금액으로 반드시 확인할 것")
