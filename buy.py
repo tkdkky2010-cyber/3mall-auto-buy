@@ -45,7 +45,8 @@ def _resolve_browser_py() -> str:
         if not c:
             continue
         try:
-            r = subprocess.run([c, "-c", "print('ok')"], capture_output=True, text=True, timeout=20)
+            r = subprocess.run([c, "-c", "print('ok')"], capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=20)
             if r.returncode == 0 and "ok" in (r.stdout or ""):
                 return c
         except Exception:
@@ -198,17 +199,34 @@ def apply_reward(cart: dict) -> dict:
     # ★동시실행 락 (2026-08-27 실사고): 수동 `buy.py reward 1` 과 결제루프의 자동 적립(#2)이
     #   **같은 9222 Chrome** 을 동시에 조종 → 로그인 세션이 섞여 #2 적립이 #1 계정으로 들어갔다.
     #   적립은 PC Chrome 한 대를 쓰는 전역 자원 — flock 으로 한 번에 하나만. 앞선 건이 끝날 때까지 대기.
-    import fcntl, signal
+    # ★락은 POSIX 전용이던 것을 플랫폼 양립으로 바꿨다 (2026-09-01):
+    #   윈도우엔 `fcntl` 이 없어 `import fcntl, signal` 에서 **ModuleNotFoundError** 로 죽었다.
+    #   결제는 다 됐는데 적립만 통째로 실패한다 = 캠페인 목적(10% 적립)이 날아가는 조용한 사고라
+    #   경고가 아니라 버그다. 세마포어 의미(전역 Chrome 1대 직렬화)는 그대로 유지한다.
+    import time as _time
     _lock_f = open(ROOT / "cart" / ".reward.lock", "w")
+
+    def _reward_lock(blocking: bool) -> None:
+        if sys.platform.startswith("win"):
+            import msvcrt
+            _lock_f.seek(0)
+            msvcrt.locking(_lock_f.fileno(), msvcrt.LK_LOCK if blocking else msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(_lock_f, fcntl.LOCK_EX if blocking else (fcntl.LOCK_EX | fcntl.LOCK_NB))
+
     try:
-        fcntl.flock(_lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _reward_lock(False)
     except OSError:
         print("  [적립] 다른 적립 프로세스 실행 중 — 끝날 때까지 대기(최대 10분)…", flush=True)
-        signal.alarm(600)                         # 무한대기 방지 — 10분 넘으면 SIGALRM 으로 죽는 게 낫다
-        try:
-            fcntl.flock(_lock_f, fcntl.LOCK_EX)   # blocking — 앞선 적립이 끝나면 즉시 진행
-        finally:
-            signal.alarm(0)
+        _deadline = _time.time() + 600            # 무한대기 방지 — 10분 넘으면 실패시킨다
+        while True:
+            try:
+                _reward_lock(True)                # blocking — 앞선 적립이 끝나면 즉시 진행
+                break
+            except OSError:
+                if _time.time() > _deadline:
+                    raise
         print("  [적립] 락 획득 — 진행", flush=True)
     globals().setdefault("_REWARD_LOCKS", []).append(_lock_f)   # fd 생존 보장(닫히면/GC되면 락 풀림)
     # ★9222 Chrome 창이 전부 닫혀 페이지 타깃 0개면 connect_over_cdp 가
@@ -247,8 +265,15 @@ def apply_reward(cart: dict) -> dict:
     got: dict = {}
     for attempt in range(1, 4):
         try:
-            r = subprocess.run([BROWSER_PY, "-c", code], cwd=str(ROOT), capture_output=True, text=True, timeout=180)
-            last_out, last_err = r.stdout, r.stderr
+            # ★encoding 을 명시하지 않으면 윈도우가 **cp949** 로 디코딩한다 (2026-09-01 실사고):
+            #   자식이 찍는 한글에서 UnicodeDecodeError → subprocess 리더스레드가 죽고
+            #   `r.stdout` 이 **None** → `"login True" in last_out` 이 TypeError.
+            #   증상은 'NoneType' 이지만 원인은 인코딩이다(파일 상단 8/25 사고와 같은 계열).
+            #   저장소 다른 호출부는 이미 utf-8/replace 를 쓰고 있었고 여기만 빠져 있었다.
+            r = subprocess.run([BROWSER_PY, "-c", code], cwd=str(ROOT), capture_output=True,
+                               text=True, encoding="utf-8", errors="replace", timeout=180,
+                               env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+            last_out, last_err = r.stdout or "", r.stderr or ""
         except Exception as e:
             print(f"  [적립] ⚠️ 적립신청 호출 실패(결제는 정상): {e}", flush=True)
             return {"prmos": prmos, "results": got, "ok": False, "err": str(e)}

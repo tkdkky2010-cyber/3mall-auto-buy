@@ -25,11 +25,28 @@ LAUNCHERS = {p: LAUNCHER for p in PORT_CHAIN}
 
 
 def _alive(port: int) -> bool:
+    """그 포트에 **PC 크롬(CFT)** 이 떠 있는가. 폰 WebView 는 False.
+
+    ★2026-09-01 실사고 — 응답이 있다고 CFT 가 아니다.
+      `phone_auto/hmall_webview.LOCAL_PORT` 가 **9223** 이라 폰 결제 중에는
+      `adb forward tcp:9223 → localabstract:webview_devtools_remote_<pid>` 가 걸려 있고,
+      그 엔드포인트도 `/json/version` 에 **정상 응답한다.** 종전 구현은 그걸 살아있는 CFT 로 보고
+      재사용해서, **PC 자동화(담기·적립·주문조회)가 폰 WebView 를 조종할 뻔했다**
+      (실측: `buy.py reward 1` 이 9223 에 붙어 180s 타임아웃, 주문조회도 동일).
+      적립이 통째로 날아가는데 로그엔 '살아있는 9223 재사용' 만 찍힌다 = 조용한 오작동.
+
+    구분법: 폰 WebView 응답에는 `Android-Package` 가 있고 User-Agent 에 `Android` 가 들어간다.
+    """
     try:
-        urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=1.5)
-        return True
-    except (urllib.error.URLError, OSError):
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=1.5) as r:
+            import json as _json
+            info = _json.loads(r.read().decode("utf-8", "replace"))
+    except (urllib.error.URLError, OSError, ValueError):
         return False
+    if info.get("Android-Package") or "Android" in (info.get("User-Agent") or ""):
+        print(f"[WARN] CDP {port} 는 **폰 WebView**({info.get('Android-Package')}) — CFT 아님, 건너뜀")
+        return False
+    return True
 
 
 def _ensure_tab(endpoint: str) -> None:

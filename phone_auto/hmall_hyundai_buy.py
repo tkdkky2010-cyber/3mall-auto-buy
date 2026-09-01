@@ -621,7 +621,23 @@ def _load_identity() -> dict:
 
 
 def _kbd_is_korean() -> bool:
-    its = _ocr_texts(cap())
+    """삼성 키보드가 한글 모드인지 판정.
+
+    ★자모(ㅂㅈㄷㄱ…)로 판정하지 말 것 — 윈도우 OCR 은 키보드 자모를
+      **모양 닮은 다른 글자로 바꿔 읽는다.** 2026-09-01 실측(한글 키보드 스크린샷):
+        ㅂ→'BB'/'B 入' · ㄱ→'기' · ㅅ→'人' · ㅁ→'口' · ㄴ→'L' · ㅇ→'0' · ㄹ→'근'
+      → 자모 매칭 0건 → '한글전환 실패' 오판 → #1·#2 AFTER_PAY_IDENTITY_FAIL.
+      (8/31 주문서가 '口토사OI그' 로 깨졌던 것과 **같은 계열**이다.)
+
+    반면 스페이스바 라벨은 깨끗하게 읽힌다 — 한글='한국어' / 영문='English (US)'
+    (둘 다 실측 확인). 그래서 **스페이스바 라벨로 판정**하고 자모는 보조로만 쓴다.
+    OCR 과 dump 를 겹쳐 읽는 집 규칙(windows-ocr-needs-dump-merge)도 같이 적용.
+    """
+    its = _ocr_texts(cap()) + _dump_texts()
+    if any("한국어" in it["text"] for it in its):
+        return True
+    if any(re.search(r"English|中文|日本語", it["text"]) for it in its):
+        return False        # 스페이스바가 다른 언어 — 확실히 한글이 아니다
     return any(c in it["text"] for it in its if it["cy"] > 1550 for c in "ㅂㅈㄷㄱㅅㅁㄴㅇㄹ")
 
 
@@ -659,7 +675,15 @@ def enter_identity_auth() -> dict:
             break
         adb.tap(*GLOBE); nap(0.7); globe_n += 1
     if not _kbd_is_korean():
-        out["err"] = "키보드 한글전환 실패"; return out
+        try:    # ★실패하면 그 화면을 남긴다 — 스크린샷 없이는 다음 세션이 또 추측한다
+            import shutil as _sh2
+            _dbg = ROOT / "phone_auto" / "_tmp" / "fail_audit" / time.strftime("%Y-%m-%d")
+            _dbg.mkdir(parents=True, exist_ok=True)
+            _sh2.copyfile(cap(), str(_dbg / f"{time.strftime('%H%M%S')}_kbd_not_korean.png"))
+            print(f"   [identity] 한글전환 실패 — 화면 저장: {_dbg}", flush=True)
+        except Exception:
+            pass
+        out["err"] = f"키보드 한글전환 실패(글로브 {globe_n}회)"; return out
     lap(f"본인인증 이름필드+한글키보드 (글로브 {globe_n}회)")
     for j in seq:
         adb.tap(*JAMO_XY[j]); nap(0.15)
@@ -1752,6 +1776,39 @@ def _row_amt_of(it: dict, amt_rows: list[dict]) -> int | None:
     return None
 
 
+# cart/today.json 의 card_slides alt(cardCdNN) → detect_card 가 쓰는 카드키
+CARD_CD_TO_KEY = {
+    "cardCd01": "BC", "cardCd02": "삼성", "cardCd03": "KB", "cardCd04": "현대",
+    "cardCd07": "신한", "cardCd08": "롯데", "cardCd10": "하나", "cardCd40": "NH",
+}
+
+
+def todays_card_ranking() -> dict[str, int]:
+    """오늘 이 상품군에 붙는 **카드별 즉시할인 %** — `cart/today.json` (step2 실측) 에서.
+
+    ★왜 필요한가 (2026-09-01 실사고): `detect_card` 는 주문서 캐러셀만 본다. 그런데 캐러셀은
+      카드 슬라이드를 **1개만 렌더링할 때가 있고**, 그러면 후보가 1개라 비교 없이 그대로 쓴다.
+      #3(kgi5907)이 그렇게 **하나 5%** 로 결제됐다 — 같은 순간 #1·#2·#4·#5 는 **현대 7%** 였다.
+      계정당 10,843원을 더 냈다. 화면에 안 보인다고 그 카드가 없는 게 아니다
+      (자동메모리 `observation-failure-not-absence`).
+    → 화면 밖의 사실을 아는 **독립 출처**를 하나 더 둔다. 못 읽으면 빈 dict(=종전 동작).
+    """
+    try:
+        d = json.loads(TODAY_JSON.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if d.get("date") != time.strftime("%Y-%m-%d"):
+        return {}                       # stale 이면 근거로 쓰지 않는다
+    best: dict[str, int] = {}
+    for p in d.get("products") or []:
+        for s in ((p.get("payment") or {}).get("card_slides") or []):
+            key = CARD_CD_TO_KEY.get(s.get("alt") or "")
+            pct = s.get("percent")
+            if key and isinstance(pct, int):
+                best[key] = max(best.get(key, 0), pct)
+    return best
+
+
 def detect_card() -> str | None:
     """주문서에서 '카드할인' 섹션까지 **스크롤하며** 금액행 카드사 토큰 추출 ('현대 5% 즉시할인'→'현대').
     구매하기 직후 주문서 상단엔 상품정보뿐 → 카드할인은 아래라 스크롤 필수(#4 실측). 없으면 None."""
@@ -1799,11 +1856,38 @@ def detect_card() -> str | None:
             #   좌/우 칸의 cy 차이가 6px(OCR 흔들림 수준)밖에 안 난다 → 어느 카드가 뽑히는지가 사실상 무작위.
             #   8/6 실측: #10 은 현대(97,052) / #11 은 삼성(92,069) 로 갈렸고, 같은 상품인데 계정마다
             #   다른 카드로 결제됐다. **싼 쪽을 놓치면 그만큼 손해**다.
-            best = min(cands, key=lambda c: c[0])
-            if len(cands) > 1:
-                s = " / ".join(f"{k} {a:,}" for a, k in sorted(cands))
-                print(f"   [detect_card] 후보 {len(cands)}개 — {s} → **최저 {best[1]} {best[0]:,}원** 선택",
-                      flush=True)
+            # ★선택 기준 = **할인율(%) 최고** 우선, 같으면 금액 최저 (2026-09-01 변경).
+            #   종전엔 금액만 봤는데 그 금액 판독이 흔들린다 — 실측 로그에 후보 2개가
+            #   `하나 504,656 / 현대 504,656` 으로 **같은 값**으로 찍혔다(5%와 7%라 같을 수 없다).
+            #   그 상태의 "최저 선택"은 사실상 동점 처리라 어느 카드가 뽑히는지가 운이었다.
+            #   `N%` 토큰은 짧아서 OCR 이 안정적으로 읽는다 → 그걸 1순위 근거로 쓴다.
+            pcts = {}
+            for it in region:
+                mp = re.search(r"(\d{1,2})\s*%", it["text"])
+                if not mp:
+                    continue
+                for alias, key in CARD_ALIASES.items():
+                    if alias in it["text"]:
+                        pcts[key] = max(pcts.get(key, 0), int(mp.group(1)))
+                        break
+            best = max(cands, key=lambda c: (pcts.get(c[1], 0), -c[0]))
+            s = " / ".join(f"{k} {a:,}({pcts.get(k, '?')}%)" for a, k in sorted(cands))
+            print(f"   [detect_card] 후보 {len(cands)}개 — {s} → **{best[1]} {best[0]:,}원 "
+                  f"({pcts.get(best[1], '?')}%)** 선택", flush=True)
+
+            # ★캐러셀이 카드를 다 안 보여줄 수 있다 → 오늘자 PC 실측(today.json)과 대조.
+            #   화면에 없다고 '없다'로 단정하지 않는다. 더 높은 할인 카드가 오늘 존재하면
+            #   그 카드를 반환한다 — select_card 가 그리드 경로로 강제 선택하고,
+            #   금액 일치 검증은 그대로 걸리므로 잘못 잡히면 거기서 막힌다.
+            rank = todays_card_ranking()
+            if rank:
+                top_key = max(rank, key=lambda k: rank[k])
+                cur_pct = pcts.get(best[1]) or rank.get(best[1], 0)
+                if rank[top_key] > cur_pct and top_key in CARDS_SUPPORTED:
+                    print(f"   [detect_card] ⚠️ 오늘 최고 할인은 **{top_key} {rank[top_key]}%** 인데 "
+                          f"주문서에선 {best[1]} {cur_pct}% 만 잡혔다 — {top_key} 로 강제 선택 "
+                          f"(캐러셀 미렌더 대비, 근거=cart/today.json)", flush=True)
+                    return top_key
             return best[1]
         _adb().swipe(540, 1700, 540, 800, 400); time.sleep(0.8)   # 카드할인 보이게 스크롤 다운
     return None
