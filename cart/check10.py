@@ -251,6 +251,12 @@ def _load_products_from_guide() -> list[dict]:
             continue
         pid = m.group(1)
         name = m.group(2).strip()
+        # ★'[중단 YYYY-MM-DD]' 표식이 붙은 행은 step2 대상에서 뺀다 (사용자 지시로 구매를 접은 상품).
+        #   행 자체를 지우지 않는 이유 = URL·상품번호를 잃으면 되살릴 때 다시 찾아야 한다.
+        #   (2026-09-01 사용자 지시: "36 37 38 동국제약, 센텔리안 제품은 이제 구매안하기로 했으니
+        #    그건 스텝2 할때 안알아봐도돼")
+        if name.startswith("[중단"):
+            continue
         url = m.group(3).strip()
         qs = url.split("?", 1)[1]
         params = [p.split("=", 1) for p in qs.split("&") if "=" in p]
