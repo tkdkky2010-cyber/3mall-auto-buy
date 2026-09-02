@@ -1,5 +1,5 @@
 {
-  "date": "2026-09-01",
+  "date": "2026-09-02",
   "account_used": "tkdkky2002",
   "products": [
     {
@@ -94,55 +94,34 @@
       "event_end": "9.23 02:00",
       "has_coupon": true,
       "error": null,
-      "coupon_claimed": true,
+      "coupon_claimed": false,
       "simple_ranges": [],
       "payment": {
         "qty": 1,
-        "list_price": 122000,
-        "member_price": 115900,
-        "card_slides": [
-          {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 97,464원",
-            "percent": 7,
-            "price": 97464
-          },
-          {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 99,560원",
-            "percent": 5,
-            "price": 99560
-          }
-        ],
-        "kakao_price": 115900,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 105900,
-        "paybacks": {
-          "하나카드": {
-            "immediate_price": 99560,
-            "payback_pct": 1.0,
-            "after_payback": 98564,
-            "reward_pt": 0,
-            "final_cost": 98564
-          }
-        },
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
         "optimal_tier": {
           "qty": 1,
           "tier_min": 100000,
           "tier_reward": 10000,
           "nominal_pct": 10.0,
-          "actual_total": 115900,
+          "actual_total": 107360,
           "actual_reward": 10000,
-          "effective_pct": 8.628127696289905
+          "effective_pct": 9.314456035767511
         },
         "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 115900,
+        "error": "바로구매 실패",
+        "benefit_unit_price": 107360,
         "options": [
           {
             "idx": 1,
-            "name": "[H] 유한건강생활 이너플로라 질유산균 3박스 총6개월분",
-            "list_price": 115900
+            "name": "[H][쇼핑백 증정] 유한건강생활 이너플로라 질유산균 3박스 총6개월분",
+            "list_price": 107360
           },
           {
             "idx": 2,
@@ -292,14 +271,14 @@
         "member_price": 102240,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 95,084원",
+            "alt": "cardCd02",
+            "text": "토스페이 삼성 7% 즉시할인 95,084원",
             "percent": 7,
             "price": 95084
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 97,128원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 97,128원",
             "percent": 5,
             "price": 97128
           }
@@ -308,12 +287,12 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 92240,
         "paybacks": {
-          "하나카드": {
-            "immediate_price": 97128,
+          "삼성카드": {
+            "immediate_price": 95084,
             "payback_pct": 1.0,
-            "after_payback": 96157,
+            "after_payback": 94133,
             "reward_pt": 0,
-            "final_cost": 96157
+            "final_cost": 94133
           }
         },
         "optimal_tier": {
@@ -338,11 +317,6 @@
             "idx": 3,
             "name": "유한건강생활 여성갱년기 백수오 올인원(뼈+혈행건강+기억력개선) 1박스 1개월분",
             "list_price": 66900
-          },
-          {
-            "idx": 4,
-            "name": "유한건강생활 여성갱년기 백수오 올인원(뼈+혈행건강+기억력개선) 2박스 총2개월분",
-            "list_price": 126900
           },
           {
             "idx": 7,
@@ -454,7 +428,7 @@
       "event_end": "9.23 02:00",
       "has_coupon": true,
       "error": null,
-      "coupon_claimed": true,
+      "coupon_claimed": false,
       "simple_ranges": [],
       "payment": {
         "qty": 2,
@@ -462,14 +436,14 @@
         "member_price": 161820,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 136,543원",
+            "alt": "cardCd02",
+            "text": "토스페이 삼성 7% 즉시할인 136,543원",
             "percent": 7,
             "price": 136543
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 139,479원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 139,479원",
             "percent": 5,
             "price": 139479
           }
@@ -478,12 +452,12 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 151820,
         "paybacks": {
-          "하나카드": {
-            "immediate_price": 139479,
+          "삼성카드": {
+            "immediate_price": 136543,
             "payback_pct": 1.0,
-            "after_payback": 138084,
+            "after_payback": 135178,
             "reward_pt": 10000,
-            "final_cost": 128084
+            "final_cost": 125178
           }
         },
         "optimal_tier": {
@@ -607,14 +581,14 @@
         "member_price": 159300,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 134,199원",
+            "alt": "cardCd02",
+            "text": "토스페이 삼성 7% 즉시할인 134,199원",
             "percent": 7,
             "price": 134199
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 137,085원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 137,085원",
             "percent": 5,
             "price": 137085
           }
@@ -623,12 +597,12 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 149300,
         "paybacks": {
-          "하나카드": {
-            "immediate_price": 137085,
+          "삼성카드": {
+            "immediate_price": 134199,
             "payback_pct": 1.0,
-            "after_payback": 135714,
+            "after_payback": 132857,
             "reward_pt": 10000,
-            "final_cost": 125714
+            "final_cost": 122857
           }
         },
         "optimal_tier": {
@@ -896,14 +870,14 @@
         "member_price": 131920,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 122,686원",
+            "alt": "cardCd02",
+            "text": "토스페이 삼성 7% 즉시할인 122,686원",
             "percent": 7,
             "price": 122686
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 125,324원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 125,324원",
             "percent": 5,
             "price": 125324
           }
@@ -912,12 +886,12 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 121920,
         "paybacks": {
-          "하나카드": {
-            "immediate_price": 125324,
+          "삼성카드": {
+            "immediate_price": 122686,
             "payback_pct": 1.0,
-            "after_payback": 124071,
+            "after_payback": 121459,
             "reward_pt": 10000,
-            "final_cost": 114071
+            "final_cost": 111459
           }
         },
         "optimal_tier": {
@@ -1066,14 +1040,14 @@
         "member_price": 262400,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 230,082원",
+            "alt": "cardCd02",
+            "text": "토스페이 삼성 7% 즉시할인 230,082원",
             "percent": 7,
             "price": 230082
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 235,030원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 235,030원",
             "percent": 5,
             "price": 235030
           }
@@ -1082,12 +1056,12 @@
         "kakao_reward_pt": 20000,
         "kakao_final_cost": 242400,
         "paybacks": {
-          "하나카드": {
-            "immediate_price": 235030,
+          "삼성카드": {
+            "immediate_price": 230082,
             "payback_pct": 1.0,
-            "after_payback": 232680,
+            "after_payback": 227781,
             "reward_pt": 20000,
-            "final_cost": 212680
+            "final_cost": 207781
           }
         },
         "optimal_tier": {
@@ -1220,14 +1194,14 @@
         "member_price": 95840,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 80,219원",
+            "alt": "cardCd02",
+            "text": "토스페이 삼성 7% 즉시할인 80,219원",
             "percent": 7,
             "price": 80219
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 81,944원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 81,944원",
             "percent": 5,
             "price": 81944
           }
@@ -1236,12 +1210,12 @@
         "kakao_reward_pt": 0,
         "kakao_final_cost": 95840,
         "paybacks": {
-          "하나카드": {
-            "immediate_price": 81944,
+          "삼성카드": {
+            "immediate_price": 80219,
             "payback_pct": 1.0,
-            "after_payback": 81125,
+            "after_payback": 79417,
             "reward_pt": 0,
-            "final_cost": 81125
+            "final_cost": 79417
           }
         },
         "optimal_tier": {
@@ -1355,32 +1329,32 @@
       "simple_ranges": [],
       "payment": {
         "qty": 2,
-        "list_price": 139800,
-        "member_price": 111840,
+        "list_price": 147420,
+        "member_price": 132680,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 104,012원",
+            "alt": "cardCd02",
+            "text": "토스페이 삼성 7% 즉시할인 123,391원",
             "percent": 7,
-            "price": 104012
+            "price": 123391
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 106,248원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 126,045원",
             "percent": 5,
-            "price": 106248
+            "price": 126045
           }
         ],
-        "kakao_price": 111840,
+        "kakao_price": 132680,
         "kakao_reward_pt": 10000,
-        "kakao_final_cost": 101840,
+        "kakao_final_cost": 122680,
         "paybacks": {
-          "하나카드": {
-            "immediate_price": 106248,
+          "삼성카드": {
+            "immediate_price": 123391,
             "payback_pct": 1.0,
-            "after_payback": 105186,
+            "after_payback": 122157,
             "reward_pt": 10000,
-            "final_cost": 95186
+            "final_cost": 112157
           }
         },
         "optimal_tier": {
@@ -1388,23 +1362,23 @@
           "tier_min": 100000,
           "tier_reward": 10000,
           "nominal_pct": 10.0,
-          "actual_total": 111840,
+          "actual_total": 132680,
           "actual_reward": 10000,
-          "effective_pct": 8.94134477825465
+          "effective_pct": 7.5369309617123905
         },
         "effective_ten_percent": true,
         "error": null,
-        "benefit_unit_price": 55920,
+        "benefit_unit_price": 66340,
         "options": [
           {
             "idx": 1,
             "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 9박스 (총 27개월분)",
-            "list_price": 69900
+            "list_price": 73710
           },
           {
             "idx": 2,
             "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 6박스 (총 18개월분)",
-            "list_price": 49900
+            "list_price": 53910
           }
         ]
       }
@@ -1509,14 +1483,14 @@
         "member_price": 110240,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 92,271원",
+            "alt": "cardCd02",
+            "text": "토스페이 삼성 7% 즉시할인 92,271원",
             "percent": 7,
             "price": 92271
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 94,256원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 94,256원",
             "percent": 5,
             "price": 94256
           }
@@ -1525,12 +1499,12 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 100240,
         "paybacks": {
-          "하나카드": {
-            "immediate_price": 94256,
+          "삼성카드": {
+            "immediate_price": 92271,
             "payback_pct": 1.0,
-            "after_payback": 93313,
+            "after_payback": 91348,
             "reward_pt": 0,
-            "final_cost": 93313
+            "final_cost": 91348
           }
         },
         "optimal_tier": {
@@ -1661,14 +1635,14 @@
         "member_price": 118840,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 110,512원",
+            "alt": "cardCd02",
+            "text": "토스페이 삼성 7% 즉시할인 110,512원",
             "percent": 7,
             "price": 110512
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 112,889원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 112,889원",
             "percent": 5,
             "price": 112889
           }
@@ -1677,12 +1651,12 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 108840,
         "paybacks": {
-          "하나카드": {
-            "immediate_price": 112889,
+          "삼성카드": {
+            "immediate_price": 110512,
             "payback_pct": 1.0,
-            "after_payback": 111760,
+            "after_payback": 109407,
             "reward_pt": 10000,
-            "final_cost": 101760
+            "final_cost": 99407
           }
         },
         "optimal_tier": {
@@ -1808,31 +1782,31 @@
       "payment": {
         "qty": 1,
         "list_price": 248000,
-        "member_price": 210800,
+        "member_price": 173600,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 182,094원",
+            "alt": "cardCd02",
+            "text": "토스페이 삼성 7% 즉시할인 147,498원",
             "percent": 7,
-            "price": 182094
+            "price": 147498
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 186,010원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 150,670원",
             "percent": 5,
-            "price": 186010
+            "price": 150670
           }
         ],
-        "kakao_price": 210800,
-        "kakao_reward_pt": 20000,
-        "kakao_final_cost": 190800,
+        "kakao_price": 173600,
+        "kakao_reward_pt": 10000,
+        "kakao_final_cost": 163600,
         "paybacks": {
-          "하나카드": {
-            "immediate_price": 186010,
+          "삼성카드": {
+            "immediate_price": 147498,
             "payback_pct": 1.0,
-            "after_payback": 184150,
+            "after_payback": 146023,
             "reward_pt": 10000,
-            "final_cost": 174150
+            "final_cost": 136023
           }
         },
         "optimal_tier": {
@@ -1840,13 +1814,13 @@
           "tier_min": 100000,
           "tier_reward": 10000,
           "nominal_pct": 10.0,
-          "actual_total": 210800,
-          "actual_reward": 20000,
-          "effective_pct": 9.487666034155598
+          "actual_total": 173600,
+          "actual_reward": 10000,
+          "effective_pct": 5.76036866359447
         },
         "effective_ten_percent": true,
         "error": null,
-        "benefit_unit_price": 210800,
+        "benefit_unit_price": 173600,
         "options": []
       }
     },
@@ -1950,14 +1924,14 @@
         "member_price": 165600,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 140,058원",
+            "alt": "cardCd02",
+            "text": "토스페이 삼성 7% 즉시할인 140,058원",
             "percent": 7,
             "price": 140058
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 143,070원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 143,070원",
             "percent": 5,
             "price": 143070
           }
@@ -1966,12 +1940,12 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 155600,
         "paybacks": {
-          "하나카드": {
-            "immediate_price": 143070,
+          "삼성카드": {
+            "immediate_price": 140058,
             "payback_pct": 1.0,
-            "after_payback": 141639,
+            "after_payback": 138657,
             "reward_pt": 10000,
-            "final_cost": 131639
+            "final_cost": 128657
           }
         },
         "optimal_tier": {
@@ -1990,618 +1964,6 @@
       }
     },
     {
-      "id": "36",
-      "name": "센텔리안24 더 마데카 크림 50ml 20개 (옵션3)",
-      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546",
-      "ten_percent": true,
-      "phrase": "올인데이 10%적립",
-      "events": [
-        {
-          "prmo": "P202608268150",
-          "name": "올인데이 10%적립",
-          "event_end": "9.01 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "9.01 23:59",
-      "has_coupon": false,
-      "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 1,
-        "list_price": 125000,
-        "member_price": 112500,
-        "card_slides": [
-          {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 104,625원",
-            "percent": 7,
-            "price": 104625
-          },
-          {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 106,875원",
-            "percent": 5,
-            "price": 106875
-          }
-        ],
-        "kakao_price": 112500,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 102500,
-        "paybacks": {
-          "하나카드": {
-            "immediate_price": 106875,
-            "payback_pct": 1.0,
-            "after_payback": 105806,
-            "reward_pt": 10000,
-            "final_cost": 95806
-          }
-        },
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 112500,
-          "actual_reward": 10000,
-          "effective_pct": 8.88888888888889
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 112500,
-        "option_picked": {
-          "idx": 3,
-          "list_price": 125000
-        },
-        "options": [
-          {
-            "idx": 1,
-            "name": "[센텔리안24] 동국제약 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
-            "list_price": 29900
-          },
-          {
-            "idx": 2,
-            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 20개",
-            "list_price": 160000
-          },
-          {
-            "idx": 3,
-            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 20개",
-            "list_price": 125000
-          },
-          {
-            "idx": 4,
-            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 3개",
-            "list_price": 24900
-          },
-          {
-            "idx": 5,
-            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 8개+15ml 1개",
-            "list_price": 62900
-          },
-          {
-            "idx": 6,
-            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 10개",
-            "list_price": 72900
-          },
-          {
-            "idx": 7,
-            "name": "[센텔리안24] 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
-            "list_price": 29900
-          },
-          {
-            "idx": 8,
-            "name": "[센텔리안24] 더마데카크림 50ml 3개+타이트 리프팅 50ml 3개",
-            "list_price": 44900
-          },
-          {
-            "idx": 10,
-            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 10개+15ml 1개",
-            "list_price": 87900
-          },
-          {
-            "idx": 11,
-            "name": "[센텔리안24] 마데카 멜라 캡처 앰플 캡슐 크림 55ml 2개",
-            "list_price": 35900
-          },
-          {
-            "idx": 12,
-            "name": "[센텔리안24] NEW 마데카크림 에이징 포커스 50ml 5개",
-            "list_price": 50900
-          },
-          {
-            "idx": 13,
-            "name": "[센텔리안24] 마데카 크림 파워 부스팅 포뮬러 어드밴스드 50ml 3개 비타민C",
-            "list_price": 25900
-          },
-          {
-            "idx": 14,
-            "name": "[센텔리안24] 동국제약 마데카크림 타이트 리프팅 50ml 6개+15ml 2개",
-            "list_price": 59900
-          },
-          {
-            "idx": 16,
-            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 10개",
-            "list_price": 63900
-          }
-        ]
-      }
-    },
-    {
-      "id": "37",
-      "name": "센텔리안24 마데카크림 타임리버스 50ml 10개 (옵션6)",
-      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546",
-      "ten_percent": true,
-      "phrase": "올인데이 10%적립",
-      "events": [
-        {
-          "prmo": "P202608268150",
-          "name": "올인데이 10%적립",
-          "event_end": "9.01 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "9.01 23:59",
-      "has_coupon": false,
-      "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 1,
-        "list_price": 72900,
-        "member_price": 65610,
-        "card_slides": [
-          {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 61,018원",
-            "percent": 7,
-            "price": 61018
-          },
-          {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 62,330원",
-            "percent": 5,
-            "price": 62330
-          }
-        ],
-        "kakao_price": 65610,
-        "kakao_reward_pt": 5000,
-        "kakao_final_cost": 60610,
-        "paybacks": {
-          "하나카드": {
-            "immediate_price": 62330,
-            "payback_pct": 1.0,
-            "after_payback": 61707,
-            "reward_pt": 5000,
-            "final_cost": 56707
-          }
-        },
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 65610,
-          "actual_reward": 5000,
-          "effective_pct": 7.620789513793628
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 65610,
-        "option_picked": {
-          "idx": 6,
-          "list_price": 72900
-        },
-        "options": [
-          {
-            "idx": 1,
-            "name": "[센텔리안24] 동국제약 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
-            "list_price": 29900
-          },
-          {
-            "idx": 2,
-            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 20개",
-            "list_price": 160000
-          },
-          {
-            "idx": 3,
-            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 20개",
-            "list_price": 125000
-          },
-          {
-            "idx": 4,
-            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 3개",
-            "list_price": 24900
-          },
-          {
-            "idx": 5,
-            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 8개+15ml 1개",
-            "list_price": 62900
-          },
-          {
-            "idx": 6,
-            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 10개",
-            "list_price": 72900
-          },
-          {
-            "idx": 7,
-            "name": "[센텔리안24] 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
-            "list_price": 29900
-          },
-          {
-            "idx": 8,
-            "name": "[센텔리안24] 더마데카크림 50ml 3개+타이트 리프팅 50ml 3개",
-            "list_price": 44900
-          },
-          {
-            "idx": 10,
-            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 10개+15ml 1개",
-            "list_price": 87900
-          },
-          {
-            "idx": 11,
-            "name": "[센텔리안24] 마데카 멜라 캡처 앰플 캡슐 크림 55ml 2개",
-            "list_price": 35900
-          },
-          {
-            "idx": 12,
-            "name": "[센텔리안24] NEW 마데카크림 에이징 포커스 50ml 5개",
-            "list_price": 50900
-          },
-          {
-            "idx": 13,
-            "name": "[센텔리안24] 마데카 크림 파워 부스팅 포뮬러 어드밴스드 50ml 3개 비타민C",
-            "list_price": 25900
-          },
-          {
-            "idx": 14,
-            "name": "[센텔리안24] 동국제약 마데카크림 타이트 리프팅 50ml 6개+15ml 2개",
-            "list_price": 59900
-          },
-          {
-            "idx": 16,
-            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 10개",
-            "list_price": 63900
-          }
-        ]
-      }
-    },
-    {
-      "id": "38",
-      "name": "센텔리안24 마데카크림 타이트 리프팅 50ml 20개 (옵션2)",
-      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546",
-      "ten_percent": true,
-      "phrase": "올인데이 10%적립",
-      "events": [
-        {
-          "prmo": "P202608268150",
-          "name": "올인데이 10%적립",
-          "event_end": "9.01 23:59",
-          "tiers": [
-            {
-              "min_won": 50000,
-              "min_unit": "원",
-              "reward_pt": 5000
-            },
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 400000,
-              "min_unit": "원",
-              "reward_pt": 40000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 50000,
-          "min_unit": "원",
-          "reward_pt": 5000
-        },
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 400000,
-          "min_unit": "원",
-          "reward_pt": 40000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        }
-      ],
-      "max_reward": "50,000P",
-      "event_end": "9.01 23:59",
-      "has_coupon": false,
-      "error": null,
-      "coupon_claimed": false,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 1,
-        "list_price": 160000,
-        "member_price": 144000,
-        "card_slides": [
-          {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 133,920원",
-            "percent": 7,
-            "price": 133920
-          },
-          {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 136,800원",
-            "percent": 5,
-            "price": 136800
-          }
-        ],
-        "kakao_price": 144000,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 134000,
-        "paybacks": {
-          "하나카드": {
-            "immediate_price": 136800,
-            "payback_pct": 1.0,
-            "after_payback": 135432,
-            "reward_pt": 10000,
-            "final_cost": 125432
-          }
-        },
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 50000,
-          "tier_reward": 5000,
-          "nominal_pct": 10.0,
-          "actual_total": 144000,
-          "actual_reward": 10000,
-          "effective_pct": 6.944444444444445
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 144000,
-        "option_picked": {
-          "idx": 2,
-          "list_price": 160000
-        },
-        "options": [
-          {
-            "idx": 1,
-            "name": "[센텔리안24] 동국제약 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
-            "list_price": 29900
-          },
-          {
-            "idx": 2,
-            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 20개",
-            "list_price": 160000
-          },
-          {
-            "idx": 3,
-            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 20개",
-            "list_price": 125000
-          },
-          {
-            "idx": 4,
-            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 3개",
-            "list_price": 24900
-          },
-          {
-            "idx": 5,
-            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 8개+15ml 1개",
-            "list_price": 62900
-          },
-          {
-            "idx": 6,
-            "name": "[센텔리안24] 마데카크림 타임리버스 50ml 10개",
-            "list_price": 72900
-          },
-          {
-            "idx": 7,
-            "name": "[센텔리안24] 마데카크림 액티브 스킨 포뮬러 50ml 4개+15ml 1개",
-            "list_price": 29900
-          },
-          {
-            "idx": 8,
-            "name": "[센텔리안24] 더마데카크림 50ml 3개+타이트 리프팅 50ml 3개",
-            "list_price": 44900
-          },
-          {
-            "idx": 10,
-            "name": "[센텔리안24] 마데카크림 타이트 리프팅 50ml 10개+15ml 1개",
-            "list_price": 87900
-          },
-          {
-            "idx": 11,
-            "name": "[센텔리안24] 마데카 멜라 캡처 앰플 캡슐 크림 55ml 2개",
-            "list_price": 35900
-          },
-          {
-            "idx": 12,
-            "name": "[센텔리안24] NEW 마데카크림 에이징 포커스 50ml 5개",
-            "list_price": 50900
-          },
-          {
-            "idx": 13,
-            "name": "[센텔리안24] 마데카 크림 파워 부스팅 포뮬러 어드밴스드 50ml 3개 비타민C",
-            "list_price": 25900
-          },
-          {
-            "idx": 14,
-            "name": "[센텔리안24] 동국제약 마데카크림 타이트 리프팅 50ml 6개+15ml 2개",
-            "list_price": 59900
-          },
-          {
-            "idx": 16,
-            "name": "[센텔리안24] 동국제약 더 마데카 크림 50ml 10개",
-            "list_price": 63900
-          }
-        ]
-      }
-    },
-    {
       "id": "39",
       "name": "서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2244447210&sectId=173266",
@@ -2613,6 +1975,132 @@
       "event_end": null,
       "has_coupon": false,
       "error": "판매중단"
+    },
+    {
+      "id": "40",
+      "name": "뉴케어 당플랜 프로 230ml 호두맛 72팩",
+      "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2248814679",
+      "ten_percent": true,
+      "phrase": "잘사는 추석 10%적립",
+      "events": [
+        {
+          "prmo": "P202608247695",
+          "name": "잘사는 추석 10%적립",
+          "event_end": "9.23 02:00",
+          "tiers": [
+            {
+              "min_won": 100000,
+              "min_unit": "원",
+              "reward_pt": 10000
+            },
+            {
+              "min_won": 200000,
+              "min_unit": "원",
+              "reward_pt": 20000
+            },
+            {
+              "min_won": 300000,
+              "min_unit": "원",
+              "reward_pt": 30000
+            },
+            {
+              "min_won": 500000,
+              "min_unit": "원",
+              "reward_pt": 50000
+            },
+            {
+              "min_won": 1000000,
+              "min_unit": "원",
+              "reward_pt": 100000
+            },
+            {
+              "min_won": 3000000,
+              "min_unit": "원",
+              "reward_pt": 300000
+            },
+            {
+              "min_won": 10000000,
+              "min_unit": "원",
+              "reward_pt": 1000000
+            }
+          ],
+          "simple_range": null
+        }
+      ],
+      "tiers": [
+        {
+          "min_won": 100000,
+          "min_unit": "원",
+          "reward_pt": 10000
+        },
+        {
+          "min_won": 200000,
+          "min_unit": "원",
+          "reward_pt": 20000
+        },
+        {
+          "min_won": 300000,
+          "min_unit": "원",
+          "reward_pt": 30000
+        },
+        {
+          "min_won": 500000,
+          "min_unit": "원",
+          "reward_pt": 50000
+        },
+        {
+          "min_won": 1000000,
+          "min_unit": "원",
+          "reward_pt": 100000
+        },
+        {
+          "min_won": 3000000,
+          "min_unit": "원",
+          "reward_pt": 300000
+        },
+        {
+          "min_won": 10000000,
+          "min_unit": "원",
+          "reward_pt": 1000000
+        }
+      ],
+      "max_reward": "1,000,000P",
+      "event_end": "9.23 02:00",
+      "has_coupon": true,
+      "error": null,
+      "coupon_claimed": true,
+      "simple_ranges": [],
+      "payment": {
+        "qty": 1,
+        "list_price": 227700,
+        "member_price": 143460,
+        "card_slides": [
+          {
+            "alt": "현대홈쇼핑 현대카드 Ed2",
+            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
+            "percent": 7,
+            "price": null,
+            "discount_type": "청구할인"
+          }
+        ],
+        "kakao_price": 143460,
+        "kakao_reward_pt": 10000,
+        "kakao_final_cost": 133460,
+        "paybacks": {},
+        "optimal_tier": {
+          "qty": 1,
+          "tier_min": 100000,
+          "tier_reward": 10000,
+          "nominal_pct": 10.0,
+          "actual_total": 143460,
+          "actual_reward": 10000,
+          "effective_pct": 6.970584134950508
+        },
+        "effective_ten_percent": true,
+        "error": null,
+        "benefit_unit_price": 143460,
+        "options": []
+      }
     }
   ],
   "ten_percent_ids": [
@@ -2629,8 +2117,6 @@
     "33",
     "34",
     "35",
-    "36",
-    "37",
-    "38"
+    "40"
   ]
 }

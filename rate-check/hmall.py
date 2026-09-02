@@ -66,7 +66,8 @@ def _pick_cdp_backend(endpoint: str):
     from playwright.sync_api import sync_playwright as _plain
     return _plain
 
-IDS = json.load(open(ROOT / "hsmaster" / "config" / "sulwhasoo-ids.json"))["ids"]
+IDS = json.load(open(ROOT / "hsmaster" / "config" / "sulwhasoo-ids.json",
+                     encoding="utf-8"))["ids"]   # ★encoding 필수 — 윈도우 기본 cp949
 
 # 캐러셀 카드 brand → 페이백계수.
 # brand 는 '롯데카드' 같은 단독형뿐 아니라 '카카오페이 롯데' / '토스페이 삼성' 처럼
@@ -241,6 +242,19 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
     # 3) cart → 일반상품 체크 → 구매하기
     page.goto(CART_URL, wait_until="domcontentloaded")
     page.wait_for_timeout(1500)
+
+    # ★담긴 줄 수 검증 (2026-09-02 실사고). `add_to_cart` 의 True 는 **버튼을 눌렀다**는 뜻이지
+    #   담겼다는 뜻이 아니다 — 조합 26 에서 `n` 1순위 후보가 `[OK]` 를 찍고도 실제로는 안 담겼고,
+    #   그 상태로 가격을 재서 **406,782원 / 공급률 0.3429** 가 나왔다(재실측 595,107 / 0.6001).
+    #   공급률은 **낮을수록 좋다**고 판정하므로, 이 오측은 cart_plan 이 그 조합을 1순위로 고르게
+    #   만든다 = 조용히 잘못된 상품을 사게 되는 값이다. 그래서 경고가 아니라 **중단**이다.
+    #   (buy/sulwhasoo.py 가 같은 이유로 이미 담기 검증을 하고 있었다 — 여기만 빠져 있었다.)
+    _want = len(combo)                       # 조합의 SKU 종류 수 = 카트 줄 수
+    _got = cart_items(page)
+    if len(_got) != _want:
+        return {"idx": idx,
+                "error": f"카트 검증 실패 — {len(_got)}줄 (기대 {_want}줄). 담긴 것: {_got}. "
+                         f"클릭은 성공했지만 실제로 안 담긴 품목이 있다 → 금액 오측 방지로 중단"}
     page.evaluate("""() => {
         const labels = Array.from(document.querySelectorAll('label.chklabel'));
         const t = labels.find(l => l.querySelector('span')?.textContent.trim() === '일반상품');
@@ -309,7 +323,7 @@ def ensure_logged_in(page) -> bool:
     if "로그아웃" in body:
         return True
     print(f"[INFO] 미로그인 감지 (홈에 '로그아웃' 없음, url={page.url[:60]})")
-    cfg = json.load(open(ROOT / "hmall_config.json"))
+    cfg = json.load(open(ROOT / "hmall_config.json", encoding="utf-8"))
     acc = cfg["accounts"][0]
     print(f"[INFO] 세션 로그아웃 감지 → 재로그인 {acc['id']}")
     return login(page, acc["id"], acc["pw"])

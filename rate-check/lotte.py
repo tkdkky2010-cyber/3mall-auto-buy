@@ -44,7 +44,8 @@ try:
 except Exception as _e:
     print(f"  [WARN] 캐시 비활성화 실패 ({_e}) — stale 값 주의")
 
-IDS = json.load(open(Path(__file__).resolve().parent.parent / "hsmaster" / "config" / "sulwhasoo-ids.json"))['ids']
+IDS = json.load(open(Path(__file__).resolve().parent.parent / "hsmaster" / "config" / "sulwhasoo-ids.json",
+                     encoding="utf-8"))['ids']   # ★encoding 필수 — 윈도우 기본 cp949 로 한글에서 죽는다
 PRICES = {c: p["price"] for c, p in PRODUCTS.items()}   # 하드코딩 금지 — 본품 추가 시 자동 반영
 
 def block_dialogs():

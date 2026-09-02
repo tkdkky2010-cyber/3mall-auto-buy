@@ -125,6 +125,7 @@ Chrome DevTools MCP에서는 컨텍스트 개념이 약하므로 다음 중 하�
 | 37 | [중단 2026-09-01] 센텔리안24 마데카크림 타임리버스 50ml 10개 (옵션6) | https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546 |
 | 38 | [중단 2026-09-01] 센텔리안24 마데카크림 타이트 리프팅 50ml 20개 (옵션2) | https://www.hmall.com/md/pda/itemPtc?slitmCd=2249003768&sectId=2861546 |
 | 39 | 서정희pick 유기농 엑스트라버진 올리브오일 100% (스페인) 30포 6박스 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2244447210&sectId=173266 |
+| 40 | 뉴케어 당플랜 프로 230ml 호두맛 72팩 | https://www.hmall.com/md/pda/itemPtc?slitmCd=2248814679 |
 
 ### 추가 제품 (필요 시 아래에 행 추가)
 
