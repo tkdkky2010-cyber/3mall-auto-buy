@@ -300,6 +300,26 @@ def cart_rows(page: Page) -> list[str]:
         return []
 
 
+_JS_CART_ROWS = r"""() => Array.from(document.querySelectorAll('input[type=checkbox][name=backet]'))
+    .map(cb => {
+        const row = cb.closest('div.pdwrap');
+        if (!row) return '';
+        const lines = (row.innerText || '').split('
+').map(s => s.trim()).filter(Boolean);
+        return lines[0] || '';
+    }).filter(Boolean)"""
+
+
+def cart_items(page: Page) -> list:
+    """카트에 담긴 상품명 목록. ★개별상품 체크박스(name=backet) 기준 — 배송 그룹이 몇 개든 정확하고
+    하단 '최근 본 상품' 캐러셀이 섞이지 않는다(rate-check/hmall.py cart_items 와 같은 규칙)."""
+    try:
+        return page.evaluate(_JS_CART_ROWS) or []
+    except Exception as e:
+        print(f"    [cart] 목록 읽기 실패: {e}")
+        return []
+
+
 def clear_cart(page: Page) -> None:
     """장바구니 비우기 — **비었는지 확인될 때까지** 최대 3회. (사용자 지시: 담기 전 기존 카트 삭제)
 
@@ -766,6 +786,35 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
             print(f"  [SKIP] #{idx} {ci}번째 add_to_cart 실패")
         if ci < len(items):
             page.wait_for_timeout(3000)
+    # ★담긴 줄 수 검증 (2026-09-02 신설). `add_to_cart` 의 True 는 **버튼을 눌렀다**는 뜻이지
+    #   담겼다는 뜻이 아니다. 실측: #1 에서 3번(갈색견과) 옵션 레이어가 안 떠
+    #   `[opt] 단일 옵션`(실제론 옵션 4개) + `수량 + 클릭 실패` 뒤에도 `[OK]` 가 찍혔고,
+    #   카트엔 1건만 담겼는데 요약은 `담기 2/2` 였다. 조용히 한 품목을 빠뜨린다.
+    #   (같은 형태를 rate-check/hmall.py·buy/sulwhasoo.py 에서도 고쳤다 — 여기만 남아 있었다.)
+    try:
+        page.goto(CART_URL, wait_until="domcontentloaded")
+        # ★카트 페이지는 비동기 렌더 — 고정 대기로 읽으면 **덜 그려진 상태**를 보고 0건으로 오판한다
+        #   (2026-09-02 실측: 1.5초 고정 대기 시 실제 2건인데 0건으로 읽혀 재시도가 돌았다).
+        #   기대 건수가 나올 때까지 폴링하고, 안 나오면 마지막 값으로 판정한다.
+        rows = []
+        for _ in range(10):                      # 최대 ~10초
+            page.wait_for_timeout(1000)
+            rows = cart_items(page)
+            if len(rows) >= len(items):
+                break
+        if len(rows) != len(items):
+            # ⚠️ **경고 전용이다 — success 를 낮추지 않는다.** (2026-09-02)
+            #   실행 중 이 컨텍스트에서 카트를 읽으면 실제로 담겨 있어도 0건으로 나온다
+            #   (외부에서 재로그인해 읽으면 정상 2건). 원인 미규명. success 를 낮추면
+            #   run.py 의 재시도가 돌면서 **멀쩡한 카트를 비우고 다시 담는다** — 오판의 대가가
+            #   크므로 판정에는 쓰지 않고 사람이 볼 신호로만 남긴다.
+            #   → 담기 결과는 `verify_hmall_cart.py` 처럼 **재로그인 후 외부 검수**로 확인할 것.
+            print(f"  [WARN] #{idx} 카트 판독 {len(rows)}건 (기대 {len(items)}건) — "
+                  f"실행 중 판독은 신뢰도가 낮다. 외부 검수로 확인할 것")
+        else:
+            print(f"  [OK] #{idx} 카트 검증 — {len(rows)}건")
+    except Exception as e:
+        print(f"  [WARN] #{idx} 카트 검증 예외: {e}")
     print(f"  ✓ #{idx} {account['id']} 담기 {success}/{len(items)}")
     return (success, len(items), True, None)   # 탭 재사용 — close 안 함(포커스 강탈 방지)
 
