@@ -148,8 +148,69 @@ def _galleria_hide_dim(page: Page) -> None:
         pass
 
 
+# 갤러리아 '개인정보 보호를 위한 비밀번호 변경안내' 팝업에서 **눌러야 하는** 버튼.
+# ⚠️ '변경하기' 는 **절대 누르지 않는다** — 비밀번호가 실제로 바뀐다.
+#    (롯데 비번변경 캠페인에서 '지금 변경하기' 를 금지한 것과 같은 이유. READ_FIRST 참조.)
+_GAL_PW_POPUP_TITLE = "비밀번호 변경안내"
+_GAL_PW_POPUP_SAFE = "30일 후 변경"
+_GAL_PW_POPUP_FORBIDDEN = "변경하기"
+
+
+def _galleria_pw_popup_present(page: Page) -> bool:
+    try:
+        return _GAL_PW_POPUP_TITLE in page.inner_text("body")
+    except Exception:
+        return False
+
+
+def _galleria_dismiss_pw_popup(page: Page) -> bool:
+    """'개인정보 보호를 위한 비밀번호 변경안내' → **'30일 후 변경'** 클릭. 닫혔으면 True.
+
+    ★role=button 하나로만 찾지 말 것 (2026-09-02 보강). 갤러리아는 로그인을 오래 안 한 계정에서
+      이 팝업을 자주 띄우는데, 버튼이 `<a>`/`<span>` 로 그려지는 경우가 있어 role 매칭이 조용히
+      빗나간다. 롯데 비번변경 캠페인이 `<img alt>` 라 `innerText` 로는 절대 못 잡던 것과 같은 계열
+      (READ_FIRST 「롯데 장바구니 담기 — 비밀번호 변경 캠페인」).
+    ★누르고 끝내지 않고 **팝업이 실제로 사라졌는지 검증**한다 — 안 닫히면 뒤 동작이 딤에 막힌다.
+    ⚠️ '변경하기' 는 비밀번호를 실제로 바꾸므로 절대 클릭 금지. 그래서 정확일치로만 찾는다.
+    """
+    if not _galleria_pw_popup_present(page):
+        return True
+    clicked = False
+    # ① 역할 무관 정확일치 탐색 (button/a/span/div 전부)
+    try:
+        clicked = bool(page.evaluate(
+            """(safe) => {
+                const els = Array.from(document.querySelectorAll('button,a,span,div,input[type=button]'));
+                const t = els.find(e => ((e.innerText || e.value || '').trim()) === safe
+                                        && e.offsetParent !== null);
+                if (t) { t.click(); return true; }
+                return false;
+            }""", _GAL_PW_POPUP_SAFE))
+    except Exception:
+        pass
+    # ② 폴백 — playwright 역할/텍스트 매칭
+    if not clicked:
+        for getter in (lambda: page.get_by_role("button", name=_GAL_PW_POPUP_SAFE),
+                       lambda: page.get_by_role("link", name=_GAL_PW_POPUP_SAFE),
+                       lambda: page.get_by_text(_GAL_PW_POPUP_SAFE, exact=True)):
+            try:
+                loc = getter()
+                if loc.count() and loc.first.is_visible():
+                    loc.first.click(timeout=2000); clicked = True; break
+            except Exception:
+                continue
+    page.wait_for_timeout(1200)
+    if not _galleria_pw_popup_present(page):
+        print(f"  [popup] 비밀번호 변경안내 → '{_GAL_PW_POPUP_SAFE}' 클릭 (닫힘 확인)")
+        return True
+    print(f"  [popup] ⚠️ 비밀번호 변경안내가 안 닫혔다 (clicked={clicked}) — "
+          f"'{_GAL_PW_POPUP_FORBIDDEN}' 는 비밀번호가 바뀌므로 누르지 않는다. 수동 확인 필요")
+    return False
+
+
 def _galleria_dismiss_popups(page: Page) -> None:
     """포스트로그인 팝업 닫기: 쇼핑클래스 혜택안내(닫기/다시 보지 않기) / 비밀번호 변경안내(30일 후 변경)."""
+    _galleria_dismiss_pw_popup(page)
     for nm in ("닫기", "다시 보지 않기", "30일 후 변경"):
         try:
             loc = page.get_by_role("button", name=nm)
@@ -1323,6 +1384,11 @@ def main() -> int:
         print(f"[ERR] idx 범위 1~{len(accounts)}")
         return 1
     acc = accounts[idx - 1]
+    # ★비활성 계정 차단 (2026-09-02). 계정 파일이 SoT — 코드에 번호를 또 적으면 두 곳이 어긋난다.
+    #   항목을 지우지 않는 이유: 롯데는 계정을 **인덱스**로 참조해서(#19·#20) 지우면 번호가 밀린다.
+    if acc.get("inactive"):
+        print(f"[SKIP] #{idx} {acc['id']} 는 비활성 계정 — {acc.get('inactive_reason', '사유 미기재')}")
+        return 0
 
     # Naver 자격증명 로드 (갤러리아 네이버페이용)
     cred = load_json(CREDENTIALS_FILE)

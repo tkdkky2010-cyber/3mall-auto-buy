@@ -2131,6 +2131,16 @@ def buy_one(idx: int, card: str | None = None, goods_no: str | None = None,
     goods_no=구매사은 (옵션)상품번호 검색 override(미지정=기본: 주문완료의 구매상품 직접 탭).
     combo_idx=구매대장 기록용 조합번호(rate 시트에서 금액/조합명 조회). 미지정이면 금액 미상으로 기록."""
     res = {"idx": idx, "status": None}
+    # ★비활성 계정은 여기서 막는다 — 범위 실행("15 16 …")에서도 자동으로 걸러진다.
+    #   판정 근거는 lotte.json(계정 SoT) 의 `inactive` 플래그. 코드에 번호를 또 적으면
+    #   두 곳이 어긋난다(저장소가 여러 번 겪은 "사본이 조용히 낡는다").
+    _accs = _accounts()
+    _acc = _accs[idx - 1] if 0 < idx <= len(_accs) else {}
+    if _acc.get("inactive"):
+        res["id"] = _acc.get("id")
+        res["status"] = f"INACTIVE({_acc.get('inactive_reason', '사용 중단 계정')})"
+        print(f"[#{idx}] {res['status']} — 건너뜀", flush=True)
+        return res
     print(f"\n{'='*54}\n[#{idx}] 롯데홈쇼핑 구매 시작", flush=True)
     ws = wake_screen()                      # ★절전/잠금 preflight (2026-07-10 #11~14 검은화면 LOGOUT_FAIL 재발방지)
     if not ws["ok"]:
