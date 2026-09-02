@@ -304,8 +304,7 @@ _JS_CART_ROWS = r"""() => Array.from(document.querySelectorAll('input[type=check
     .map(cb => {
         const row = cb.closest('div.pdwrap');
         if (!row) return '';
-        const lines = (row.innerText || '').split('
-').map(s => s.trim()).filter(Boolean);
+        const lines = (row.innerText || '').split('\n').map(s => s.trim()).filter(Boolean);
         return lines[0] || '';
     }).filter(Boolean)"""
 
@@ -379,44 +378,60 @@ def clear_cart(page: Page) -> None:
         print(f"    [cart] 비우기 실패: {e}")
 
 
-def click_coupon_receive(page: Page) -> None:
+def click_coupon_receive(page: Page) -> str:
+    """상품페이지 쿠폰 다운로드. **무슨 일이 있었는지 반드시 찍는다** → 상태 문자열 반환.
+
+    ★2026-09-02: 종전엔 성공·이미받음·버튼없음·예외를 전부 **말없이** 통과시켰다. 그래서
+      "쿠폰 받았나"를 로그로 확인할 방법이 아예 없었다(사용자 지시 "쿠폰 꼭 받아라 모든계정").
+      이 저장소가 반복해서 걷어낸 '조용한 통과'와 같은 형태다 — 관측이 없으면 검증도 없다."""
+    got, already = 0, 0
     try:
         btn = page.locator("button").filter(has_text="쿠폰 받기").first
-        if btn.count() > 0 and btn.is_visible():
-            btn.click()
-            page.wait_for_timeout(700)
-            for b in page.locator("button").filter(has_text="다운").all():
-                try:
-                    if b.is_visible() and "다운 완료" not in b.inner_text():
-                        b.click()
-                        page.wait_for_timeout(500)
-                        for txt in ("확인", "예"):
-                            ok = page.locator("button").filter(has_text=txt).first
-                            if ok.count() > 0 and ok.is_visible():
-                                ok.click()
-                                page.wait_for_timeout(400)
-                                break
-                except Exception:
-                    pass
-            closed = page.evaluate("""
-                () => {
-                    const btns = Array.from(document.querySelectorAll('button'));
-                    const target = btns.find(b => {
-                        if (b.offsetParent === null) return false;
-                        const span = b.querySelector('span.hiding');
-                        return span && span.textContent.trim() === '닫기';
-                    });
-                    if (target) { target.click(); return true; }
-                    return false;
-                }
-            """)
-            if not closed:
-                close = page.locator("button").filter(has_text="닫기").first
-                if close.count() > 0 and close.is_visible():
-                    close.click()
-            page.wait_for_timeout(400)
+        if not (btn.count() > 0 and btn.is_visible()):
+            print("    [coupon] '쿠폰 받기' 버튼 없음 — 이 상품엔 쿠폰이 없다")
+            return "no-button"
+        btn.click()
+        page.wait_for_timeout(700)
+        for b in page.locator("button").filter(has_text="다운").all():
+            try:
+                if not b.is_visible():
+                    continue
+                if "다운 완료" in b.inner_text():
+                    already += 1
+                    continue
+                b.click()
+                got += 1
+                page.wait_for_timeout(500)
+                for txt in ("확인", "예"):
+                    ok = page.locator("button").filter(has_text=txt).first
+                    if ok.count() > 0 and ok.is_visible():
+                        ok.click()
+                        page.wait_for_timeout(400)
+                        break
+            except Exception:
+                pass
+        closed = page.evaluate("""
+            () => {
+                const btns = Array.from(document.querySelectorAll('button'));
+                const target = btns.find(b => {
+                    if (b.offsetParent === null) return false;
+                    const span = b.querySelector('span.hiding');
+                    return span && span.textContent.trim() === '닫기';
+                });
+                if (target) { target.click(); return true; }
+                return false;
+            }
+        """)
+        if not closed:
+            close = page.locator("button").filter(has_text="닫기").first
+            if close.count() > 0 and close.is_visible():
+                close.click()
+        page.wait_for_timeout(400)
     except Exception as e:
-        print(f"    [coupon skip] {e}")
+        print(f"    [coupon] ⚠️ 처리 중 예외: {e}")
+        return f"error:{e}"
+    print(f"    [coupon] 다운로드 {got}장 / 이미받음 {already}장")
+    return f"got={got},already={already}"
 
 
 def add_to_cart(page: Page, product_id: str, info: dict, qty: int) -> bool:

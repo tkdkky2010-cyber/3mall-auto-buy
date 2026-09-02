@@ -104,6 +104,24 @@ TODAY_JSON = ROOT / "cart" / "today.json"
 TODAY_CARTS = ROOT / "cart" / "today_carts.json"
 
 
+def _cart_has_item(idx: int, kw: str) -> bool:
+    """`cart/today_carts.json` 의 그 계정 카트에 이름이 kw 를 포함하는 상품이 있나.
+
+    `then=` 2차 주문의 **대상 계정 판정 정본**. 계정 번호를 CLI 로 또 받지 않는 이유 —
+    번호를 코드/명령 두 군데에 두면 어긋나고, 없는 계정에 2차 주문을 시도하면
+    `SKIP_EMPTY` 가 fail_audit 에 **가짜 실패**로 쌓인다 (SKIP_EMPTY 는 _OK_PREFIX 가 아니다).
+    판정 근거는 카트 매니페스트 한 곳이다."""
+    try:
+        mf = json.loads(TODAY_CARTS.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"   [then] 카트 매니페스트 읽기 실패 — 2차 주문 skip: {e}", flush=True)
+        return False
+    for c in mf.get("carts", []):
+        if c.get("mall") in ("현대", "hmall") and c.get("account") == idx:
+            return any(kw in (it.get("name") or "") for it in c.get("items") or [])
+    return False
+
+
 def preflight_today_files() -> bool:
     """★결제 시작 전 `cart/today.json` · `cart/today_carts.json` 이 **오늘자인지** 확인.
     stale 이면 False → 호출측이 결제를 **중단**한다.
@@ -2623,6 +2641,22 @@ def main() -> int:
     # only=데이즈온 / only=석류,견과 → 카트에서 그 상품만 선택해 주문(혼합 카트 카드별 분리주문).
     only_kw = next(([s for s in a.split("=", 1)[1].split(",") if s]
                     for a in args if a.startswith("only=")), None)
+    # then=뉴케어:롯데 → 계정마다 1차 주문이 끝나면 **로그아웃 전에** 그 계정의 2차 주문을 이어서 한다.
+    #   왜 주문을 나누나: 한 주문 = 카드 하나다. 뉴케어는 롯데카드로 사야 해서(사용자 지시 2026-09-02)
+    #   다른 품목과 같은 주문에 넣을 수 없다 → 혼합 카트를 `only=` 로 쪼개 2번 주문한다.
+    #   ★대상 계정은 CLI 로 또 받지 않는다 — `cart/today_carts.json` 에 그 상품이 있는 계정만 자동으로
+    #     붙인다(없는 계정에 굳이 시도하면 SKIP_EMPTY 가 fail_audit 에 가짜 실패로 쌓인다).
+    then_spec = next((a.split("=", 1)[1] for a in args if a.startswith("then=")), None)
+    # `then=넛츠시그니처+뉴케어:롯데` → [( '넛츠시그니처', '' ), ( '뉴케어', '롯데' )] 순서대로 이어서 주문.
+    # ★단계를 나누는 이유가 카드만이 아니다 — **쿠폰이 주문당 1회**라 상품을 한 주문에 합치면
+    #   쿠폰을 한 번밖에 못 받는다 (2026-09-02 실측: 견과 2종 합본 298,642원 / 사용자 지시로 분리).
+    then_stages = []
+    for part in (then_spec or "").split("+"):
+        part = part.strip()
+        if not part:
+            continue
+        kw, _, card = part.partition(":")
+        then_stages.append((kw.strip(), card.strip()))
     plan = only or PLAN
     if not preflight_today_files():      # ★stale 데이터로 결제 금지 (대장/적립 조용한 누락 방지)
         return 1
@@ -2638,22 +2672,42 @@ def main() -> int:
             print(f"\n{'='*54}\n★ 날짜가 바뀜({start_date} → {time.strftime('%Y-%m-%d')}) — "
                   f"남은 계정 {plan[n:]} 중단. step1/step2 재실행 후 다시 결제할 것.\n{'='*54}", flush=True)
             break
-        try:
-            r = buy_one(idx, card=card_override, combo_idx=combo_idx, only=only_kw)
-        except Exception as e:
-            r = {"idx": idx, "status": f"EXC:{e}"}
-        print(f"[#{idx}] => {r.get('status')}", flush=True)
-        summary.append(r)
-        # ★실패면 그 자리에서 증거를 남긴다 (사용자 지시 2026-08-31 — 롯데·현대 공통).
-        if _FA.is_failure(r.get("status")):
+        def _order(_card, _only, _tag=""):
+            """주문 1건 = buy_one + 실패검수. 1차/2차(then=) 가 **같은 사후처리**를 타게 한다."""
             try:
-                # ★이 모듈엔 `_texts` 가 없다 — 롯데에서 호출부를 복사해 와 매 실패마다
-                #   NameError 로 검수가 통째로 죽었다(2026-08-31 실측). 현대는 OCR+dump 를
-                #   합쳐 읽는 게 정본이라(위 _ocr_texts(cap()) + _dump_texts()) 그대로 넘긴다.
-                _FA.audit(idx, r.get("status"), "현대", serial=hw._serial(), acc_id=r.get("id"),
-                          texts_fn=lambda: _ocr_texts(cap()) + _dump_texts(), cap_fn=cap)
-            except Exception as _e:
-                print(f"   [검수] 실패(무시): {_e}", flush=True)
+                _r = buy_one(idx, card=_card, combo_idx=combo_idx, only=_only)
+            except Exception as e:
+                _r = {"idx": idx, "status": f"EXC:{e}"}
+            _r.setdefault("_only", _only)   # ★핸드셰이크 finish 명령이 이 주문의 상품을 써야 한다
+            print(f"[#{idx}]{_tag} => {_r.get('status')}", flush=True)
+            summary.append(_r)
+            # ★실패면 그 자리에서 증거를 남긴다 (사용자 지시 2026-08-31 — 롯데·현대 공통).
+            if _FA.is_failure(_r.get("status")):
+                try:
+                    # ★이 모듈엔 `_texts` 가 없다 — 롯데에서 호출부를 복사해 와 매 실패마다
+                    #   NameError 로 검수가 통째로 죽었다(2026-08-31 실측). 현대는 OCR+dump 를
+                    #   합쳐 읽는 게 정본이라(위 _ocr_texts(cap()) + _dump_texts()) 그대로 넘긴다.
+                    _FA.audit(idx, _r.get("status"), "현대", serial=hw._serial(), acc_id=_r.get("id"),
+                              texts_fn=lambda: _ocr_texts(cap()) + _dump_texts(), cap_fn=cap)
+                except Exception as _e:
+                    print(f"   [검수] 실패(무시): {_e}", flush=True)
+            return _r
+
+        r = _order(card_override, only_kw)
+        # ★후속 주문(then=) — **그 계정 카트에 그 상품이 있을 때만** 한 단계씩 이어서.
+        #   7분 간격은 마지막 주문 뒤에 한 번만 잰다(계정 단위 간격이지 주문 단위가 아니다).
+        for si, (kw, kcard) in enumerate(then_stages, 2):
+            st = str(r.get("status", ""))
+            # 앞 주문이 인계대기/인프라장애면 이어가지 않는다 (콜드런치가 살아있는 결제화면을 날린다).
+            if "_HANDOFF" in st or st.startswith("SCREEN_LOCKED") or "offline" in st:
+                print(f"[#{idx}] 앞 주문이 {st[:24]} — 남은 단계 {[k for k, _ in then_stages[si-2:]]} 중단",
+                      flush=True)
+                break
+            if not _cart_has_item(idx, kw):
+                continue          # 이 계정엔 그 상품이 없다 (SKIP_EMPTY 가짜 실패 방지)
+            print(f"\n[#{idx}] ── {si}차 주문: {kw}"
+                  f"{' (' + kcard + '카드)' if kcard else ''} ──", flush=True)
+            r = _order(kcard or None, [kw], _tag=f"[{kw}]")
         # ★인프라 장애 연속 2회 = 폰이 죽은 것 (2026-08-27 실사고: device offline 후 #4~12 가
         #   전부 SCREEN_LOCKED 로 헛돌며 로그만 오염). 계정별 재시도 무의미 → 루프 중단.
         st = str(r.get("status", ""))
@@ -2674,7 +2728,8 @@ def main() -> int:
         #   인계 러너로 그 계정을 끝낸 뒤, 아래에 찍힌 명령으로 나머지 계정을 이어서 돌린다.
         card = _handoff_card(r)
         if card:
-            _handoff_stop(card, idx, plan[n + 1:], card_override, only_kw, combo_idx)
+            _handoff_stop(card, idx, plan[n + 1:], card_override,
+                          r.get("_only") or only_kw, combo_idx, then_spec)
             break
         if n < len(plan) - 1:
             _account_gap(r)
@@ -2720,7 +2775,8 @@ _HANDOFF_STEPS = {
 }
 
 
-def _handoff_stop(card: str, idx: int, rest: list[int], card_override, only, combo_idx=None) -> None:
+def _handoff_stop(card: str, idx: int, rest: list[int], card_override, only,
+                  combo_idx=None, then_spec: str | None = None) -> None:
     """인계 지점에서 루프를 멈추며 **다음에 칠 명령을 그대로** 찍는다.
     남은 계정을 사람이 다시 계산하게 두면 빠뜨린다 → 명령줄을 완성해서 준다.
     ★combo_idx(설화수)면 `combo=N` 을, 아니면 상품 키워드를 붙인다 — finish 가 그걸로
@@ -2736,7 +2792,9 @@ def _handoff_stop(card: str, idx: int, rest: list[int], card_override, only, com
         ov = f" {card_override}" if card_override else ""
         okw = f" only={','.join(only)}" if only else ""
         cb = f" combo={combo_idx}" if combo_idx is not None else ""
-        print(f"  4) 남은 계정:  python3 -u -m phone_auto.hmall_hyundai_buy{ov} {args}{okw}{cb}", flush=True)
+        th = f" then={then_spec}" if then_spec else ""   # 2차 주문 지정을 빠뜨리면 뉴케어가 통째로 누락된다
+        print(f"  4) 남은 계정:  python3 -u -m phone_auto.hmall_hyundai_buy{ov} {args}{okw}{cb}{th}",
+              flush=True)
     else:
         print("  4) 남은 계정 없음 — 이 계정이 마지막", flush=True)
     print("=" * 54, flush=True)
