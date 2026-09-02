@@ -527,6 +527,33 @@ def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_
         except Exception as e:
             print(f"    [WARN] 결제수단 검증 예외: {e}")
 
+        # 3.9) ★결제 직전 금액 가드 (2026-09-02 신설).
+        #   갤러리아 경로엔 금액 확인이 **아예 없었다** — 쿠폰/GWP 가 조용히 빠져도 그대로 결제된다.
+        #   롯데에서 쿠폰 0장이 ok:True 로 통과해 계정당 15만원을 더 낼 뻔한 것과 같은 구멍이다
+        #   (자동메모리 lotte-order-money-guards). 금액을 **못 읽어도** MAX_PAY 가 걸려 있으면 멈춘다
+        #   — 모르는 금액은 결제하지 않는다.
+        _max = os.environ.get("MAX_PAY")
+        _amt = None
+        try:
+            _amt = page.evaluate(r"""() => {
+                const body = document.body ? document.body.innerText : '';
+                // '결제예정금액'/'최종결제금액'/'총 결제금액' 뒤에 오는 첫 금액
+                const m = body.match(/(?:결제\s*예정\s*금액|최종\s*결제\s*금액|총\s*결제\s*금액)[^0-9]{0,20}([\d,]{4,})/);
+                if (m) return parseInt(m[1].replace(/,/g, ''));
+                return null;
+            }""")
+        except Exception as e:
+            print(f"    [WARN] 결제금액 판독 예외: {e}")
+        print(f"    [금액] 결제 예정: {_amt:,}원" if _amt else "    [금액] ⚠️ 결제 예정 금액 판독 실패")
+        out["amount"] = _amt
+        if _max:
+            if _amt is None:
+                out["error"] = f"AMOUNT_UNREADABLE(MAX_PAY={_max} — 금액을 못 읽으면 결제 안 함)"
+                print(f"    [ABORT] {out['error']}"); return out
+            if _amt > int(_max):
+                out["error"] = f"AMOUNT_TOO_HIGH({_amt} > MAX_PAY {_max}) — 혜택 미적용 의심, 결제 안 함"
+                print(f"    [ABORT] {out['error']}"); return out
+
         # 4) 결제하기 — id `regist_order_button` 직접 클릭
         # alert이 떠서 popup 막힐 수 있으므로 dialog handler 등록
         dialog_messages = []
@@ -546,10 +573,40 @@ def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_
                     try:
                         # ★2026-08-23 Naver 로그인 V3 UI: 제출버튼 #submit_btn → #loginBtn_row/#loginBtn_column.
                         #   fill 은 bvsd 봇감지에 걸릴 수 있어 키 타이핑(delay)으로 입력.
-                        pay_page.locator("#id").click(); pay_page.locator("#id").fill("")
-                        pay_page.keyboard.type(naver_id, delay=120)
-                        pay_page.locator("#pw").click(); pay_page.locator("#pw").fill("")
-                        pay_page.keyboard.type(naver_pw, delay=130)
+                        # ★입력칸을 **확인하고** 제출한다 (2026-09-02 실사고).
+                        #   `fill("")` 만으로는 네이버 자동완성/폼복원이 되살려서, 아이디 칸이
+                        #   실제로 `tkdkky20tkdkky20` (옛 값 두 번)이 된 채 제출됐다. 화면엔
+                        #   "The ID or password is incorrect" 만 떠서 **비번 문제로 오인**했다.
+                        #   로그인 실패는 계정에 흔적이 남는다(캡차·잠금) → 쓰레기 값으로 시도를
+                        #   낭비하면 안 된다. 자동메모리 login-retry-locks-account.
+                        def _fill_verified(sel: str, val: str, label: str) -> bool:
+                            for attempt in (1, 2):
+                                loc = pay_page.locator(sel)
+                                loc.click()
+                                pay_page.keyboard.press("Control+A")
+                                pay_page.keyboard.press("Delete")
+                                loc.fill("")
+                                pay_page.wait_for_timeout(200)
+                                pay_page.keyboard.type(val, delay=120)
+                                pay_page.wait_for_timeout(300)
+                                got = pay_page.evaluate(
+                                    "(s) => { const e = document.querySelector(s); return e ? e.value : null; }", sel)
+                                if got == val:
+                                    return True
+                                print(f"    [WARN] {label} 입력 불일치(시도{attempt}) — "
+                                      f"기대 {len(val)}자 / 실제 {len(got or '')}자")
+                            return False
+
+                        if not _fill_verified("#id", naver_id, "네이버 아이디"):
+                            out["error"] = ("NAVER_ID_INPUT_FAIL — 아이디 칸이 의도한 값이 되지 않았다. "
+                                            "쓰레기 값으로 로그인 시도를 낭비하지 않기 위해 제출하지 않음")
+                            print(f"    [ABORT] {out['error']}")
+                            return out
+                        if not _fill_verified("#pw", naver_pw, "네이버 비밀번호"):
+                            out["error"] = "NAVER_PW_INPUT_FAIL — 비밀번호 칸 입력 실패, 제출하지 않음"
+                            print(f"    [ABORT] {out['error']}")
+                            return out
+                        print(f"    [OK] 네이버 로그인 입력 검증 — id={naver_id}")
                         pay_page.wait_for_timeout(500)
                         for _bid in ("loginBtn_row", "loginBtn_column", "submit_btn"):
                             _b = pay_page.locator(f"#{_bid}")
@@ -637,7 +694,33 @@ def galleria_checkout(page: Page, naver_id: str = "", naver_pw: str = "", naver_
             if dialog_messages:
                 print(f"    [DEBUG] dialog 메시지: {dialog_messages}")
 
-        out["success"] = True
+        # ★주문 성사 검증 (2026-09-02 신설). 종전엔 결제창을 눌렀다는 것만으로 success=True 였다
+        #   — "클릭 성공 ≠ 주문 완료". 어느 계정이 실제로 주문됐는지 알 수 없어 사후에 사람이
+        #   주문내역을 뒤져야 했다(9/1 현대몰 #13 과 같은 상황).
+        #   갤러리아는 결제가 끝나면 원래 창이 `initOrderFinish` 로 이동하고 '주문번호: NNN' 이 뜬다.
+        try:
+            for _ in range(20):                      # 최대 ~40초 폴링
+                if "initOrderFinish" in (page.url or ""):
+                    break
+                page.wait_for_timeout(2000)
+            body = page.inner_text("body")
+            m = re.search(r"주문번호\s*[:：]\s*([0-9]{10,})", body)
+            amt = re.search(r"최종\s*결제금액\s*([\d,]{4,})\s*원", body)
+            if m:
+                out["order_no"] = m.group(1)
+                out["paid_amount"] = int(amt.group(1).replace(",", "")) if amt else None
+                out["success"] = True
+                print(f"    [OK] 주문완료 — 주문번호 {out['order_no']}"
+                      + (f" / 결제 {out['paid_amount']:,}원" if out.get("paid_amount") else ""))
+            else:
+                out["success"] = False
+                out["error"] = (f"ORDER_UNCONFIRMED — 결제 절차는 진행했으나 주문완료 화면/주문번호를 "
+                                f"확인하지 못했다 (url={page.url[:60]}). 주문내역 확인 필요")
+                print(f"    [WARN] {out['error']}")
+        except Exception as e:
+            out["success"] = False
+            out["error"] = f"ORDER_VERIFY_EXC: {e}"
+            print(f"    [WARN] {out['error']}")
         return out
     except Exception as e:
         out["error"] = f"checkout 예외: {e}"
