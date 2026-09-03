@@ -1,5 +1,5 @@
 {
-  "_comment": "2026-09-03 현대몰 설화수 조합25 (e×2 + n×2) 19계정. 당일카드 롯데 5%. 결제 예상 508,725원/계정 (step1 실측). 설화수 결제는 combo=25 로 돌려야 대장이 record_combo 로 남는다.",
+  "_comment": "2026-09-03 현대몰 식품 결제 매니페스트. 견과 2·3 #1~5 각 2개 / 이디야 오리지널 9 #11~15 각 2개. 뉴케어(40)는 오늘 판매중지라 제외(사용자 지시). ★name 은 **카트 행 실제 상품명**이다 — cdp_select_only(only=) 와 _cart_has_item(then=) 이 이 문자열로 매칭한다(2026-09-03 verify_cart 실측). ★견과는 반드시 only=넛츠시그니처 then=시그니처오리지널 로 **주문을 쪼갠다** — 쿠폰이 주문당 1회라 합본이면 계정당 약 14,000원 손해(9/2 실측 합본 298,642 vs 분리 284,692). ★설화수 조합25 #1~6 매니페스트는 scratchpad/today_carts.sulwhasoo-20260903.json 로 옮겼다 — 한 계정에 카트가 2개면 _record_after_done 의 next() 가 앞엣것을 잡아 기록이 어긋난다.",
   "date": "2026-09-03",
   "carts": [
     {
@@ -7,19 +7,17 @@
       "account": 1,
       "items": [
         {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
+          "product": "2",
+          "name": "[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉",
+          "qty": 2
         },
         {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
+          "product": "3",
+          "name": "[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉",
+          "qty": 2
         }
       ],
-      "amount": 508725,
+      "amount": 284692,
       "paid": true
     },
     {
@@ -27,19 +25,17 @@
       "account": 2,
       "items": [
         {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
+          "product": "2",
+          "name": "[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉",
+          "qty": 2
         },
         {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
+          "product": "3",
+          "name": "[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉",
+          "qty": 2
         }
       ],
-      "amount": 508725,
+      "amount": 284692,
       "paid": true
     },
     {
@@ -47,19 +43,17 @@
       "account": 3,
       "items": [
         {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
+          "product": "2",
+          "name": "[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉",
+          "qty": 2
         },
         {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
+          "product": "3",
+          "name": "[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉",
+          "qty": 2
         }
       ],
-      "amount": 508725,
+      "amount": 284692,
       "paid": true
     },
     {
@@ -67,19 +61,17 @@
       "account": 4,
       "items": [
         {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
+          "product": "2",
+          "name": "[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉",
+          "qty": 2
         },
         {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
+          "product": "3",
+          "name": "[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉",
+          "qty": 2
         }
       ],
-      "amount": 508725,
+      "amount": 284692,
       "paid": true
     },
     {
@@ -87,300 +79,83 @@
       "account": 5,
       "items": [
         {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
+          "product": "2",
+          "name": "[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉",
+          "qty": 2
         },
         {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
+          "product": "3",
+          "name": "[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉",
+          "qty": 2
         }
       ],
-      "amount": 508725,
+      "amount": 284692,
       "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 6,
-      "items": [
-        {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
-        }
-      ],
-      "amount": 508725,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 7,
-      "items": [
-        {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
-        }
-      ],
-      "amount": 508725,
-      "paid": false
-    },
-    {
-      "mall": "현대",
-      "account": 8,
-      "items": [
-        {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
-        }
-      ],
-      "amount": 508725,
-      "paid": false
-    },
-    {
-      "mall": "현대",
-      "account": 9,
-      "items": [
-        {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
-        }
-      ],
-      "amount": 508725,
-      "paid": false
-    },
-    {
-      "mall": "현대",
-      "account": 10,
-      "items": [
-        {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
-        }
-      ],
-      "amount": 508725,
-      "paid": false
     },
     {
       "mall": "현대",
       "account": 11,
       "items": [
         {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
+          "product": "9",
+          "name": "[우수고객전용][이디야] 오리지널 아메리카노 150T x2개",
+          "qty": 2
         }
       ],
-      "amount": 508725,
-      "paid": false
+      "amount": 61343,
+      "paid": true
     },
     {
       "mall": "현대",
       "account": 12,
       "items": [
         {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
+          "product": "9",
+          "name": "[우수고객전용][이디야] 오리지널 아메리카노 150T x2개",
+          "qty": 2
         }
       ],
-      "amount": 508725,
-      "paid": false
+      "amount": 61343,
+      "paid": true
     },
     {
       "mall": "현대",
       "account": 13,
       "items": [
         {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
+          "product": "9",
+          "name": "[우수고객전용][이디야] 오리지널 아메리카노 150T x2개",
+          "qty": 2
         }
       ],
-      "amount": 508725,
-      "paid": false
+      "amount": 61343,
+      "paid": true
     },
     {
       "mall": "현대",
       "account": 14,
       "items": [
         {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
+          "product": "9",
+          "name": "[우수고객전용][이디야] 오리지널 아메리카노 150T x2개",
+          "qty": 2
         }
       ],
-      "amount": 508725,
-      "paid": false
+      "amount": 61343,
+      "paid": true
     },
     {
       "mall": "현대",
       "account": 15,
       "items": [
         {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
+          "product": "9",
+          "name": "[우수고객전용][이디야] 오리지널 아메리카노 150T x2개",
+          "qty": 2
         }
       ],
-      "amount": 508725,
-      "paid": false
-    },
-    {
-      "mall": "현대",
-      "account": 16,
-      "items": [
-        {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
-        }
-      ],
-      "amount": 508725,
-      "paid": false
-    },
-    {
-      "mall": "현대",
-      "account": 17,
-      "items": [
-        {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
-        }
-      ],
-      "amount": 508725,
-      "paid": false
-    },
-    {
-      "mall": "현대",
-      "account": 18,
-      "items": [
-        {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
-        }
-      ],
-      "amount": 508725,
-      "paid": false
-    },
-    {
-      "mall": "현대",
-      "account": 19,
-      "items": [
-        {
-          "product": "e",
-          "name": "탄력3종 (에센셜 탄력케어 세트)",
-          "qty": 2,
-          "amount": 0
-        },
-        {
-          "product": "n",
-          "name": "탄력크림EX 75ml",
-          "qty": 2,
-          "amount": 0
-        }
-      ],
-      "amount": 508725,
-      "paid": false
+      "amount": 61343,
+      "paid": true
     }
   ]
 }
