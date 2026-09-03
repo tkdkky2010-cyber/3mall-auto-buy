@@ -1,5 +1,5 @@
 {
-  "date": "2026-09-02",
+  "date": "2026-09-03",
   "account_used": "tkdkky2002",
   "products": [
     {
@@ -94,7 +94,7 @@
       "event_end": "9.23 02:00",
       "has_coupon": true,
       "error": null,
-      "coupon_claimed": false,
+      "coupon_claimed": true,
       "simple_ranges": [],
       "payment": {
         "qty": 1,
@@ -271,14 +271,14 @@
         "member_price": 102240,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "토스페이 삼성 7% 즉시할인 95,084원",
-            "percent": 7,
-            "price": 95084
+            "alt": "cardCd08",
+            "text": "롯데 5% 즉시할인 97,128원",
+            "percent": 5,
+            "price": 97128
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 97,128원",
+            "alt": "cardCd10",
+            "text": "하나 5% 즉시할인 97,128원",
             "percent": 5,
             "price": 97128
           }
@@ -287,12 +287,19 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 92240,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 95084,
-            "payback_pct": 1.0,
-            "after_payback": 94133,
+          "롯데카드": {
+            "immediate_price": 97128,
+            "payback_pct": 2.0,
+            "after_payback": 95185,
             "reward_pt": 0,
-            "final_cost": 94133
+            "final_cost": 95185
+          },
+          "하나카드": {
+            "immediate_price": 97128,
+            "payback_pct": 1.0,
+            "after_payback": 96157,
+            "reward_pt": 0,
+            "final_cost": 96157
           }
         },
         "optimal_tier": {
@@ -428,7 +435,7 @@
       "event_end": "9.23 02:00",
       "has_coupon": true,
       "error": null,
-      "coupon_claimed": false,
+      "coupon_claimed": true,
       "simple_ranges": [],
       "payment": {
         "qty": 2,
@@ -436,28 +443,35 @@
         "member_price": 161820,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "토스페이 삼성 7% 즉시할인 136,543원",
-            "percent": 7,
-            "price": 136543
+            "alt": "cardCd08",
+            "text": "롯데 5% 즉시할인 153,729원",
+            "percent": 5,
+            "price": 153729
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 139,479원",
+            "alt": "cardCd10",
+            "text": "하나 5% 즉시할인 153,729원",
             "percent": 5,
-            "price": 139479
+            "price": 153729
           }
         ],
         "kakao_price": 161820,
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 151820,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 136543,
-            "payback_pct": 1.0,
-            "after_payback": 135178,
+          "롯데카드": {
+            "immediate_price": 153729,
+            "payback_pct": 2.0,
+            "after_payback": 150654,
             "reward_pt": 10000,
-            "final_cost": 125178
+            "final_cost": 140654
+          },
+          "하나카드": {
+            "immediate_price": 153729,
+            "payback_pct": 1.0,
+            "after_payback": 152192,
+            "reward_pt": 10000,
+            "final_cost": 142192
           }
         },
         "optimal_tier": {
@@ -573,7 +587,7 @@
       "event_end": "9.23 02:00",
       "has_coupon": true,
       "error": null,
-      "coupon_claimed": true,
+      "coupon_claimed": false,
       "simple_ranges": [],
       "payment": {
         "qty": 2,
@@ -581,14 +595,14 @@
         "member_price": 159300,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "토스페이 삼성 7% 즉시할인 134,199원",
-            "percent": 7,
-            "price": 134199
+            "alt": "cardCd08",
+            "text": "롯데 5% 즉시할인 137,085원",
+            "percent": 5,
+            "price": 137085
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 137,085원",
+            "alt": "cardCd10",
+            "text": "하나 5% 즉시할인 137,085원",
             "percent": 5,
             "price": 137085
           }
@@ -597,12 +611,19 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 149300,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 134199,
-            "payback_pct": 1.0,
-            "after_payback": 132857,
+          "롯데카드": {
+            "immediate_price": 137085,
+            "payback_pct": 2.0,
+            "after_payback": 134343,
             "reward_pt": 10000,
-            "final_cost": 122857
+            "final_cost": 124343
+          },
+          "하나카드": {
+            "immediate_price": 137085,
+            "payback_pct": 1.0,
+            "after_payback": 135714,
+            "reward_pt": 10000,
+            "final_cost": 125714
           }
         },
         "optimal_tier": {
@@ -870,14 +891,14 @@
         "member_price": 131920,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "토스페이 삼성 7% 즉시할인 122,686원",
-            "percent": 7,
-            "price": 122686
+            "alt": "cardCd08",
+            "text": "롯데 5% 즉시할인 125,324원",
+            "percent": 5,
+            "price": 125324
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 125,324원",
+            "alt": "cardCd10",
+            "text": "하나 5% 즉시할인 125,324원",
             "percent": 5,
             "price": 125324
           }
@@ -886,12 +907,19 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 121920,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 122686,
-            "payback_pct": 1.0,
-            "after_payback": 121459,
+          "롯데카드": {
+            "immediate_price": 125324,
+            "payback_pct": 2.0,
+            "after_payback": 122818,
             "reward_pt": 10000,
-            "final_cost": 111459
+            "final_cost": 112818
+          },
+          "하나카드": {
+            "immediate_price": 125324,
+            "payback_pct": 1.0,
+            "after_payback": 124071,
+            "reward_pt": 10000,
+            "final_cost": 114071
           }
         },
         "optimal_tier": {
@@ -1040,14 +1068,14 @@
         "member_price": 262400,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "토스페이 삼성 7% 즉시할인 230,082원",
-            "percent": 7,
-            "price": 230082
+            "alt": "cardCd08",
+            "text": "롯데 5% 즉시할인 235,030원",
+            "percent": 5,
+            "price": 235030
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 235,030원",
+            "alt": "cardCd10",
+            "text": "하나 5% 즉시할인 235,030원",
             "percent": 5,
             "price": 235030
           }
@@ -1056,12 +1084,19 @@
         "kakao_reward_pt": 20000,
         "kakao_final_cost": 242400,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 230082,
-            "payback_pct": 1.0,
-            "after_payback": 227781,
+          "롯데카드": {
+            "immediate_price": 235030,
+            "payback_pct": 2.0,
+            "after_payback": 230329,
             "reward_pt": 20000,
-            "final_cost": 207781
+            "final_cost": 210329
+          },
+          "하나카드": {
+            "immediate_price": 235030,
+            "payback_pct": 1.0,
+            "after_payback": 232680,
+            "reward_pt": 20000,
+            "final_cost": 212680
           }
         },
         "optimal_tier": {
@@ -1194,14 +1229,14 @@
         "member_price": 95840,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "토스페이 삼성 7% 즉시할인 80,219원",
-            "percent": 7,
-            "price": 80219
+            "alt": "cardCd08",
+            "text": "롯데 5% 즉시할인 81,944원",
+            "percent": 5,
+            "price": 81944
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 81,944원",
+            "alt": "cardCd10",
+            "text": "하나 5% 즉시할인 81,944원",
             "percent": 5,
             "price": 81944
           }
@@ -1210,12 +1245,19 @@
         "kakao_reward_pt": 0,
         "kakao_final_cost": 95840,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 80219,
-            "payback_pct": 1.0,
-            "after_payback": 79417,
+          "롯데카드": {
+            "immediate_price": 81944,
+            "payback_pct": 2.0,
+            "after_payback": 80305,
             "reward_pt": 0,
-            "final_cost": 79417
+            "final_cost": 80305
+          },
+          "하나카드": {
+            "immediate_price": 81944,
+            "payback_pct": 1.0,
+            "after_payback": 81125,
+            "reward_pt": 0,
+            "final_cost": 81125
           }
         },
         "optimal_tier": {
@@ -1333,14 +1375,14 @@
         "member_price": 132680,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "토스페이 삼성 7% 즉시할인 123,391원",
-            "percent": 7,
-            "price": 123391
+            "alt": "cardCd08",
+            "text": "롯데 5% 즉시할인 126,045원",
+            "percent": 5,
+            "price": 126045
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 126,045원",
+            "alt": "cardCd10",
+            "text": "하나 5% 즉시할인 126,045원",
             "percent": 5,
             "price": 126045
           }
@@ -1349,12 +1391,19 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 122680,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 123391,
-            "payback_pct": 1.0,
-            "after_payback": 122157,
+          "롯데카드": {
+            "immediate_price": 126045,
+            "payback_pct": 2.0,
+            "after_payback": 123524,
             "reward_pt": 10000,
-            "final_cost": 112157
+            "final_cost": 113524
+          },
+          "하나카드": {
+            "immediate_price": 126045,
+            "payback_pct": 1.0,
+            "after_payback": 124785,
+            "reward_pt": 10000,
+            "final_cost": 114785
           }
         },
         "optimal_tier": {
@@ -1483,14 +1532,14 @@
         "member_price": 110240,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "토스페이 삼성 7% 즉시할인 92,271원",
-            "percent": 7,
-            "price": 92271
+            "alt": "cardCd08",
+            "text": "롯데 5% 즉시할인 94,256원",
+            "percent": 5,
+            "price": 94256
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 94,256원",
+            "alt": "cardCd10",
+            "text": "하나 5% 즉시할인 94,256원",
             "percent": 5,
             "price": 94256
           }
@@ -1499,12 +1548,19 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 100240,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 92271,
-            "payback_pct": 1.0,
-            "after_payback": 91348,
+          "롯데카드": {
+            "immediate_price": 94256,
+            "payback_pct": 2.0,
+            "after_payback": 92371,
             "reward_pt": 0,
-            "final_cost": 91348
+            "final_cost": 92371
+          },
+          "하나카드": {
+            "immediate_price": 94256,
+            "payback_pct": 1.0,
+            "after_payback": 93313,
+            "reward_pt": 0,
+            "final_cost": 93313
           }
         },
         "optimal_tier": {
@@ -1635,14 +1691,14 @@
         "member_price": 118840,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "토스페이 삼성 7% 즉시할인 110,512원",
-            "percent": 7,
-            "price": 110512
+            "alt": "cardCd08",
+            "text": "롯데 5% 즉시할인 112,889원",
+            "percent": 5,
+            "price": 112889
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 112,889원",
+            "alt": "cardCd10",
+            "text": "하나 5% 즉시할인 112,889원",
             "percent": 5,
             "price": 112889
           }
@@ -1651,12 +1707,19 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 108840,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 110512,
-            "payback_pct": 1.0,
-            "after_payback": 109407,
+          "롯데카드": {
+            "immediate_price": 112889,
+            "payback_pct": 2.0,
+            "after_payback": 110631,
             "reward_pt": 10000,
-            "final_cost": 99407
+            "final_cost": 100631
+          },
+          "하나카드": {
+            "immediate_price": 112889,
+            "payback_pct": 1.0,
+            "after_payback": 111760,
+            "reward_pt": 10000,
+            "final_cost": 101760
           }
         },
         "optimal_tier": {
@@ -1782,31 +1845,38 @@
       "payment": {
         "qty": 1,
         "list_price": 248000,
-        "member_price": 173600,
+        "member_price": 210800,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "토스페이 삼성 7% 즉시할인 147,498원",
-            "percent": 7,
-            "price": 147498
+            "alt": "cardCd08",
+            "text": "롯데 5% 즉시할인 186,010원",
+            "percent": 5,
+            "price": 186010
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 150,670원",
+            "alt": "cardCd10",
+            "text": "하나 5% 즉시할인 186,010원",
             "percent": 5,
-            "price": 150670
+            "price": 186010
           }
         ],
-        "kakao_price": 173600,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 163600,
+        "kakao_price": 210800,
+        "kakao_reward_pt": 20000,
+        "kakao_final_cost": 190800,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 147498,
-            "payback_pct": 1.0,
-            "after_payback": 146023,
+          "롯데카드": {
+            "immediate_price": 186010,
+            "payback_pct": 2.0,
+            "after_payback": 182290,
             "reward_pt": 10000,
-            "final_cost": 136023
+            "final_cost": 172290
+          },
+          "하나카드": {
+            "immediate_price": 186010,
+            "payback_pct": 1.0,
+            "after_payback": 184150,
+            "reward_pt": 10000,
+            "final_cost": 174150
           }
         },
         "optimal_tier": {
@@ -1814,13 +1884,13 @@
           "tier_min": 100000,
           "tier_reward": 10000,
           "nominal_pct": 10.0,
-          "actual_total": 173600,
-          "actual_reward": 10000,
-          "effective_pct": 5.76036866359447
+          "actual_total": 210800,
+          "actual_reward": 20000,
+          "effective_pct": 9.487666034155598
         },
         "effective_ten_percent": true,
         "error": null,
-        "benefit_unit_price": 173600,
+        "benefit_unit_price": 210800,
         "options": []
       }
     },
@@ -1924,14 +1994,14 @@
         "member_price": 165600,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "토스페이 삼성 7% 즉시할인 140,058원",
-            "percent": 7,
-            "price": 140058
+            "alt": "cardCd08",
+            "text": "롯데 5% 즉시할인 143,070원",
+            "percent": 5,
+            "price": 143070
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 143,070원",
+            "alt": "cardCd10",
+            "text": "하나 5% 즉시할인 143,070원",
             "percent": 5,
             "price": 143070
           }
@@ -1940,12 +2010,19 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 155600,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 140058,
-            "payback_pct": 1.0,
-            "after_payback": 138657,
+          "롯데카드": {
+            "immediate_price": 143070,
+            "payback_pct": 2.0,
+            "after_payback": 140209,
             "reward_pt": 10000,
-            "final_cost": 128657
+            "final_cost": 130209
+          },
+          "하나카드": {
+            "immediate_price": 143070,
+            "payback_pct": 1.0,
+            "after_payback": 141639,
+            "reward_pt": 10000,
+            "final_cost": 131639
           }
         },
         "optimal_tier": {
@@ -1980,127 +2057,14 @@
       "id": "40",
       "name": "뉴케어 당플랜 프로 230ml 호두맛 72팩",
       "url": "https://www.hmall.com/md/pda/itemPtc?slitmCd=2248814679",
-      "ten_percent": true,
-      "phrase": "잘사는 추석 10%적립",
-      "events": [
-        {
-          "prmo": "P202608247695",
-          "name": "잘사는 추석 10%적립",
-          "event_end": "9.23 02:00",
-          "tiers": [
-            {
-              "min_won": 100000,
-              "min_unit": "원",
-              "reward_pt": 10000
-            },
-            {
-              "min_won": 200000,
-              "min_unit": "원",
-              "reward_pt": 20000
-            },
-            {
-              "min_won": 300000,
-              "min_unit": "원",
-              "reward_pt": 30000
-            },
-            {
-              "min_won": 500000,
-              "min_unit": "원",
-              "reward_pt": 50000
-            },
-            {
-              "min_won": 1000000,
-              "min_unit": "원",
-              "reward_pt": 100000
-            },
-            {
-              "min_won": 3000000,
-              "min_unit": "원",
-              "reward_pt": 300000
-            },
-            {
-              "min_won": 10000000,
-              "min_unit": "원",
-              "reward_pt": 1000000
-            }
-          ],
-          "simple_range": null
-        }
-      ],
-      "tiers": [
-        {
-          "min_won": 100000,
-          "min_unit": "원",
-          "reward_pt": 10000
-        },
-        {
-          "min_won": 200000,
-          "min_unit": "원",
-          "reward_pt": 20000
-        },
-        {
-          "min_won": 300000,
-          "min_unit": "원",
-          "reward_pt": 30000
-        },
-        {
-          "min_won": 500000,
-          "min_unit": "원",
-          "reward_pt": 50000
-        },
-        {
-          "min_won": 1000000,
-          "min_unit": "원",
-          "reward_pt": 100000
-        },
-        {
-          "min_won": 3000000,
-          "min_unit": "원",
-          "reward_pt": 300000
-        },
-        {
-          "min_won": 10000000,
-          "min_unit": "원",
-          "reward_pt": 1000000
-        }
-      ],
-      "max_reward": "1,000,000P",
-      "event_end": "9.23 02:00",
-      "has_coupon": true,
-      "error": null,
-      "coupon_claimed": true,
-      "simple_ranges": [],
-      "payment": {
-        "qty": 1,
-        "list_price": 227700,
-        "member_price": 143460,
-        "card_slides": [
-          {
-            "alt": "현대홈쇼핑 현대카드 Ed2",
-            "text": "현대홈쇼핑 현대카드 Ed2 7% 청구할인",
-            "percent": 7,
-            "price": null,
-            "discount_type": "청구할인"
-          }
-        ],
-        "kakao_price": 143460,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 133460,
-        "paybacks": {},
-        "optimal_tier": {
-          "qty": 1,
-          "tier_min": 100000,
-          "tier_reward": 10000,
-          "nominal_pct": 10.0,
-          "actual_total": 143460,
-          "actual_reward": 10000,
-          "effective_pct": 6.970584134950508
-        },
-        "effective_ten_percent": true,
-        "error": null,
-        "benefit_unit_price": 143460,
-        "options": []
-      }
+      "ten_percent": false,
+      "phrase": null,
+      "events": [],
+      "tiers": [],
+      "max_reward": null,
+      "event_end": null,
+      "has_coupon": false,
+      "error": "판매중단"
     }
   ],
   "ten_percent_ids": [
@@ -2116,7 +2080,6 @@
     "25",
     "33",
     "34",
-    "35",
-    "40"
+    "35"
   ]
 }
