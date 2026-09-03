@@ -2003,6 +2003,16 @@ def select_card(card: str, day: str | None = None) -> dict:
         #   → 결제수단 행 아래 카드명 **양성 검증** 필수. 실패면 진행 금지(딴 카드 결제 방지).
         if _verify_pay_method(grid_name):
             return {"ok": True, "via": "캐러셀"}
+        # ★캐러셀 금액일치는 통과했는데 결제수단이 딴 카드 = **탭이 아예 안 나갔다**.
+        #   금액일치 판정이 '어느 카드가' 선택됐는지 못 가르기 때문 — 같은 할인율 카드가
+        #   2장이면 기본선택 카드로도 금액이 맞아 '이미 선택됨'으로 오판한다
+        #   (2026-09-03 #3 실측: 롯데·하나 둘 다 5%/501,087원, 결제수단은 롯데카드).
+        #   여기서는 **미선택이 확정된 상태**라 토글 보호를 풀고 한 번 강제 탭한다.
+        print(f"[card] {card} 캐러셀 통과했으나 결제수단은 딴 카드 → 강제 탭 1회 재시도", flush=True)
+        FlowRunner(use_camera=False).run_action(
+            {"action": "hmall_select_card_discount", "card": card, "force_tap": True})
+        if _verify_pay_method(grid_name):
+            return {"ok": True, "via": "캐러셀(강제탭)"}
         return {"ok": False, "via": "캐러셀",
                 "err": f"{card} 캐러셀 탭 후 결제수단에 '{grid_name}' 미확인 — 오결제 방지 중단"}
     except Exception as e:

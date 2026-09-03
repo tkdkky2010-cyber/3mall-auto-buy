@@ -688,6 +688,15 @@ class FlowRunner:
             tokens = _CARD_TOKENS.get(want, [want] if want else [])
             if want:
                 self._log(f"  카드 지정={want} (토큰 {tokens}) — 캐러셀에서 이 카드만 탭")
+            # ★force_tap — 금액일치 판정을 **1회 건너뛰고** 무조건 탭한다.
+            #   금액일치는 '어느 카드가' 선택됐는지 못 가른다: 같은 할인율 카드가 2장이면
+            #   기본선택된 카드로도 금액이 맞는다 (2026-09-03 #3 실측 — 롯데·하나 둘 다
+            #   5%/501,087원 → 롯데 선택 상태인데 '하나 선택됨'으로 오판하고 탭을 건너뜀).
+            #   ⚠️캐러셀 행은 토글이라 **무조건 켜면 선택된 카드를 해제한다** — 호출측이
+            #   결제수단 카드명으로 **미선택을 확정한 뒤에만** 켤 것(select_card 참고).
+            force_tap = bool(action.get("force_tap"))
+            if force_tap:
+                self._log("  force_tap=1 — 금액일치 판정 1회 건너뛰고 강제 탭")
 
             # ★★열 폭 — 캐러셀이 **2열**이면 "같은 행"에 **다른 카드**가 있다(2026-08-05 실측:
             #   비씨 cx=114 / NH cx=621, 각자의 '5% 즉시할인' cx=181 / cx=695).
@@ -738,7 +747,7 @@ class FlowRunner:
                 ix1, iy1, ix2, iy2 = cand
                 iy, ix = (iy1 + iy2) // 2, (ix1 + ix2) // 2
                 row, pay = _row_amt(nodes, iy, ix), _pay(nodes)
-                if row is not None and pay is not None and row == pay:
+                if row is not None and pay is not None and row == pay and not (force_tap and taps == 0):
                     self._log(f"  ✓ 캐러셀 금액 == 결제버튼 금액 ({row:,}원) — {want or '즉시할인'} 카드 선택됨")
                     return
                 if taps >= 2:
@@ -747,7 +756,8 @@ class FlowRunner:
                         f"(캐러셀 {row} vs 결제 {pay}) — 결제 중단")
                 self.adb.tap((ix1 + ix2) // 2, iy)
                 taps += 1
-                self._log(f"  {want or '즉시할인'} 탭 #{taps} @ ({(ix1+ix2)//2},{iy}) (캐러셀 {row} vs 결제 {pay} 불일치)")
+                self._log(f"  {want or '즉시할인'} 탭 #{taps} @ ({(ix1+ix2)//2},{iy}) "
+                          f"(캐러셀 {row} vs 결제 {pay} {'강제' if force_tap and taps == 1 else '불일치'})")
                 time.sleep(2.2)
             # ★want 지정인데 여기 왔다 = 캐러셀에 그 카드가 없다는 뜻일 수 있다. 추측 탭 금지(오결제) → 중단.
             raise FlowError(
