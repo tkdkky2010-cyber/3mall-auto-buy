@@ -2717,7 +2717,12 @@ def main() -> int:
                 continue          # 이 계정엔 그 상품이 없다 (SKIP_EMPTY 가짜 실패 방지)
             print(f"\n[#{idx}] ── {si}차 주문: {kw}"
                   f"{' (' + kcard + '카드)' if kcard else ''} ──", flush=True)
-            r = _order(kcard or None, [kw], _tag=f"[{kw}]")
+            # ★카드 결정: 단계 지정(`kw:카드`) > CLI 지정(card_override) > 당일카드 자동감지.
+            #   card_override 를 물려주지 않으면 2차가 조용히 **딴 카드로 결제된다**
+            #   (2026-09-04 실측: `현대 … then=시그니처오리지널` 인데 #5 2차가 BC 로 갔다.
+            #    BC·현대가 같은 할인율로 공동 1위라 detect_card 가 그날 그때그때 다른 쪽을 골랐고,
+            #    #1·#3·#4 는 우연히 현대가 잡혀 안 드러났다 — 사용자 지시를 어기는 조용한 실패).
+            r = _order(kcard or card_override, [kw], _tag=f"[{kw}]")
         # ★인프라 장애 연속 2회 = 폰이 죽은 것 (2026-08-27 실사고: device offline 후 #4~12 가
         #   전부 SCREEN_LOCKED 로 헛돌며 로그만 오염). 계정별 재시도 무의미 → 루프 중단.
         st = str(r.get("status", ""))

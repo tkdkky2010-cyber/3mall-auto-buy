@@ -1,6 +1,6 @@
 {
-  "_comment": "2026-09-03 현대몰 식품 결제 매니페스트. 견과 2·3 #1~5 각 2개 / 이디야 오리지널 9 #11~15 각 2개. 뉴케어(40)는 오늘 판매중지라 제외(사용자 지시). ★name 은 **카트 행 실제 상품명**이다 — cdp_select_only(only=) 와 _cart_has_item(then=) 이 이 문자열로 매칭한다(2026-09-03 verify_cart 실측). ★견과는 반드시 only=넛츠시그니처 then=시그니처오리지널 로 **주문을 쪼갠다** — 쿠폰이 주문당 1회라 합본이면 계정당 약 14,000원 손해(9/2 실측 합본 298,642 vs 분리 284,692). ★설화수 조합25 #1~6 매니페스트는 scratchpad/today_carts.sulwhasoo-20260903.json 로 옮겼다 — 한 계정에 카트가 2개면 _record_after_done 의 next() 가 앞엣것을 잡아 기록이 어긋난다.",
-  "date": "2026-09-03",
+  "_comment": "2026-09-04 현대몰 식품 결제 매니페스트. 견과 2·3 #1~5 각 2개 / 이디야 오리지널 9 #11~15 각 2개. 뉴케어(40)는 step2 실측 'ERR 판매중단' — 9/3 에 이어 이틀째라 제외. ★name 은 카트 행 실제 상품명 (only=/then= 매칭용, 9/3 verify_cart 실측). ★견과는 only=넛츠시그니처 then=시그니처오리지널 로 주문을 쪼갠다 — 쿠폰이 주문당 1회라 합본이면 계정당 약 14,000원 손해(9/2 실측 298,642 vs 분리 284,692).",
+  "date": "2026-09-04",
   "carts": [
     {
       "mall": "현대",
@@ -17,7 +17,7 @@
           "qty": 2
         }
       ],
-      "amount": 284692,
+      "amount": null,
       "paid": true
     },
     {
@@ -35,7 +35,7 @@
           "qty": 2
         }
       ],
-      "amount": 284692,
+      "amount": null,
       "paid": true
     },
     {
@@ -53,7 +53,7 @@
           "qty": 2
         }
       ],
-      "amount": 284692,
+      "amount": null,
       "paid": true
     },
     {
@@ -71,7 +71,7 @@
           "qty": 2
         }
       ],
-      "amount": 284692,
+      "amount": null,
       "paid": true
     },
     {
@@ -89,7 +89,7 @@
           "qty": 2
         }
       ],
-      "amount": 284692,
+      "amount": null,
       "paid": true
     },
     {
@@ -102,7 +102,7 @@
           "qty": 2
         }
       ],
-      "amount": 61343,
+      "amount": null,
       "paid": true
     },
     {
@@ -115,7 +115,7 @@
           "qty": 2
         }
       ],
-      "amount": 61343,
+      "amount": null,
       "paid": true
     },
     {
@@ -128,7 +128,7 @@
           "qty": 2
         }
       ],
-      "amount": 61343,
+      "amount": null,
       "paid": true
     },
     {
@@ -141,7 +141,7 @@
           "qty": 2
         }
       ],
-      "amount": 61343,
+      "amount": null,
       "paid": true
     },
     {
@@ -154,7 +154,7 @@
           "qty": 2
         }
       ],
-      "amount": 61343,
+      "amount": null,
       "paid": true
     }
   ]
