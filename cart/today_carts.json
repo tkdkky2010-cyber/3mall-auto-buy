@@ -1,161 +1,18 @@
 {
-  "_comment": "2026-09-04 현대몰 식품 결제 매니페스트. 견과 2·3 #1~5 각 2개 / 이디야 오리지널 9 #11~15 각 2개. 뉴케어(40)는 step2 실측 'ERR 판매중단' — 9/3 에 이어 이틀째라 제외. ★name 은 카트 행 실제 상품명 (only=/then= 매칭용, 9/3 verify_cart 실측). ★견과는 only=넛츠시그니처 then=시그니처오리지널 로 주문을 쪼갠다 — 쿠폰이 주문당 1회라 합본이면 계정당 약 14,000원 손해(9/2 실측 298,642 vs 분리 284,692).",
-  "date": "2026-09-04",
+  "date": "2026-09-07",
+  "_comment": "현대몰 오늘 카트 CFT 재구성 및 외부 재로그인 검수 완료. 결제 전 상태.",
   "carts": [
-    {
-      "mall": "현대",
-      "account": 1,
-      "items": [
-        {
-          "product": "2",
-          "name": "[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉",
-          "qty": 2
-        },
-        {
-          "product": "3",
-          "name": "[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉",
-          "qty": 2
-        }
-      ],
-      "amount": null,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 2,
-      "items": [
-        {
-          "product": "2",
-          "name": "[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉",
-          "qty": 2
-        },
-        {
-          "product": "3",
-          "name": "[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉",
-          "qty": 2
-        }
-      ],
-      "amount": null,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 3,
-      "items": [
-        {
-          "product": "2",
-          "name": "[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉",
-          "qty": 2
-        },
-        {
-          "product": "3",
-          "name": "[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉",
-          "qty": 2
-        }
-      ],
-      "amount": null,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 4,
-      "items": [
-        {
-          "product": "2",
-          "name": "[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉",
-          "qty": 2
-        },
-        {
-          "product": "3",
-          "name": "[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉",
-          "qty": 2
-        }
-      ],
-      "amount": null,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 5,
-      "items": [
-        {
-          "product": "2",
-          "name": "[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉",
-          "qty": 2
-        },
-        {
-          "product": "3",
-          "name": "[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉",
-          "qty": 2
-        }
-      ],
-      "amount": null,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 11,
-      "items": [
-        {
-          "product": "9",
-          "name": "[우수고객전용][이디야] 오리지널 아메리카노 150T x2개",
-          "qty": 2
-        }
-      ],
-      "amount": null,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 12,
-      "items": [
-        {
-          "product": "9",
-          "name": "[우수고객전용][이디야] 오리지널 아메리카노 150T x2개",
-          "qty": 2
-        }
-      ],
-      "amount": null,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 13,
-      "items": [
-        {
-          "product": "9",
-          "name": "[우수고객전용][이디야] 오리지널 아메리카노 150T x2개",
-          "qty": 2
-        }
-      ],
-      "amount": null,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 14,
-      "items": [
-        {
-          "product": "9",
-          "name": "[우수고객전용][이디야] 오리지널 아메리카노 150T x2개",
-          "qty": 2
-        }
-      ],
-      "amount": null,
-      "paid": true
-    },
-    {
-      "mall": "현대",
-      "account": 15,
-      "items": [
-        {
-          "product": "9",
-          "name": "[우수고객전용][이디야] 오리지널 아메리카노 150T x2개",
-          "qty": 2
-        }
-      ],
-      "amount": null,
-      "paid": true
-    }
-  ]
+    {"mall":"현대","account":1,"items":[{"product":"2","name":"[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉","qty":2},{"product":"3","name":"[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉","qty":2}],"paid":false,"amount":null},
+    {"mall":"현대","account":2,"items":[{"product":"2","name":"[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉","qty":2},{"product":"3","name":"[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉","qty":2}],"paid":false,"amount":null},
+    {"mall":"현대","account":3,"items":[{"product":"2","name":"[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉","qty":2},{"product":"3","name":"[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉","qty":2}],"paid":false,"amount":null},
+    {"mall":"현대","account":4,"items":[{"product":"2","name":"[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉","qty":2},{"product":"3","name":"[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉","qty":2}],"paid":false,"amount":null},
+    {"mall":"현대","account":5,"items":[{"product":"2","name":"[우수고객전용][하루견과] 순수견과100% 하루견과 넛츠시그니처 23gx100봉","qty":2},{"product":"3","name":"[우수고객전용][하루견과] ONLY견과 시그니처오리지널 22gx100봉","qty":2}],"paid":false,"amount":null},
+    {"mall":"현대","account":11,"items":[{"product":"9","name":"이디야 오리지널 아메리카노 150T x2개","qty":2}],"paid":false,"amount":null},
+    {"mall":"현대","account":12,"items":[{"product":"9","name":"이디야 오리지널 아메리카노 150T x2개","qty":2}],"paid":false,"amount":null},
+    {"mall":"현대","account":13,"items":[{"product":"9","name":"이디야 오리지널 아메리카노 150T x2개","qty":2}],"paid":false,"amount":null},
+    {"mall":"현대","account":14,"items":[{"product":"9","name":"이디야 오리지널 아메리카노 150T x2개","qty":2}],"paid":false,"amount":null},
+    {"mall":"현대","account":15,"items":[{"product":"9","name":"이디야 오리지널 아메리카노 150T x2개","qty":2}],"paid":false,"amount":null}
+  ],
+  "execution_status": "carts_verified",
+  "closed_reason": null
 }

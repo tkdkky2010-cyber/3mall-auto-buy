@@ -392,11 +392,15 @@ def login(idx: int) -> dict:
     _adb().tap(*NAV_MY); time.sleep(1.5)
     dismiss_popups(2)
     time.sleep(1.0)   # ★마이 후 리플로우 정착 (6/2 지적)
-    # ① 로그인옵션 화면 — dump 로 '아이디/비밀번호로 계속하기' 절대좌표
-    cont = _dump_find(_dump_nodes(), "아이디/비밀번호로 계속하기")
+    # ① 로그인옵션 화면 — 앱 문구가 '...계속하기' 또는 '...로그인'으로 바뀔 수 있다.
+    #    둘 다 같은 ID/PW 폼 진입 버튼이다. 한 문구만 찾고 중단하면 계정 전환이 불필요하게
+    #    멈춰 후속 결제/적립 순서가 끊긴다(2026-09-07 실측).
+    cont = (_dump_find(_dump_nodes(), "아이디/비밀번호로 계속하기")
+            or _dump_find(_dump_nodes(), "아이디/비밀번호 로그인"))
     if cont:
         _adb().tap(cont["cx"], cont["cy"]); time.sleep(1.5)
     elif not (ocr_tap("아이디/비밀번호로 계속하기", contains=True, retries=4)
+              or ocr_tap("아이디/비밀번호 로그인", contains=True, retries=2)
               or ocr_tap("계속하기", contains=True, retries=2)):
         out["err"] = "로그인 진입 버튼 미발견"; return out
     if not wait_text("아이디", timeout=10):

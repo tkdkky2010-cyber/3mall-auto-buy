@@ -342,11 +342,10 @@ def clear_cart(page: Page) -> None:
             rows = cart_rows(page)
             if not rows:
                 body = page.inner_text("body")
-                if attempt == 1 and ("장바구니가 비어" in body or "담긴 상품이 없" in body):
+                if "장바구니가 비어" in body or "담긴 상품이 없" in body:
                     print("    [cart] 이미 비어있음")
-                else:
-                    print(f"    [cart] 비우기 완료 (검증 0건)")
-                return
+                    return
+                raise RuntimeError("카트 0행이지만 빈 장바구니 문구 없음 — 판독 불명, 담기 중단")
             total, newly = page.evaluate(_JS_SELECT_ALL)
             page.wait_for_timeout(600)
             delete_btn = page.locator("button.btn-linelgray").filter(has_text="선택삭제").first
@@ -359,7 +358,7 @@ def clear_cart(page: Page) -> None:
                 delete_btn = page.locator("button").filter(has_text="품절/불가 삭제").first
             if delete_btn.count() == 0:
                 print(f"    [cart] ⚠️ 선택삭제 버튼 없음 — 잔여 {len(rows)}건 {rows}")
-                return
+                raise RuntimeError("카트 삭제 버튼 없음 — 담기 중단")
             delete_btn.click()
             page.wait_for_timeout(900)
             for txt in ("예", "확인", "삭제"):
@@ -373,9 +372,13 @@ def clear_cart(page: Page) -> None:
         if left:
             # 조용히 넘어가면 잔여물 위에 담겨 결제/측정이 오염된다(8/2 조합 오염 사고와 같은 계열).
             print(f"    [cart] ⚠️⚠️ 3회 시도 후에도 잔여 {len(left)}건 — {left}\n"
-                  f"           수동 삭제 필요. 이대로 담으면 결제에 섞인다.", flush=True)
+                   f"           수동 삭제 필요. 이대로 담으면 결제에 섞인다.", flush=True)
+            raise RuntimeError("카트 삭제 후 잔여 상품 존재 — 담기 중단")
+        if not any(k in page.inner_text("body") for k in ("장바구니가 비어", "담긴 상품이 없")):
+            raise RuntimeError("빈 카트 최종 확인 실패 — 담기 중단")
     except Exception as e:
         print(f"    [cart] 비우기 실패: {e}")
+        raise
 
 
 def click_coupon_receive(page: Page) -> str:
@@ -830,6 +833,21 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
             print(f"  [OK] #{idx} 카트 검증 — {len(rows)}건")
     except Exception as e:
         print(f"  [WARN] #{idx} 카트 검증 예외: {e}")
+    # 줄 수가 같아도 기존 수량에 더해진 4개/2개는 실패다. 새로고침 후 상품코드와 수량을 대조한다.
+    page.reload(wait_until="domcontentloaded")
+    page.locator('div.pdwrap[data-baskt-seq]').first.wait_for(timeout=15000)
+    actual = page.locator('div.pdwrap[data-baskt-seq]').evaluate_all(r'''rows => rows.map(r => {
+        const a = r.querySelector('a[href*="slitmCd="]');
+        const spans = r.querySelectorAll('.option-info span');
+        const q = spans.length ? spans[spans.length - 1].textContent.trim().match(/^(\d+)개$/) : null;
+        return {code: a ? new URL(a.href).searchParams.get('slitmCd') : null,
+                qty: q ? Number(q[1]) : null};
+    })''')
+    expected = sorted((str(e['info']['slitmCd']), int(e['qty'])) for e in items)
+    observed = sorted((str(r['code']), r['qty'] if r['qty'] is not None else -1) for r in actual)
+    if observed != expected:
+        raise RuntimeError(f"카트 상품/수량 불일치: expected={expected}, actual={observed}")
+    print(f"  ✓ #{idx} 상품코드·수량 재조회 검증 {observed}")
     print(f"  ✓ #{idx} {account['id']} 담기 {success}/{len(items)}")
     return (success, len(items), True, None)   # 탭 재사용 — close 안 함(포커스 강탈 방지)
 
