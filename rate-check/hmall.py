@@ -241,7 +241,6 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
 
     # 3) cart → 일반상품 체크 → 구매하기
     page.goto(CART_URL, wait_until="domcontentloaded")
-    page.wait_for_timeout(1500)
 
     # ★담긴 줄 수 검증 (2026-09-02 실사고). `add_to_cart` 의 True 는 **버튼을 눌렀다**는 뜻이지
     #   담겼다는 뜻이 아니다 — 조합 26 에서 `n` 1순위 후보가 `[OK]` 를 찍고도 실제로는 안 담겼고,
@@ -250,7 +249,23 @@ def process_combo(page, idx: int, combo: list[tuple[str, int]],
     #   만든다 = 조용히 잘못된 상품을 사게 되는 값이다. 그래서 경고가 아니라 **중단**이다.
     #   (buy/sulwhasoo.py 가 같은 이유로 이미 담기 검증을 하고 있었다 — 여기만 빠져 있었다.)
     _want = len(combo)                       # 조합의 SKU 종류 수 = 카트 줄 수
-    _got = cart_items(page)
+    # ★2026-09-08: 현대몰 카트가 DOM 로드 뒤 비동기로 늦게 그려지는 경우가 있다.
+    #   고정 1.5초 뒤 한 번만 읽으면 정상적으로 담긴 카트도 0줄로 오판한다.
+    #   최대 12초 기다리고, 그래도 불일치하면 한 번 새로고침해 다시 확인한다.
+    #   끝까지 정확히 일치하지 않을 때만 기존처럼 fail-closed 한다.
+    _got = []
+    for _attempt in range(12):
+        page.wait_for_timeout(1000)
+        _got = cart_items(page)
+        if len(_got) == _want:
+            break
+    if len(_got) != _want:
+        page.reload(wait_until="domcontentloaded")
+        for _attempt in range(8):
+            page.wait_for_timeout(1000)
+            _got = cart_items(page)
+            if len(_got) == _want:
+                break
     if len(_got) != _want:
         return {"idx": idx,
                 "error": f"카트 검증 실패 — {len(_got)}줄 (기대 {_want}줄). 담긴 것: {_got}. "

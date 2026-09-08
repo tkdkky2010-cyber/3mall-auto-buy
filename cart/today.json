@@ -1,5 +1,5 @@
 {
-  "date": "2026-09-07",
+  "date": "2026-09-08",
   "account_used": "tkdkky2002",
   "products": [
     {
@@ -271,28 +271,28 @@
         "member_price": 102240,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 97,128원",
-            "percent": 5,
-            "price": 97128
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 95,084원",
+            "percent": 7,
+            "price": 95084
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 97,128원",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 97,128원",
             "percent": 5,
             "price": 97128
           }
         ],
-        "kakao_price": 102240,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 92240,
+        "kakao_price": 95084,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": 95084,
         "paybacks": {
-          "삼성카드": {
+          "비씨카드": {
             "immediate_price": 97128,
-            "payback_pct": 1.0,
-            "after_payback": 96157,
+            "payback_pct": 1.5,
+            "after_payback": 95671,
             "reward_pt": 0,
-            "final_cost": 96157
+            "final_cost": 95671
           }
         },
         "optimal_tier": {
@@ -436,28 +436,28 @@
         "member_price": 161820,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 153,729원",
-            "percent": 5,
-            "price": 153729
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 150,493원",
+            "percent": 7,
+            "price": 150493
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 153,729원",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 153,729원",
             "percent": 5,
             "price": 153729
           }
         ],
-        "kakao_price": 161820,
+        "kakao_price": 150493,
         "kakao_reward_pt": 10000,
-        "kakao_final_cost": 151820,
+        "kakao_final_cost": 140493,
         "paybacks": {
-          "삼성카드": {
+          "비씨카드": {
             "immediate_price": 153729,
-            "payback_pct": 1.0,
-            "after_payback": 152192,
+            "payback_pct": 1.5,
+            "after_payback": 151423,
             "reward_pt": 10000,
-            "final_cost": 142192
+            "final_cost": 141423
           }
         },
         "optimal_tier": {
@@ -581,28 +581,28 @@
         "member_price": 159300,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 137,085원",
-            "percent": 5,
-            "price": 137085
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 134,199원",
+            "percent": 7,
+            "price": 134199
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 137,085원",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 137,085원",
             "percent": 5,
             "price": 137085
           }
         ],
-        "kakao_price": 159300,
+        "kakao_price": 134199,
         "kakao_reward_pt": 10000,
-        "kakao_final_cost": 149300,
+        "kakao_final_cost": 124199,
         "paybacks": {
-          "삼성카드": {
+          "비씨카드": {
             "immediate_price": 137085,
-            "payback_pct": 1.0,
-            "after_payback": 135714,
+            "payback_pct": 1.5,
+            "after_payback": 135029,
             "reward_pt": 10000,
-            "final_cost": 125714
+            "final_cost": 125029
           }
         },
         "optimal_tier": {
@@ -870,28 +870,28 @@
         "member_price": 131920,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 125,324원",
-            "percent": 5,
-            "price": 125324
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 122,686원",
+            "percent": 7,
+            "price": 122686
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 125,324원",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 125,324원",
             "percent": 5,
             "price": 125324
           }
         ],
-        "kakao_price": 131920,
+        "kakao_price": 122686,
         "kakao_reward_pt": 10000,
-        "kakao_final_cost": 121920,
+        "kakao_final_cost": 112686,
         "paybacks": {
-          "삼성카드": {
+          "비씨카드": {
             "immediate_price": 125324,
-            "payback_pct": 1.0,
-            "after_payback": 124071,
+            "payback_pct": 1.5,
+            "after_payback": 123444,
             "reward_pt": 10000,
-            "final_cost": 114071
+            "final_cost": 113444
           }
         },
         "optimal_tier": {
@@ -1040,28 +1040,28 @@
         "member_price": 262400,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 235,030원",
-            "percent": 5,
-            "price": 235030
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 230,082원",
+            "percent": 7,
+            "price": 230082
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 235,030원",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 235,030원",
             "percent": 5,
             "price": 235030
           }
         ],
-        "kakao_price": 262400,
+        "kakao_price": 230082,
         "kakao_reward_pt": 20000,
-        "kakao_final_cost": 242400,
+        "kakao_final_cost": 210082,
         "paybacks": {
-          "삼성카드": {
+          "비씨카드": {
             "immediate_price": 235030,
-            "payback_pct": 1.0,
-            "after_payback": 232680,
+            "payback_pct": 1.5,
+            "after_payback": 231505,
             "reward_pt": 20000,
-            "final_cost": 212680
+            "final_cost": 211505
           }
         },
         "optimal_tier": {
@@ -1346,28 +1346,28 @@
         "member_price": 95840,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 81,944원",
-            "percent": 5,
-            "price": 81944
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 80,219원",
+            "percent": 7,
+            "price": 80219
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 81,944원",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 81,944원",
             "percent": 5,
             "price": 81944
           }
         ],
-        "kakao_price": 95840,
+        "kakao_price": 80219,
         "kakao_reward_pt": 0,
-        "kakao_final_cost": 95840,
+        "kakao_final_cost": 80219,
         "paybacks": {
-          "삼성카드": {
+          "비씨카드": {
             "immediate_price": 81944,
-            "payback_pct": 1.0,
-            "after_payback": 81125,
+            "payback_pct": 1.5,
+            "after_payback": 80715,
             "reward_pt": 0,
-            "final_cost": 81125
+            "final_cost": 80715
           }
         },
         "optimal_tier": {
@@ -1481,32 +1481,32 @@
       "simple_ranges": [],
       "payment": {
         "qty": 2,
-        "list_price": 147420,
-        "member_price": 132680,
+        "list_price": 139800,
+        "member_price": 111840,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 126,045원",
-            "percent": 5,
-            "price": 126045
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 104,012원",
+            "percent": 7,
+            "price": 104012
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 126,045원",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 106,248원",
             "percent": 5,
-            "price": 126045
+            "price": 106248
           }
         ],
-        "kakao_price": 132680,
+        "kakao_price": 104012,
         "kakao_reward_pt": 10000,
-        "kakao_final_cost": 122680,
+        "kakao_final_cost": 94012,
         "paybacks": {
-          "삼성카드": {
-            "immediate_price": 126045,
-            "payback_pct": 1.0,
-            "after_payback": 124785,
+          "비씨카드": {
+            "immediate_price": 106248,
+            "payback_pct": 1.5,
+            "after_payback": 104654,
             "reward_pt": 10000,
-            "final_cost": 114785
+            "final_cost": 94654
           }
         },
         "optimal_tier": {
@@ -1514,23 +1514,23 @@
           "tier_min": 100000,
           "tier_reward": 10000,
           "nominal_pct": 10.0,
-          "actual_total": 132680,
+          "actual_total": 111840,
           "actual_reward": 10000,
-          "effective_pct": 7.5369309617123905
+          "effective_pct": 8.94134477825465
         },
         "effective_ten_percent": true,
         "error": null,
-        "benefit_unit_price": 66340,
+        "benefit_unit_price": 55920,
         "options": [
           {
             "idx": 1,
             "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 9박스 (총 27개월분)",
-            "list_price": 73710
+            "list_price": 69900
           },
           {
             "idx": 2,
             "name": "올바른 와이 케어 프로바이오틱스 VL8 아연 셀레늄 90캡슐 6박스 (총 18개월분)",
-            "list_price": 53910
+            "list_price": 49900
           }
         ]
       }
@@ -1635,28 +1635,28 @@
         "member_price": 110240,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 94,256원",
-            "percent": 5,
-            "price": 94256
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 92,271원",
+            "percent": 7,
+            "price": 92271
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 94,256원",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 94,256원",
             "percent": 5,
             "price": 94256
           }
         ],
-        "kakao_price": 110240,
-        "kakao_reward_pt": 10000,
-        "kakao_final_cost": 100240,
+        "kakao_price": 92271,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": 92271,
         "paybacks": {
-          "삼성카드": {
+          "비씨카드": {
             "immediate_price": 94256,
-            "payback_pct": 1.0,
-            "after_payback": 93313,
+            "payback_pct": 1.5,
+            "after_payback": 92842,
             "reward_pt": 0,
-            "final_cost": 93313
+            "final_cost": 92842
           }
         },
         "optimal_tier": {
@@ -1787,28 +1787,28 @@
         "member_price": 118840,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 112,889원",
-            "percent": 5,
-            "price": 112889
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 110,512원",
+            "percent": 7,
+            "price": 110512
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 112,889원",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 112,889원",
             "percent": 5,
             "price": 112889
           }
         ],
-        "kakao_price": 118840,
+        "kakao_price": 110512,
         "kakao_reward_pt": 10000,
-        "kakao_final_cost": 108840,
+        "kakao_final_cost": 100512,
         "paybacks": {
-          "삼성카드": {
+          "비씨카드": {
             "immediate_price": 112889,
-            "payback_pct": 1.0,
-            "after_payback": 111760,
+            "payback_pct": 1.5,
+            "after_payback": 111196,
             "reward_pt": 10000,
-            "final_cost": 101760
+            "final_cost": 101196
           }
         },
         "optimal_tier": {
@@ -1933,34 +1933,13 @@
       "simple_ranges": [],
       "payment": {
         "qty": 1,
-        "list_price": 248000,
-        "member_price": 210800,
-        "card_slides": [
-          {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 186,010원",
-            "percent": 5,
-            "price": 186010
-          },
-          {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 186,010원",
-            "percent": 5,
-            "price": 186010
-          }
-        ],
-        "kakao_price": 210800,
-        "kakao_reward_pt": 20000,
-        "kakao_final_cost": 190800,
-        "paybacks": {
-          "삼성카드": {
-            "immediate_price": 186010,
-            "payback_pct": 1.0,
-            "after_payback": 184150,
-            "reward_pt": 10000,
-            "final_cost": 174150
-          }
-        },
+        "list_price": null,
+        "member_price": null,
+        "card_slides": [],
+        "kakao_price": null,
+        "kakao_reward_pt": 0,
+        "kakao_final_cost": null,
+        "paybacks": {},
         "optimal_tier": {
           "qty": 1,
           "tier_min": 100000,
@@ -1971,7 +1950,7 @@
           "effective_pct": 9.487666034155598
         },
         "effective_ten_percent": true,
-        "error": null,
+        "error": "바로구매 실패",
         "benefit_unit_price": 210800,
         "options": []
       }
@@ -2076,28 +2055,28 @@
         "member_price": 165600,
         "card_slides": [
           {
-            "alt": "cardCd02",
-            "text": "삼성 5% 즉시할인 143,070원",
-            "percent": 5,
-            "price": 143070
+            "alt": "cardCd04",
+            "text": "카카오페이 현대 7% 즉시할인 140,058원",
+            "percent": 7,
+            "price": 140058
           },
           {
-            "alt": "cardCd40",
-            "text": "NH 5% 즉시할인 143,070원",
+            "alt": "cardCd01",
+            "text": "비씨 5% 즉시할인 143,070원",
             "percent": 5,
             "price": 143070
           }
         ],
-        "kakao_price": 165600,
+        "kakao_price": 140058,
         "kakao_reward_pt": 10000,
-        "kakao_final_cost": 155600,
+        "kakao_final_cost": 130058,
         "paybacks": {
-          "삼성카드": {
+          "비씨카드": {
             "immediate_price": 143070,
-            "payback_pct": 1.0,
-            "after_payback": 141639,
+            "payback_pct": 1.5,
+            "after_payback": 140924,
             "reward_pt": 10000,
-            "final_cost": 131639
+            "final_cost": 130924
           }
         },
         "optimal_tier": {
