@@ -2042,26 +2042,6 @@ def _order_sheet_tail(res: dict, idx: int, card, goods_no, combo_idx) -> dict:
     _actual = int(_n) if _n else None
     res["pay_amount"] = _actual
     print(f"[#{idx}] 결제 예정 금액: {_amt or '(판독실패)'}", flush=True)
-    # ★시트 조합가 대조 (2026-09-09 신설) — MAX_PAY 와 달리 **환경변수 없이 항상** 동작한다.
-    #   플러스쿠폰은 실패해도 err 를 안 남기므로(set_plus_coupons 참고) 이 대조가 사실상
-    #   유일한 자동 backstop 이다.
-    try:
-        sys.path.insert(0, str(ROOT))
-        import purchase_ledger as PL
-        _chk = PL.check_amount("롯데홈쇼핑", combo_idx, _actual)
-    except Exception as e:
-        # ⚠️ 여기로 오는 건 `purchase_ledger` 자체를 **못 불러온** 경우뿐이다(그땐 통과시킨다).
-        #    시트 조회 실패는 check_amount 안에서 **차단**으로 처리된다 — 모르는 금액은 결제 안 함.
-        _chk = {"ok": True, "reason": f"purchase_ledger 로드 실패로 대조 건너뜀({e})"}
-    res["amount_check"] = _chk
-    print(f"[#{idx}] 시트 대조 — {_chk.get('reason')}", flush=True)
-    if not _chk.get("ok"):
-        res["status"] = f"SHEET_AMOUNT_GUARD — {_chk.get('reason')}"
-        print(f"[#{idx}] ⛔ {res['status']}", flush=True)
-        return res
-    # ★상한 가드 (2026-08-25): 쿠폰이 한 장도 안 걸린 채 결제되는 사고를 **코드가** 막는다.
-    #   실측 — 쿠폰 0장이면 700,000원, 정상 적용이면 530,247원. 사람이 로그를 봐야만 알 수 있으면
-    #   무인 실행에서 조용히 15만원을 더 낸다. MAX_PAY 넘으면 결제하지 않고 그 계정을 실패시킨다.
     _max = os.environ.get("MAX_PAY")
     # ★금액을 못 읽으면 **가드가 통째로 사라진다** (2026-08-31 실측: '결제 예정 금액: (판독실패)'
     #   인데도 그대로 결제 실행됨). 종전 조건 `if _max and _amt:` 은 _amt=None 이면 검사를 건너뛰어

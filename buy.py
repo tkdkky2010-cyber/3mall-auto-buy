@@ -108,9 +108,9 @@ def pay_hmall(cart: dict) -> tuple[bool, str]:
         timeout=900, extra_env={"HMALL_CDP_PORT": str(_free_port())},
     )
     if timed:
-        return False, out[-800:] + "\n⚠️ 타임아웃 — 폰에서 주문 완료됐을 수 있음, 수동확인 필요(중복결제 주의)"
+        return False, out[-4000:] + "\n⚠️ 타임아웃 — 폰에서 주문 완료됐을 수 있음, 수동확인 필요(중복결제 주의)"
     ok = (rc == 0) and (("=> DONE" in out) or ("SKIP_EMPTY" in out))
-    return ok, out[-800:]
+    return ok, out[-4000:]
 
 
 def pay_lotte(cart: dict) -> tuple[bool, str]:
@@ -123,9 +123,9 @@ def pay_lotte(cart: dict) -> tuple[bool, str]:
         args.append(f"combo={cart['combo']}")
     rc, out, timed = _run(args, timeout=900)
     if timed:
-        return False, out[-800:] + "\n⚠️ 타임아웃 — 수동확인 필요"
+        return False, out[-4000:] + "\n⚠️ 타임아웃 — 수동확인 필요"
     ok = (rc == 0) and ("DONE(주문" in out)
-    return ok, out[-800:]
+    return ok, out[-4000:]
 
 
 def pay_galleria(cart: dict) -> tuple[bool, str]:
@@ -137,9 +137,9 @@ def pay_galleria(cart: dict) -> tuple[bool, str]:
         timeout=600,
     )
     if timed:
-        return False, out[-800:] + "\n⚠️ 타임아웃 — 수동확인 필요"
+        return False, out[-4000:] + "\n⚠️ 타임아웃 — 수동확인 필요"
     ok = (rc == 0) and ("결제 진행 완료" in out)
-    return ok, out[-800:]
+    return ok, out[-4000:]
 
 
 TODAY_JSON = ROOT / "cart" / "today.json"
