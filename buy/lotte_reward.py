@@ -167,10 +167,110 @@ def claim(page, goods_no: str) -> dict:
     return out
 
 
+def check(page, goods_no: str) -> dict:
+    """★확인 전용 — 아무것도 누르지 않는다 (사용자 지시 2026-09-09: "신청완료 확인은 CFT로,
+    적립은 폰으로"). 상품상세의 '최대 N% 적립' 카드를 **전부** 열어보고, 각 행사페이지의
+    '나의 적립현황' 문구와 버튼 상태(신청완료/신청하기)를 그대로 돌려준다.
+
+    claim() 과 달리 첫 후보만 보지 않는다 — 상품상세엔 무관한 행사가 같이 걸려 있어서
+    첫 카드가 그 주문의 행사가 아닐 수 있다(2026-09-09 실측: 20% 광세일 vs 10% 아모레)."""
+    out = {"goods_no": goods_no, "events": []}
+    ignore = _ignore_keywords()
+    url = f"https://www.lotteimall.com/goods/viewGoodsDetail.lotte?goods_no={goods_no}"
+    page.goto(url, wait_until="domcontentloaded", timeout=20000)
+    page.wait_for_timeout(2500)
+    try:
+        S.dismiss_popup(page)
+    except Exception:
+        pass
+    cands = []
+    for el in page.locator("a, button").all():
+        try:
+            t = (el.inner_text(timeout=600) or "").strip()
+        except Exception:
+            continue
+        if not t or not REWARD_PAT.search(t.replace("\n", " ")):
+            continue
+        if any(k in t for k in ignore):
+            continue
+        cands.append((" ".join(t.split())[:40], el))
+    out["candidates"] = [t for t, _ in cands]
+    if not cands:
+        out["err"] = "'최대 N%/N만 적립' 카드 미발견"
+        return out
+    for text, el in cands:
+        ev = page
+        try:
+            with page.context.expect_page(timeout=4000) as pop:
+                el.click(timeout=5000)
+            ev = pop.value
+            ev.wait_for_load_state("domcontentloaded", timeout=15000)
+        except Exception:
+            page.wait_for_timeout(2500)
+        ev.wait_for_timeout(1500)
+        try:
+            body = " ".join((ev.inner_text("body", timeout=8000) or "").split())
+        except Exception:
+            body = ""
+        st = {"card": text}
+        m = re.search(r"([\d,]+원 구매)", body)
+        st["구매"] = m.group(1) if m else None
+        m = re.search(r"(적립금\s*[\d,]+\s*원\s*적립가능)", body)
+        st["적립"] = " ".join(m.group(1).split()) if m else None
+        m = re.search(r"([\d,]+원 남았어요)", body)
+        st["남음"] = m.group(1) if m else None
+        st["신청완료"] = "신청완료" in body
+        st["신청하기"] = ("혜택 신청하기" in body) and not st["신청완료"]
+        st["최대달성"] = "최대 혜택을 달성" in body
+        out["events"].append(st)
+        if ev is not page:
+            try:
+                ev.close()
+            except Exception:
+                pass
+        else:
+            # go_back 은 롯데 행사페이지에서 domcontentloaded 를 못 잡고 타임아웃한다(2026-09-09 실측).
+            # 상품 URL 로 다시 들어가는 편이 확실하다.
+            page.goto(url, wait_until="domcontentloaded", timeout=20000)
+            page.wait_for_timeout(2000)
+    done = [e for e in out["events"] if e["신청완료"]]
+    open_ = [e for e in out["events"] if e["신청하기"]]
+    out["verdict"] = ("신청완료" if done else ("미신청(신청가능)" if open_ else "대상행사 없음"))
+    out["ok"] = bool(done)
+    return out
+
+
 def main() -> int:
     if len(sys.argv) < 2:
-        print("사용: python buy/lotte_reward.py <account_idx> [goods_no]")
+        print("사용: python buy/lotte_reward.py [check] <account_idx> [account_idx...] [goods_no]")
         return 2
+    if sys.argv[1] == "check":
+        args = sys.argv[2:]
+        idxs = [int(x) for x in args if x.isdigit() and len(x) <= 3]
+        goods = next((x for x in args if x.isdigit() and len(x) > 3), None) or _default_goods_no()
+        accounts = S.load_json(S.LOTTE_ACCOUNTS)["accounts"]
+        port = S.resolve_cdp_port(int(S.CDP_PORT))
+        rows = []
+        with sync_playwright() as p:
+            browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+            ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+            for i in idxs:
+                acc = accounts[i - 1]
+                usable = [pg for pg in ctx.pages
+                          if not pg.is_closed() and S.LOTTE_PW_CAMPAIGN_URL not in (pg.url or "")]
+                page = usable[-1] if usable else ctx.new_page()
+                page.goto(S.LOTTE_HOME, wait_until="domcontentloaded", timeout=20000)
+                page.wait_for_timeout(1500)
+                if not S.lotte_login(page, acc["id"], acc["pw"]):
+                    rows.append({"idx": i, "id": acc["id"], "verdict": "LOGIN_FAIL"}); continue
+                r = check(page, goods)
+                r.update({"idx": i, "id": acc["id"]})
+                rows.append(r)
+                print(f"[#{i} {acc['id']}] {r.get('verdict')} — {r.get('events')}", flush=True)
+        print("\n===== CFT 확인 요약 =====")
+        for r in rows:
+            print(f"  #{r['idx']} {r['id']}: {r.get('verdict')}")
+        return 0
     idx = int(sys.argv[1])
     goods_no = sys.argv[2] if len(sys.argv) > 2 else _default_goods_no()
 

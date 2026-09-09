@@ -1946,7 +1946,11 @@ def claim_lotte_reward(goods_no: str | None = None) -> dict:    # (search_term �
                 cands.append((int(m.group(1)), it))
         if cands:
             cands.sort(key=lambda x: x[0], reverse=True)     # 큰 수치부터 시도
-            picks = [c[1] for c in cands]; break
+            seen, picks = set(), []                          # OCR+dump 가 같은 카드를 두 번 준다
+            for _n, it in cands:
+                if it["text"] not in seen:
+                    seen.add(it["text"]); picks.append(it)
+            break
         _adb().swipe(540, 1500, 540, 900, 450); time.sleep(0.9)
     else:
         picks = []
@@ -1993,12 +1997,18 @@ def claim_lotte_reward(goods_no: str | None = None) -> dict:    # (search_term �
         if not txt:
             print(f"   [reward] 후보{pi} '{cand['text']}' — 적립현황 미발견(스크롤 10회) → 다음", flush=True)
             _adb().back(); time.sleep(2.0); continue
+        # ★2026-09-10 정정 — 판정은 **버튼 문구**로 한다.
+        #   종전엔 `남았어요`/`0원 구매` 로 '대상 아님' 을 갈랐는데, 그 문구가 화면 어딘가에 섞이면
+        #   **신청 가능한 건까지 대상 아님으로 버렸다.** #10(kim455307)이 그렇게 걸렸다 —
+        #   같은 화면에 `혜택 신청하기` 버튼이 멀쩡히 살아 있었고, 손으로 누르니 그대로 신청됐다
+        #   (주문 2026-09-09-K55787 / 아모레 10% / 10,000원). 적립이 조용히 새는 오탐이라 위험하다.
+        #   버튼은 사이트가 직접 내는 상태값이다: '혜택 신청완료'(비활성) / '혜택 신청하기'(가능).
         if "신청완료" in txt:
             out["card"] = cand["text"]; out["already"] = True; out["ok"] = True
             print(f"   [reward] 후보{pi} '{cand['text']}' — 이미 신청완료", flush=True)
             return out
-        if ("남았어요" in txt) or ("0원 구매" in txt):
-            print(f"   [reward] 후보{pi} '{cand['text']}' — 이 주문은 대상 아님(적립 미달) → 다음", flush=True)
+        if "신청하기" not in txt:
+            print(f"   [reward] 후보{pi} '{cand['text']}' — 신청 버튼 없음(대상 아님) → 다음", flush=True)
             _adb().back(); time.sleep(2.0); continue
         card = cand
         print(f"   [reward] 후보{pi} '{cand['text']}' — ★대상 확인 → 신청 진행", flush=True)
