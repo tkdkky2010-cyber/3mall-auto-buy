@@ -1047,6 +1047,19 @@ def set_cash_receipt(points_used: int = 0) -> dict:
     #   `㉧ 소득공제` 가 그대로 남고 '휴대폰번호' 칸이 유지된다 → 사업자 라벨이 아예 안 생겨
     #   '사업자 등록번호 라벨 미발견' 으로 끝났다). 라디오 원은 라벨 **왼쪽**에 있다
     #   (실측: 라벨 cx=733 / 라디오 cx=624 → 약 -109). 누른 뒤 **'사업자' 등장으로 검증**한다.
+    # ★★ 안내 모달을 먼저 닫는다 (2026-09-09 #12 실사고).
+    #    카드 선택 직후 "현금영수증 발급이 가능합니다. / 발급방식을 선택해 주세요. [확인]" 모달이
+    #    화면을 덮는다. 안 닫으면 아래 라디오 탭이 전부 **딤 오버레이에 맞아** 아무 일도 안 일어나고
+    #    '지출증빙 라디오 선택 실패(사업자 라벨 미등장)' 로 끝난다 — 결제 직전에서 통째로 멈춘다.
+    #    (#12 leenamsu0318: 쿠폰·카드 다 정상, 512,685원 결제 직전이었는데 이 팝업 하나로 미결제.)
+    def _dismiss_cash_notice() -> bool:
+        if not (screen_has("발급방식") or screen_has("현금영수증 발급이")):
+            return False
+        ok = ocr_or_dump_tap("확인", retries=2)
+        print(f"   [현금영수증] 안내 모달 닫기 {'✓' if ok else '✗'}", flush=True)
+        nap(1.2)
+        return ok
+    _dismiss_cash_notice()
     lab = _find_text("지출증빙")
     if not lab:
         out["skip"] = "지출증빙 비활성"; out["ok"] = True; return out
@@ -1054,6 +1067,7 @@ def set_cash_receipt(points_used: int = 0) -> dict:
         _adb().tap(lab["cx"] + dx, lab["cy"]); nap(1.5)
         if _find_text("사업자") or _find_text("등록번호"):
             break
+        _dismiss_cash_notice()                 # 탭 중에 다시 뜨는 경우도 있다
         lab = _find_text("지출증빙") or lab
     else:
         out["err"] = "지출증빙 라디오 선택 실패(사업자 라벨 미등장)"; return out
