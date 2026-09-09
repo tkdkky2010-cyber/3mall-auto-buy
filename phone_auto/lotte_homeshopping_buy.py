@@ -1981,7 +1981,21 @@ def _from_order_sheet(res: dict, idx: int, card: str | None = None,
     if res["dc"].get("applied", 0) == 0 and res["dc"].get("err"):
         print(f"[#{idx}] 할인쿠폰 0장({res['dc']['err']}) → 재시도", flush=True)
         res["dc"] = set_discount_coupons()
+    # ★재시도까지 실패하면 **결제하지 않는다** (2026-09-09 신설).
+    #   종전엔 그대로 결제로 넘어가서, 쿠폰 누락분을 MAX_PAY 를 켠 날에만 막을 수 있었다.
+    #   `err` 는 '보유 N장인데 0장 적용' 처럼 **적용됐어야 하는데 안 된** 경우에만 붙는다 —
+    #   쿠폰이 아예 없는 날(avail=0)은 err 가 없으므로 여기서 안 걸린다.
+    if res["dc"].get("applied", 0) == 0 and res["dc"].get("err"):
+        res["status"] = (f"COUPON_FAIL:{res['dc']['err']} — 재시도 후에도 할인쿠폰 0장. "
+                         f"그대로 결제하면 그만큼 비싸진다. 결제 안 함")
+        print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+        return res
     res["pc"] = set_plus_coupons()
+    # ⚠️ `set_plus_coupons` 는 **err 를 한 번도 세팅하지 않는다** — 실패해도 `ok:True`,
+    #    '받은 쿠폰 X' 로 skip 될 뿐이라 "정말 쿠폰이 없는 날" 과 구분되지 않는다.
+    #    그래서 아래 재시도 조건은 사실상 발동하지 않고, 플러스쿠폰 누락의 실질적 backstop 은
+    #    _order_sheet_tail 의 **시트 조합가 대조**다. (2026-08-28 #5: 26장 보유인데 skip 돼
+    #    627,197원(정상 543,xxx)에 결제될 뻔했다 — 그때도 금액 가드가 막았다.)
     if res["pc"].get("applied", 0) == 0 and res["pc"].get("err"):
         print(f"[#{idx}] 플러스쿠폰 0장({res['pc']['err']}) → 재시도", flush=True)
         res["pc"] = set_plus_coupons()
@@ -2023,7 +2037,28 @@ def _order_sheet_tail(res: dict, idx: int, card, goods_no, combo_idx) -> dict:
     _amt = next((it["text"] for it in _ocr_texts(cap())
                  if "결제하기" in it["text"] and it["cy"] > 2000), None)
     res["amount_text"] = _amt
+    # 숫자 1회만 뽑아 아래 두 가드가 같이 쓴다 (종전엔 MAX_PAY 블록 안에서 따로 파싱했다).
+    _n = re.sub(r"[^0-9]", "", _amt.split("원")[0]) if _amt else ""
+    _actual = int(_n) if _n else None
+    res["pay_amount"] = _actual
     print(f"[#{idx}] 결제 예정 금액: {_amt or '(판독실패)'}", flush=True)
+    # ★시트 조합가 대조 (2026-09-09 신설) — MAX_PAY 와 달리 **환경변수 없이 항상** 동작한다.
+    #   플러스쿠폰은 실패해도 err 를 안 남기므로(set_plus_coupons 참고) 이 대조가 사실상
+    #   유일한 자동 backstop 이다.
+    try:
+        sys.path.insert(0, str(ROOT))
+        import purchase_ledger as PL
+        _chk = PL.check_amount("롯데홈쇼핑", combo_idx, _actual)
+    except Exception as e:
+        # ⚠️ 여기로 오는 건 `purchase_ledger` 자체를 **못 불러온** 경우뿐이다(그땐 통과시킨다).
+        #    시트 조회 실패는 check_amount 안에서 **차단**으로 처리된다 — 모르는 금액은 결제 안 함.
+        _chk = {"ok": True, "reason": f"purchase_ledger 로드 실패로 대조 건너뜀({e})"}
+    res["amount_check"] = _chk
+    print(f"[#{idx}] 시트 대조 — {_chk.get('reason')}", flush=True)
+    if not _chk.get("ok"):
+        res["status"] = f"SHEET_AMOUNT_GUARD — {_chk.get('reason')}"
+        print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+        return res
     # ★상한 가드 (2026-08-25): 쿠폰이 한 장도 안 걸린 채 결제되는 사고를 **코드가** 막는다.
     #   실측 — 쿠폰 0장이면 700,000원, 정상 적용이면 530,247원. 사람이 로그를 봐야만 알 수 있으면
     #   무인 실행에서 조용히 15만원을 더 낸다. MAX_PAY 넘으면 결제하지 않고 그 계정을 실패시킨다.
@@ -2037,12 +2072,10 @@ def _order_sheet_tail(res: dict, idx: int, card, goods_no, combo_idx) -> dict:
                          "무력화되므로 결제하지 않는다")
         print(f"[#{idx}] ⛔ {res['status']}", flush=True)
         return res
-    if _max and _amt:
-        _n = re.sub(r"[^0-9]", "", _amt.split("원")[0])
-        if _n and int(_n) > int(_max):
-            res["status"] = f"AMOUNT_TOO_HIGH({_n} > MAX_PAY {_max}) — 혜택 미적용 의심, 결제 안 함"
-            print(f"[#{idx}] ⛔ {res['status']}", flush=True)
-            return res
+    if _max and _actual is not None and _actual > int(_max):
+        res["status"] = f"AMOUNT_TOO_HIGH({_actual} > MAX_PAY {_max}) — 혜택 미적용 의심, 결제 안 함"
+        print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+        return res
     if os.environ.get("STOP_BEFORE_PAY") == "1":
         # 검증용 — 주문서까지만 만들고 결제 직전에 멈춘다(실돈 안 나감). 쿠폰/금액 확인에 쓴다.
         res["status"] = f"STOP_BEFORE_PAY(금액={_amt})"

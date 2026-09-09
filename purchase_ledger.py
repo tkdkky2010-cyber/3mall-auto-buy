@@ -12,6 +12,7 @@
 from __future__ import annotations
 from pathlib import Path
 import json
+import os
 import time
 
 ROOT = Path(__file__).resolve().parent
@@ -74,6 +75,59 @@ def combo_info(mall: str, combo_idx, *, tab=None) -> tuple:
             nm = row[name_col].strip() if name_col < len(row) else ""
             return (nm or None, int(amt) if amt.lstrip("-").isdigit() else None)
     return (None, None)
+
+
+# ════════════════════════════════════════════════════════════════
+#  결제 직전 금액 가드 (2026-09-09 신설)
+# ════════════════════════════════════════════════════════════════
+#  기준 = rate 시트 오늘 탭의 그 조합 **'최종구매가'**(쿠폰 적용 후 결제금액).
+#
+#  ★상한 **한 방향만** 본다 — 적립금·L.POINT·H.Point 사용은 실제 결제액을 **낮추기만** 하므로
+#    "예상보다 낮다"는 정상이다. 막아야 하는 건 "예상보다 높다"(= 혜택이 안 걸렸다) 뿐이다.
+#
+#  왜 만들었나: 종전 가드(`MAX_PAY`)는 **환경변수를 켜야만** 동작했다. 사람이 그날 안 켜면
+#    쿠폰 0장이 조용히 정가로 결제된다 — 2026-08-25 602,000원(정상 541,800) /
+#    2026-08-26 606,181원(정상 545,000대). 두 번 다 "MAX_PAY 가 막았다"고 기록돼 있지만
+#    그건 **그날 사람이 켰기 때문**이고, 코드가 막은 게 아니다.
+#    정답(시트 조합가)은 이미 이 파일 안에 있었는데 **결제가 끝난 뒤 대장 기록에만** 쓰고 있었다.
+#
+#  ⚠️ `combo_info` 가 시트를 네트워크로 읽는다(계정당 1회, 결제 직전). 조회 실패도 **차단**이다 —
+#     "모르는 금액은 결제하지 않는다"(기존 MAX_PAY 의 AMOUNT_UNREADABLE 과 같은 원칙).
+TOLERANCE_PCT = float(os.environ.get("AMOUNT_TOLERANCE_PCT", "3"))
+
+
+def check_amount(mall: str, combo_idx, actual: int | None, *, tab=None) -> dict:
+    """결제 직전 금액 검증 → `{"ok", "expected", "limit", "reason"}`. **ok=False 면 결제하지 않는다.**
+
+    - `SKIP_SHEET_GUARD=1`  → 검사 안 함 (탈출구; 시트가 없는 날 수동 진행용).
+    - `combo_idx is None`   → 검사 안 함. 식품은 시트에 조합가가 없다.
+    - 시트값 없음 / 금액 판독 실패 → **차단**.
+    - `AMOUNT_TOLERANCE_PCT` (기본 3) 로 허용 오차 조정.
+    """
+    if os.environ.get("SKIP_SHEET_GUARD") == "1":
+        return {"ok": True, "expected": None, "limit": None,
+                "reason": "SKIP_SHEET_GUARD=1 — 시트 대조 해제됨"}
+    if combo_idx is None:
+        return {"ok": True, "expected": None, "limit": None,
+                "reason": "조합 미지정(식품) — 시트 대조 대상 아님"}
+    _, expected = combo_info(mall, combo_idx, tab=tab)
+    if not expected:
+        return {"ok": False, "expected": None, "limit": None,
+                "reason": (f"시트에서 조합{combo_idx} 최종구매가를 못 읽었다 "
+                           f"(오늘 탭 없음 / Step1 미실행 / 조회 실패). 모르는 금액은 결제하지 않는다. "
+                           f"확인 후 강행하려면 SKIP_SHEET_GUARD=1")}
+    limit = round(expected * (1 + TOLERANCE_PCT / 100))
+    if actual is None:
+        return {"ok": False, "expected": expected, "limit": limit,
+                "reason": (f"결제 예정 금액 판독 실패 (시트 기대 {expected:,}원). "
+                           f"모르는 금액은 결제하지 않는다")}
+    if actual > limit:
+        return {"ok": False, "expected": expected, "limit": limit,
+                "reason": (f"실제 {actual:,}원 > 한도 {limit:,}원 "
+                           f"(시트 조합{combo_idx} {expected:,}원 +{TOLERANCE_PCT:g}%) — 혜택 미적용 의심")}
+    return {"ok": True, "expected": expected, "limit": limit,
+            "reason": (f"시트 조합{combo_idx} {expected:,}원 / 한도 {limit:,}원 "
+                       f"vs 실제 {actual:,}원 — 통과")}
 
 
 def food_info(product_id) -> tuple:

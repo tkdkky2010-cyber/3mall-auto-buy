@@ -1928,6 +1928,22 @@ def money_guard(idx: int, res: dict) -> bool:
     res["pay_amount"] = res["amount"] = amt
     print(f"[#{idx}] 결제 예정 금액: {amt:,}원" if amt is not None
           else f"[#{idx}] ⚠️ 결제 예정 금액 판독 실패", flush=True)
+    # ★시트 조합가 대조 (2026-09-09 신설) — MAX_PAY 와 달리 **환경변수 없이 항상** 동작한다.
+    #   combo_idx 는 buy_one 이 res 에 넣어 둔다. ⚠️ `resume` 은 조합을 모르므로(res 에 없음)
+    #   이 대조가 건너뛰어진다 — 그 경로는 여전히 MAX_PAY 가 유일한 상한이다.
+    try:
+        import purchase_ledger as PL
+        chk = PL.check_amount("현대Hmall", res.get("combo_idx"), amt)
+    except Exception as e:
+        # ⚠️ 여기로 오는 건 `purchase_ledger` 자체를 **못 불러온** 경우뿐이다(그땐 통과시킨다).
+        #    시트 조회 실패는 check_amount 안에서 **차단**으로 처리된다 — 모르는 금액은 결제 안 함.
+        chk = {"ok": True, "reason": f"purchase_ledger 로드 실패로 대조 건너뜀({e})"}
+    res["amount_check"] = chk
+    print(f"[#{idx}] 시트 대조 — {chk.get('reason')}", flush=True)
+    if not chk.get("ok"):
+        res["status"] = f"SHEET_AMOUNT_GUARD — {chk.get('reason')}"
+        print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+        return False
     _max = os.environ.get("MAX_PAY")
     if _max:
         if amt is None:
