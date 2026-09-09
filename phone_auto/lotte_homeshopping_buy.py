@@ -1863,12 +1863,17 @@ def _ignore_keywords() -> list[str]:
 
 def claim_lotte_reward(goods_no: str | None = None) -> dict:    # (search_term 제거 — 검색폐기로 미사용)
     """구매사은 적립금 신청 (G). ★**구매한 상품 상세로 직접 진입**(주문완료 화면의 구매상품 항목 탭)
-    → '구매사은·혜택' 섹션의 '최대 N% 적립'/'최대 N만 적립' (★ignore 제외) → '광세일' 행사페이지 → '혜택 신청하기'.
+    상품상세 → '최대 N% 적립' 카드 후보 수집(OCR+dump) → 후보를 하나씩 눌러 행사페이지에서
+    **스크롤로 '나의 적립현황' 을 노출시킨 뒤 대상 여부 판정** → 대상이면 '혜택 신청하기'.
 
-    ★검색 방식 폐기(2026-06-03 사용자 지적): 설화수 검색→랜덤상품 선택은 **구매 안 한 제품에 오claim** 위험
-    (#14 실측: 자음생크림리치 구매했는데 검색결과 '자음생2종'에 적립). → 주문완료의 **그 주문 상품**만 탭해 상세 진입.
-    상품 미발견/상세 미진입/광세일 게이트 실패 시 **SKIP**(오claim 방지 — 적립 못해도 잘못된 적립보다 나음).
-    goods_no 지정 시(호출자 override) 번호검색=정확. ⚠️앱 직접구매 건만, 신청기간 내. '혜택 신청완료'면 idempotent."""
+    ★행사명은 코드에 넣지 않는다(매달 바뀜). 대상 판정은 구조로만:
+        `N원 구매` + `적립금 N원 적립가능!`  → 대상        (2026-09-09 아모레 브랜드릴레이 10%)
+        `0원 구매` / `N원 남았어요`          → 대상 아님   (2026-09-09 광세일 TV패션/리빙 20%)
+    ★수치가 큰 카드가 정답이 아니다. 안 되면 back 하고 다음 후보 — 신청 시도는 무제한이다
+      (사용자 확인 2026-09-09).
+    ⚠️ 판정을 **탭 직후 화면**으로 하면 안 된다. 그 화면엔 행사안내 문구뿐이고 적립현황은
+      한참 아래에 있다 — 그래서 전부 '대상'으로 통과해 6번 연속 실패했다.
+    """
     out = {}
     ignore = _ignore_keywords()
     if goods_no:
@@ -1947,45 +1952,76 @@ def claim_lotte_reward(goods_no: str | None = None) -> dict:    # (search_term �
         picks = []
     if not picks:
         out["err"] = "'최대 N%/N만 적립' 카드 미발견 (OCR+dump, 상품상세 14회 스크롤)"; return out
-    # ★★ 후보를 하나씩 눌러 보고 **이 구매가 그 행사 대상인지** 확인한다 (2026-09-09 실사고).
-    #    종전엔 '최고 수치' 하나만 눌렀는데, 상품상세엔 무관한 행사도 같이 걸려 있다 —
-    #    #8 복구에서 `최대 20% 적립`(광세일 TV패션/리빙)을 골라 들어갔고 그 페이지는
-    #    "0원 구매 / 10,000원 적립까지 50,000원 남았어요" 였다(= 이 주문은 대상 아님).
-    #    정답은 `최대 10% 적립`('아모레' 브랜드릴레이) 이었다. 수치가 큰 게 정답이 아니다.
-    #    → **행사명은 안 본다.** 페이지에 "남았어요"(미달) 가 뜨면 대상 아님으로 보고 뒤로 가서 다음 후보.
+    # ════════════════════════════════════════════════════════════════
+    #  후보 카드 순회 → 행사페이지에서 **대상 여부 확인** → 신청
+    # ════════════════════════════════════════════════════════════════
+    #  ★★ 2026-09-09 핸드셰이크(에이전트가 스샷 직접 판독)로 확정한 흐름이다.
+    #     그 전에 여섯 번 실패했고, 매번 원인이 달랐다 — 아래가 전부 실측 근거다.
+    #
+    #  ① 상품상세엔 **무관한 행사가 같이** 걸려 있다. '최고 수치' 선택은 틀린 전략이다:
+    #       `최대 20% 적립` = 광세일 TV패션/리빙 → 적립현황 `0원 구매` / `50,000원 남았어요`
+    #       `최대 10% 적립` = '아모레' 브랜드릴레이 → `555,380원 구매` / `10,000원 적립가능!`  ← 정답
+    #     (사용자 확인: "아모레10% 적립 맞음". 행사명은 코드에 넣지 않는다 — 매달 바뀐다.)
+    #
+    #  ② ★**대상 판정은 카드를 탭한 직후 화면으로 하면 안 된다.**
+    #     행사페이지 첫 화면엔 배너와 '행사안내' 문구뿐이고, `나의 적립현황` 은
+    #     **한참 아래로 스크롤해야** 나온다. 탭 직후만 보고 판정하면 `남았어요` 가 없으니
+    #     전부 "대상"으로 통과해 엉뚱한 행사에 신청을 시도한다(내가 6번 그랬다).
+    #     → **스크롤해서 `적립현황` 을 찾은 뒤** 판정한다.
+    #
+    #  ③ 로딩 완료 신호로 `"구매"` 같은 흔한 낱말을 쓰면 안 된다 — 어느 화면에나 있어 즉시 통과한다.
+    #
+    #  ④ 사용자 확인: "적립하는건 무한히 해도 상관없기 때문에 되는 거 걸릴때까지 찾으면됨"
+    #     → 대상이 아니면 back 하고 다음 후보. 오claim 걱정으로 멈출 필요 없다.
+    def _scroll_find(keys: tuple, max_scroll: int = 10) -> str:
+        """아래로 스크롤하며 keys 중 하나가 보이면 그 시점의 전체 화면 텍스트를 돌려준다."""
+        for _ in range(max_scroll):
+            txt = " ".join(t["text"] for t in _texts())
+            if any(k in txt for k in keys):
+                return txt
+            _adb().swipe(540, 1600, 540, 800, 450); time.sleep(1.0)
+        return ""
+
     card = None
-    for pi, cand in enumerate(picks[:4]):
+    for pi, cand in enumerate(picks[:6]):
         _adb().tap(cand["cx"], cand["cy"]); time.sleep(3.0)
         if not (screen_has("행사안내") or screen_has("혜택 신청")):
-            print(f"   [reward] 후보{pi} '{cand['text']}' — 행사페이지 미도달, 되돌아감", flush=True)
+            print(f"   [reward] 후보{pi} '{cand['text']}' — 행사페이지 미도달 → 다음", flush=True)
             _adb().back(); time.sleep(2.0); continue
-        # ★'나의 적립현황' 은 **지연 렌더**된다 — 한 번만 보면 놓친다(2026-09-09 실측:
-        #   화면엔 "10,000원 적립까지 50,000원 남았어요" 가 cy=1402 에 멀쩡히 있는데 통과됐다).
-        #   최대 5초 폴링해서 미달 문구가 뜨는지 본다.
-        _short = None
-        for _ in range(12):          # ★실측: 5초로는 못 잡았다(적립현황이 늦게 뜬다)
-            if screen_has("남았어요") or screen_has("0원 구매"):
-                _short = True; break
-            time.sleep(1.0)
-        if _short:
-            print(f"   [reward] 후보{pi} '{cand['text']}' — 이 주문은 대상 아님(적립 미달), 다음 후보", flush=True)
+        # ★스크롤해서 '나의 적립현황' 을 노출시킨 뒤 판정한다 (위 ② 참조).
+        txt = _scroll_find(("적립현황", "신청완료"))
+        if not txt:
+            print(f"   [reward] 후보{pi} '{cand['text']}' — 적립현황 미발견(스크롤 10회) → 다음", flush=True)
+            _adb().back(); time.sleep(2.0); continue
+        if "신청완료" in txt:
+            out["card"] = cand["text"]; out["already"] = True; out["ok"] = True
+            print(f"   [reward] 후보{pi} '{cand['text']}' — 이미 신청완료", flush=True)
+            return out
+        if ("남았어요" in txt) or ("0원 구매" in txt):
+            print(f"   [reward] 후보{pi} '{cand['text']}' — 이 주문은 대상 아님(적립 미달) → 다음", flush=True)
             _adb().back(); time.sleep(2.0); continue
         card = cand
-        print(f"   [reward] 후보{pi} '{cand['text']}' — 대상 확인, 신청 진행", flush=True)
+        print(f"   [reward] 후보{pi} '{cand['text']}' — ★대상 확인 → 신청 진행", flush=True)
         break
     if not card:
-        out["err"] = f"적립 대상 행사 미발견 (후보 {[c['text'] for c in picks[:4]]})"; return out
+        out["err"] = f"적립 대상 행사 미발견 (후보 {[c['text'] for c in picks[:6]]})"; return out
     out["card"] = card["text"]
-    # 6) '혜택 신청하기' 스크롤 탐색 → 탭. 이미 '혜택 신청완료'면 idempotent.
+    # 6) '혜택 신청하기' 탭. 위에서 이미 적립현황까지 스크롤돼 있어 보통 같은 화면에 있다.
+    #    실측 좌표 예: 적립현황 cy≈1608 일 때 버튼 cy≈2230.
     for _ in range(6):
-        if any("신청완료" in it["text"] for it in _ocr_texts(cap())):
+        its = _ocr_texts(cap())
+        if any("신청완료" in it["text"] for it in its):
             out["already"] = True; out["ok"] = True; return out
-        b = next((it for it in _ocr_texts(cap()) if "혜택" in it["text"] and "신청하기" in it["text"]), None)
+        b = next((it for it in its if "혜택" in it["text"] and "신청하기" in it["text"]), None)
         if b:
             _adb().tap(b["cx"], b["cy"]); time.sleep(2.5)
             out["completed"] = screen_has("신청이 완료") or screen_has("완료되었")
+            out["max_reached"] = screen_has("최대 혜택을 달성")   # 실측 문구
             ocr_tap("확인", retries=2)
-            out["ok"] = True; return out
+            out["ok"] = True
+            print(f"   [reward] 신청 결과 completed={out['completed']} "
+                  f"max={out.get('max_reached')}", flush=True)
+            return out
         _adb().swipe(540, 1500, 540, 800, 500); time.sleep(1.0)
     out["err"] = "혜택 신청하기 버튼 미발견"
     return out
