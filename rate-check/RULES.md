@@ -172,11 +172,17 @@ Step 1 종료 후 `rate-check/_tmp/` 와 `rate-check/` 에 잔존해서는 안 �
 
 ## §9. Chrome 인스턴스 분리
 
-- Step 1 (rate-check) 전용 Chrome: **9224** (분리된 user data dir).
-- Step 2 (check10): **9223**.
-- buy/run.py 등 Hmall 메인 작업: **9222**.
-- 사용자가 9222 를 다른 작업에 쓰는 중이면 step 1 은 9224 사용 필수 (cart/login state 충돌 방지).
-- CDP attach 스크립트는 `chrome_launcher.ensure_chrome(port)` 호출.
+> ⚠️ **2026-07-16 「단일 CFT 원칙」으로 폐기된 서술이었다** (2026-09-09 정정).
+> 아래 "Step1=9224 / Step2=9223 분리" 는 **더 이상 하지 않는다.** 그대로 따르면 로그인 안 된
+> 별도 Chrome 이 떠서 조용히 실패한다. 정본 = `CHROME_SETUP.md` 머리말 + `chrome_launcher.py` 헤더.
+
+- **모든 자동화(rate-check · check10 · buy 전부) = 로그인된 CFT 하나, 포트 9222.**
+- 9223 / 9224 는 **별도 인스턴스가 아니라 같은 CFT 프로필의 포트 폴백**이다
+  (`chrome_launcher.PORT_CHAIN = (9222, 9223, 9224)` — 9222 가 점유/행일 때만 내려간다).
+- ⚠️ **9223 은 폰 결제 중 쓰지 말 것** — `phone_auto/hmall_webview.LOCAL_PORT` 가 9223 이라
+  `adb forward` 가 걸려 있고, 붙으면 180s 타임아웃 후 적립이 통째로 날아가는데 로그엔
+  "살아있는 9223 재사용" 만 찍힌다 = 조용한 오작동 (`chrome_launcher.py:31` 실측).
+- CDP attach 스크립트는 `chrome_launcher.resolve_cdp_port()` / `ensure_chrome(port)` 호출.
 
 ---
 
