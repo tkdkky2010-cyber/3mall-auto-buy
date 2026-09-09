@@ -1940,17 +1940,42 @@ def claim_lotte_reward(goods_no: str | None = None) -> dict:    # (search_term �
             if m and not any(k in it["text"] for k in ignore) and 200 < it["cy"] < 2050:
                 cands.append((int(m.group(1)), it))
         if cands:
-            cands.sort(key=lambda x: x[0], reverse=True)     # 최고 수치 (%·만 혼재 시 통상 1장)
-            card = cands[0][1]; break
+            cands.sort(key=lambda x: x[0], reverse=True)     # 큰 수치부터 시도
+            picks = [c[1] for c in cands]; break
         _adb().swipe(540, 1500, 540, 900, 450); time.sleep(0.9)
-    if not card:
+    else:
+        picks = []
+    if not picks:
         out["err"] = "'최대 N%/N만 적립' 카드 미발견 (OCR+dump, 상품상세 14회 스크롤)"; return out
+    # ★★ 후보를 하나씩 눌러 보고 **이 구매가 그 행사 대상인지** 확인한다 (2026-09-09 실사고).
+    #    종전엔 '최고 수치' 하나만 눌렀는데, 상품상세엔 무관한 행사도 같이 걸려 있다 —
+    #    #8 복구에서 `최대 20% 적립`(광세일 TV패션/리빙)을 골라 들어갔고 그 페이지는
+    #    "0원 구매 / 10,000원 적립까지 50,000원 남았어요" 였다(= 이 주문은 대상 아님).
+    #    정답은 `최대 10% 적립`('아모레' 브랜드릴레이) 이었다. 수치가 큰 게 정답이 아니다.
+    #    → **행사명은 안 본다.** 페이지에 "남았어요"(미달) 가 뜨면 대상 아님으로 보고 뒤로 가서 다음 후보.
+    card = None
+    for pi, cand in enumerate(picks[:4]):
+        _adb().tap(cand["cx"], cand["cy"]); time.sleep(3.0)
+        if not (screen_has("행사안내") or screen_has("혜택 신청")):
+            print(f"   [reward] 후보{pi} '{cand['text']}' — 행사페이지 미도달, 되돌아감", flush=True)
+            _adb().back(); time.sleep(2.0); continue
+        # ★'나의 적립현황' 은 **지연 렌더**된다 — 한 번만 보면 놓친다(2026-09-09 실측:
+        #   화면엔 "10,000원 적립까지 50,000원 남았어요" 가 cy=1402 에 멀쩡히 있는데 통과됐다).
+        #   최대 5초 폴링해서 미달 문구가 뜨는지 본다.
+        _short = None
+        for _ in range(12):          # ★실측: 5초로는 못 잡았다(적립현황이 늦게 뜬다)
+            if screen_has("남았어요") or screen_has("0원 구매"):
+                _short = True; break
+            time.sleep(1.0)
+        if _short:
+            print(f"   [reward] 후보{pi} '{cand['text']}' — 이 주문은 대상 아님(적립 미달), 다음 후보", flush=True)
+            _adb().back(); time.sleep(2.0); continue
+        card = cand
+        print(f"   [reward] 후보{pi} '{cand['text']}' — 대상 확인, 신청 진행", flush=True)
+        break
+    if not card:
+        out["err"] = f"적립 대상 행사 미발견 (후보 {[c['text'] for c in picks[:4]]})"; return out
     out["card"] = card["text"]
-    _adb().tap(card["cx"], card["cy"]); time.sleep(3.0)
-    # 5) ★광세일 구매사은 행사페이지인지 게이트 검증 (선물/live 오이동 시 신청완료 오매칭 방지 — #6 교훈)
-    #    ★행사명은 쓰지 않는다(2026-09-09) — '행사안내'(행사페이지 공통 문구) 또는 신청 버튼으로만 판정.
-    if not (screen_has("행사안내") or screen_has("혜택 신청")):
-        out["err"] = f"적립 행사페이지 미도달(잘못된 카드: {card['text']})"; return out
     # 6) '혜택 신청하기' 스크롤 탐색 → 탭. 이미 '혜택 신청완료'면 idempotent.
     for _ in range(6):
         if any("신청완료" in it["text"] for it in _ocr_texts(cap())):
