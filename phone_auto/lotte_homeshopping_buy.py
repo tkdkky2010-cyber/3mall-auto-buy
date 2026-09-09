@@ -1895,33 +1895,48 @@ def claim_lotte_reward(goods_no: str | None = None) -> dict:    # (search_term �
     #    판별 = '구매사은' 헤더(cy) **아래** + 정규식 `최대\d+[%만]적립`(단위·수치 매일 변동,
     #    2026-08-23 사용자: 8/18 '최대 5만 적립' 형식이라 %전용 정규식이 못 찾음) + ignore 제외.
     #    헤더 아래로 스코프하면 ①배너(섹션 위)·②소액카드(섹션 위)가 자동 배제됨.
+    #    ★2026-09-09 전면 변경 (사용자 지시: "행사이름 넣지마 그냥 '최대 ~~' 이걸로 시작하는 것만
+    #      찾으면 되잖아"). 종전엔 화면에서 '구매사은' 헤더를 본 뒤에만 카드를 찾았다 →
+    #      섹션 제목이 다른 행사('아모레' 브랜드릴레이 등)에선 **카드가 눈앞에 있어도 통째로 SKIP**
+    #      됐다 (9/9 #8·#9·#11 세 건 적립 0 — 사용자가 화면에 '최대 10% 적립' 카드를 직접 확인).
+    #      이제 **텍스트가 '최대' 로 시작하는 것만** 본다. 상단 배너 ①"'광세일' 구매시 최대 N% 적립금"
+    #      은 '최대' 로 시작하지 않아 자연히 배제된다 — 행사명을 몰라도 갈린다.
+    #      ②"최대 NNNP/N원 적립"(%·만 없음)은 정규식이 계속 배제한다.
+    #    ★2026-09-09 실측으로 확정한 원인 — **OCR 이 혜택 캐러셀을 한 줄로 뭉갠다.**
+    #      화면엔 카드가 분명히 있는데(사용자 스샷 "'아모레' 브랜드릴레이 / 최대 10% 적립"),
+    #      `_ocr_texts` 는 "최대 17% 결제일 할인 롯데홈쇼핑 삼성카... 최대 4만원 혜택 받기 최대 10%"
+    #      처럼 캐러셀 전체를 한 줄로 붙여 주면서 **'적립' 글자를 잃어버린다** → 정규식이 영영 안 맞는다.
+    #      (9/9 #8·#9·#10·#11·#13·#14 여섯 건 적립 0 의 진짜 원인. 섹션 헤더 문제가 아니었다.)
+    #      **`_dump_nodes()` 는 카드마다 TextView 로 따로 준다** — 좌표도 정확:
+    #          (1018,915) [TextView] '최대 10% 적립'   ← 이걸 탭하면 된다
+    #      → OCR 과 dump 를 **겹쳐 읽는다** (READ_FIRST 「판독은 OCR + dump 를 겹쳐 쓴다」.
+    #        이 함수만 그 규칙을 안 따르고 있었다.)
     card = None
-    in_section = False
     for _ in range(14):
-        its = _ocr_texts(cap())
-        hdr = next((i for i in its if "구매사은" in i["text"]), None)
-        if hdr:
-            in_section = True
-        if in_section:
-            ymin = hdr["cy"] if hdr else 0           # 헤더 보이면 그 아래만; 헤더가 위로 밀렸으면 화면 전체(배너는 이미 위로 사라짐)
-            cands = []
-            for it in its:
-                if it["cy"] < ymin:
-                    continue
-                m = re.search(r"최대\s*(\d+)\s*(?:%|만\s*원?)\s*적립", it["text"])
-                if m and not any(k in it["text"] for k in ignore):
-                    cands.append((int(m.group(1)), it))
-            if cands:
-                cands.sort(key=lambda x: x[0], reverse=True)     # 최고 수치 적립 이벤트 (%·만 혼재 시 통상 카드 1장)
-                card = cands[0][1]; break
+        cands = []
+        its = [{"text": it["text"], "cx": it["cx"], "cy": it["cy"]} for it in _ocr_texts(cap())]
+        its += [{"text": (n["text"] or "").strip(), "cx": n["cx"], "cy": n["cy"]}
+                for n in _dump_nodes() if (n["text"] or "").strip()]
+        for it in its:
+            m = re.match(r"\s*최대\s*(\d+)\s*(?:%|만\s*원?)\s*적립", it["text"])
+            # ★상단/하단 고정영역 밖만 후보로 (READ_FIRST 「하단 고정버튼 위로 올린 뒤 본다」).
+            #   상품상세 하단엔 '선물하기/구매하기' 바가 cy≈2152 에 **고정**돼 있다. dump 는
+            #   그 아래 가려진 카드도 좌표를 주므로(실측 cy=2265), 그대로 탭하면 **구매하기를 누른다.**
+            #   → 안전영역(cy < 2050)에 들어올 때까지 스크롤해서 올린 뒤 탭한다.
+            if m and not any(k in it["text"] for k in ignore) and 200 < it["cy"] < 2050:
+                cands.append((int(m.group(1)), it))
+        if cands:
+            cands.sort(key=lambda x: x[0], reverse=True)     # 최고 수치 (%·만 혼재 시 통상 1장)
+            card = cands[0][1]; break
         _adb().swipe(540, 1500, 540, 900, 450); time.sleep(0.9)
     if not card:
-        out["err"] = "구매사은 '최대 N%/N만 적립' 카드 미발견(광세일 행사상품 아닐 수 있음)"; return out
+        out["err"] = "'최대 N%/N만 적립' 카드 미발견 (OCR+dump, 상품상세 14회 스크롤)"; return out
     out["card"] = card["text"]
     _adb().tap(card["cx"], card["cy"]); time.sleep(3.0)
     # 5) ★광세일 구매사은 행사페이지인지 게이트 검증 (선물/live 오이동 시 신청완료 오매칭 방지 — #6 교훈)
-    if not (screen_has("행사안내") or screen_has("광세일")):
-        out["err"] = f"광세일 적립 event 미도달(잘못된 카드: {card['text']})"; return out
+    #    ★행사명은 쓰지 않는다(2026-09-09) — '행사안내'(행사페이지 공통 문구) 또는 신청 버튼으로만 판정.
+    if not (screen_has("행사안내") or screen_has("혜택 신청")):
+        out["err"] = f"적립 행사페이지 미도달(잘못된 카드: {card['text']})"; return out
     # 6) '혜택 신청하기' 스크롤 탐색 → 탭. 이미 '혜택 신청완료'면 idempotent.
     for _ in range(6):
         if any("신청완료" in it["text"] for it in _ocr_texts(cap())):

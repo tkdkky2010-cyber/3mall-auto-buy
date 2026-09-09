@@ -20,6 +20,7 @@
 from __future__ import annotations
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -315,6 +316,15 @@ def _pay_cart(cart: dict, data: dict) -> bool:
         #   확인할 방법이 없었다** — 폴백(OCR→dump)·일반결제 탭·주문번호가 전부 버려졌다.
         #   READ_FIRST 「성공 메시지는 검증이 아니다」. 계정 9개를 실돈으로 돌리기 전에 필요한 증거다.
         print(f"--- log(성공) ---\n{log}\n-----------------", flush=True)
+        # ★롯데: 뷰티포인트·구매사은 결과를 매니페스트에 남긴다 (사용자 지시 2026-09-09
+        #   "결제마무리하고 나서 무조건 적립신청 제대로했는지 뷰티포인트 적립도 제대로 신청했는지
+        #    결과값 넣을수있도록 해놔"). 종전엔 로그에만 있어 보고에서 누락됐다.
+        if mall == "lotte":
+            m = re.search(r"\[뷰티(.*?)\s*/\s*적립(.*?)\]", log)
+            cart["beauty"] = m.group(1).strip() if m else "미확인"
+            cart["reward"] = m.group(2).strip() if m else "미확인"
+            _save(data)
+            print(f"  [적립결과] 뷰티={cart['beauty']} / 구매사은={cart['reward']}", flush=True)
         if mall == "hmall":               # 현대 식품: 10% prmo 있으면 적립신청 (없으면 skip)
             rw = apply_reward(cart)
             cart["reward_ok"] = bool(rw.get("ok"))
@@ -333,7 +343,10 @@ def cmd_status(data: dict) -> int:
     for c in carts:
         mark = "✓결제" if c.get("paid") else "·미결제"
         names = ",".join(i.get("name", "?") for i in c.get("items", []))
-        print(f"  {mark}  {c['mall']:6} #{c['account']:<3} {names}")
+        rw = ""
+        if c.get("beauty") or c.get("reward"):
+            rw = f"  [뷰티={c.get('beauty','?')} / 적립={c.get('reward','?')}]"
+        print(f"  {mark}  {c['mall']:6} #{c['account']:<3} {names}{rw}")
     unpaid = [c for c in carts if not c.get("paid")]
     print(f"  미결제 {len(unpaid)}건")
     return 0
