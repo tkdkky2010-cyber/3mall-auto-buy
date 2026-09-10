@@ -75,12 +75,12 @@ def check_one(context, idx: int, account: dict, prmo: str = "") -> dict:
     # ★deep=True 로 한 번에 간다 — 얕은 정리는 로그인폼이 홈으로 리다이렉트돼
     #   30초 타임아웃을 태운 뒤에야 재시도로 넘어간다(#14 실측).
     hrun._hmall_clean(context, page, deep=True)
-    ok = hrun.login(page, account["id"], account["pw"])
+    ok = hrun.login_capped(page, account["id"], account["pw"])
     if not ok:
         print(f"  [RETRY] #{idx} {account['id']} — 쿠키/스토리지 폐기 후 재시도")
         hrun._hmall_clean(context, page, deep=True)
         page.wait_for_timeout(2000)
-        ok = hrun.login(page, account["id"], account["pw"])
+        ok = hrun.login_capped(page, account["id"], account["pw"])
     if not ok:
         return {"idx": idx, "id": account["id"], "ok": False, "point": None, "name": ""}
     got = read_point(page)

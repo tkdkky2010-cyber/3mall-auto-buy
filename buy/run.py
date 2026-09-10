@@ -35,6 +35,7 @@ PROJECT_ROOT = ROOT.parent
 load_dotenv(ROOT / ".env")
 sys.path.insert(0, str(PROJECT_ROOT))
 from chrome_launcher import ensure_chrome, resolve_cdp_port  # noqa: E402  (CDP attach 스크립트는 필수)
+import hmall_login_guard as _guard  # noqa: E402  계정당 로그인 2회 상한
 
 ACCOUNTS_FILE = Path(os.environ.get("HMALL_CONFIG_PATH") or (PROJECT_ROOT / "hmall_config.json"))
 PRODUCTS_FILE = ROOT / "products.json"
@@ -263,6 +264,23 @@ def login(page: Page, account_id: str, account_pw: str) -> bool:
         print(f"  [LOGIN ERR] {account_id}: {e}")
         _dump_login_debug(page, account_id, captured_dialogs)
         return False
+
+
+def login_capped(page: Page, account_id: str, account_pw: str) -> bool:
+    """계정당 하루 2회까지만 로그인 시도 (사용자 지시 2026-09-10).
+
+    2회 실패한 계정은 즉시 False — 반복 시도가 차단을 부른다.
+    9/10 에 조회를 세 번 나눠 돌려 계정당 4~5회 로그인시켰고 #10·#11 이
+    '로그인에 실패하였습니다. 다른 로그인 수단을 이용바랍니다.' 로 막혔다.
+    """
+    if _guard.blocked(account_id):
+        print(f"  [SKIP] {account_id} — 오늘 로그인 2회 실패, 더 시도하지 않음")
+        return False
+    ok = login(page, account_id, account_pw)
+    n = _guard.record(account_id, ok)
+    if not ok:
+        print(f"  [ATTEMPT] {account_id} — 실패 {n}/{_guard.MAX_ATTEMPTS}")
+    return ok
 
 
 def _dump_login_debug(page: Page, account_id: str, dialogs: list[str]) -> None:
@@ -781,12 +799,12 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
     if cdp_mode:
         _hmall_clean(context, page)
 
-    logged_in = login(page, account["id"], account["pw"])
+    logged_in = login_capped(page, account["id"], account["pw"])
     if not logged_in and cdp_mode:
         print(f"  [RETRY] #{idx} {account['id']} — 쿠키/스토리지 폐기 후 재시도")
         _hmall_clean(context, page, deep=True)
         page.wait_for_timeout(2000)
-        logged_in = login(page, account["id"], account["pw"])
+        logged_in = login_capped(page, account["id"], account["pw"])
 
     if not logged_in:
         print(f"  [SKIP] #{idx} {account['id']} — 로그인 실패")
@@ -843,7 +861,11 @@ def process_account(context: BrowserContext, idx: int, account: dict, items: lis
         return {code: a ? new URL(a.href).searchParams.get('slitmCd') : null,
                 qty: q ? Number(q[1]) : null};
     })''')
-    expected = sorted((str(e['info']['slitmCd']), int(e['qty'])) for e in items)
+    # ★옵션상품은 **카트에 자식코드**로 잡힌다(이디야 옵션2: 부모 2246603712 → 카트 2246603862).
+    #   URL 진입은 부모코드 기준이라 slitmCd 를 바꿀 수 없다 → 검증용 코드를 따로 둔다
+    #   (`cart_slitmCd`). 없으면 종전대로 slitmCd. 2026-09-09 워크로그 미해결 #4 처방.
+    expected = sorted((str(e['info'].get('cart_slitmCd') or e['info']['slitmCd']),
+                       int(e['qty'])) for e in items)
     observed = sorted((str(r['code']), r['qty'] if r['qty'] is not None else -1) for r in actual)
     if observed != expected:
         raise RuntimeError(f"카트 상품/수량 불일치: expected={expected}, actual={observed}")
