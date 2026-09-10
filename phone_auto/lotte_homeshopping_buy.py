@@ -263,7 +263,11 @@ CARD_APPS = ("com.hanaskcard.paycla", "com.kbcard.kbkookmincard", "com.hanaskcar
              "com.samsung.android.spay", "com.nh.cashcardapp", "nh.smart.card",
              "com.hyundaicard.appcard",          # ★현대카드 (2026-08-31 #14 실측 — 빠져 있었다)
              "com.kbstar.kbbank", "com.wooricard.smartapp", "com.citibank.cardapp",
-             "com.hanaskcard.jayoung", "com.lotte.lottecard")
+             "com.hanaskcard.jayoung", "com.lotte.lottecard",
+             "net.ib.android.smcard")            # ★삼성카드 모니모 (2026-09-10 #5 실측 — 빠져 있었다)
+
+# reset 재시도에서 **죽이면 안 되는** 패키지 (죽이면 화면이 더 망가진다).
+RESET_KEEP = ("com.sec.android.app.launcher", "com.android.systemui", "com.google.android.apps.nexuslauncher")
 
 
 def reset_lotte_app() -> None:
@@ -305,6 +309,15 @@ def reset_lotte_app() -> None:
             return
         print(f"   [reset] 롯데앱이 앞에 없다(시도 {attempt + 1}/3) — 포그라운드: "
               f"{fg.strip()[:120]}", flush=True)
+        # ★HOME 만으로는 **스스로 다시 뜨는 앱**을 못 이긴다 (2026-09-10 #5 실사고):
+        #   삼성카드 모니모(net.ib.android.smcard) 의 MonimoPay 가입 화면이 3회 내내 앞을 잡아
+        #   LOGOUT_FAIL 로 #5~#7 이 통째로 멈췄다. 앞에 있는 앱을 **직접 force-stop** 한다.
+        #   목록(CARD_APPS)에 없는 앱도 이 경로로 걸린다 — 앱은 얼마든지 새로 생기므로.
+        m = re.search(r"u0 ([A-Za-z0-9_.]+)/", fg)
+        if m and m.group(1) not in RESET_KEEP and m.group(1) != PKG:
+            print(f"   [reset] 앞을 막는 앱 force-stop: {m.group(1)}", flush=True)
+            subprocess.run([hw.ADB, "-s", serial, "shell", "am", "force-stop", m.group(1)],
+                           capture_output=True)
         subprocess.run([hw.ADB, "-s", serial, "shell", "input", "keyevent", "3"],
                        capture_output=True)      # HOME 으로 접고 다시 띄운다
         time.sleep(1.5)
