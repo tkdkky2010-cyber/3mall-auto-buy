@@ -1911,6 +1911,20 @@ def detect_card() -> str | None:
     return None
 
 
+# ★삼성카드 1건 상한 (사용자 지시 2026-09-11: "삼성카드는 30만 미만으로 하라고").
+#   왜 — 2026-09-11 #3·#4 실측:
+#     · 삼성 **일반결제**는 결제액이 30만원을 넘으면 '인증서(금융/공동)' 단계를 요구한다.
+#       (#1 278,018 / #2 276,925 = 통과, #3 362,292 / #4 367,080 = 인증서 요구.)
+#       모니모에 금융인증서가 없어(`금융인증서가 없습니다`) 이 길은 막힌다.
+#     · 대안인 **모니모 pay**(앱카드)의 결제비밀번호 키패드는 자동화가 **구조적으로 불가능**하다:
+#       화면이 FLAG_SECURE 라 screencap 이 새까맣게 나오고(비전·OCR 판독 불가),
+#       uiautomator dump 는 뚫리지만 숫자키가 전부 `ImageButton` + `content-desc=''` 이라
+#       **어느 칸이 몇인지 읽을 방법이 없다**(재배열 버튼 = 셔플). 찍어 누르면 비번 오류 잠김.
+#   → 그래서 '넘으면 멈춘다'. 주문을 30만원 미만으로 쪼개서(`only=` 키워드) 두 건으로 결제한다.
+#   ⚠️ 이 값을 올리려면 위 두 경로 중 하나가 실제로 뚫린 뒤에 올릴 것. 숫자만 올리면 그 자리에서 멈춘다.
+SAMSUNG_MAX_PAY = 300_000
+
+
 def money_guard(idx: int, res: dict) -> bool:
     """★결제 직전 금액 가드 — 통과하면 True, 막았으면 False(res['status'] 세팅됨).
 
@@ -1928,6 +1942,18 @@ def money_guard(idx: int, res: dict) -> bool:
     res["pay_amount"] = res["amount"] = amt
     print(f"[#{idx}] 결제 예정 금액: {amt:,}원" if amt is not None
           else f"[#{idx}] ⚠️ 결제 예정 금액 판독 실패", flush=True)
+    # ★삼성카드 30만원 상한 — MAX_PAY 와 달리 **환경변수 없이 항상** 건다 (위 SAMSUNG_MAX_PAY 주석).
+    #   판독 실패도 막는다: 모르는 금액이 30만을 넘는지 알 수 없으면 결제하지 않는다.
+    if str(res.get("card") or "") == "삼성":
+        if amt is None:
+            res["status"] = "AMOUNT_UNREADABLE(삼성 30만원 상한 — 금액을 못 읽으면 결제 안 함)"
+            print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+            return False
+        if amt >= SAMSUNG_MAX_PAY:
+            res["status"] = (f"SAMSUNG_OVER_LIMIT({amt:,}원 ≥ {SAMSUNG_MAX_PAY:,}원) — "
+                             f"인증서 단계에 막힌다. only= 로 상품을 나눠 30만원 미만 2건으로 결제할 것")
+            print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+            return False
     _max = os.environ.get("MAX_PAY")
     if _max:
         if amt is None:

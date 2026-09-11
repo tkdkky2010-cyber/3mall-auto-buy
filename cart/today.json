@@ -1,5 +1,5 @@
 {
-  "date": "2026-09-10",
+  "date": "2026-09-11",
   "account_used": "tkdkky2002",
   "products": [
     {
@@ -261,14 +261,14 @@
         "member_price": 102240,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 95,084원",
-            "percent": 7,
-            "price": 95084
+            "alt": "cardCd02",
+            "text": "삼성 5% 즉시할인 97,128원",
+            "percent": 5,
+            "price": 97128
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 97,128원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 97,128원",
             "percent": 5,
             "price": 97128
           }
@@ -277,7 +277,7 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 92240,
         "paybacks": {
-          "하나카드": {
+          "삼성카드": {
             "immediate_price": 97128,
             "payback_pct": 1.0,
             "after_payback": 96157,
@@ -307,11 +307,6 @@
             "idx": 3,
             "name": "유한건강생활 여성갱년기 백수오 올인원(뼈+혈행건강+기억력개선) 1박스 1개월분",
             "list_price": 66900
-          },
-          {
-            "idx": 7,
-            "name": "유한건강생활 전홍삼스틱 홍삼즙 오리지널 1박스 1개월분",
-            "list_price": 58900
           },
           {
             "idx": 9,
@@ -426,14 +421,14 @@
         "member_price": 161820,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 150,493원",
-            "percent": 7,
-            "price": 150493
+            "alt": "cardCd02",
+            "text": "삼성 5% 즉시할인 153,729원",
+            "percent": 5,
+            "price": 153729
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 153,729원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 153,729원",
             "percent": 5,
             "price": 153729
           }
@@ -442,7 +437,7 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 151820,
         "paybacks": {
-          "하나카드": {
+          "삼성카드": {
             "immediate_price": 153729,
             "payback_pct": 1.0,
             "after_payback": 152192,
@@ -571,14 +566,14 @@
         "member_price": 159300,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 134,199원",
-            "percent": 7,
-            "price": 134199
+            "alt": "cardCd02",
+            "text": "삼성 5% 즉시할인 137,085원",
+            "percent": 5,
+            "price": 137085
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 137,085원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 137,085원",
             "percent": 5,
             "price": 137085
           }
@@ -587,7 +582,7 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 149300,
         "paybacks": {
-          "하나카드": {
+          "삼성카드": {
             "immediate_price": 137085,
             "payback_pct": 1.0,
             "after_payback": 135714,
@@ -860,14 +855,14 @@
         "member_price": 131920,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 122,686원",
-            "percent": 7,
-            "price": 122686
+            "alt": "cardCd02",
+            "text": "삼성 5% 즉시할인 125,324원",
+            "percent": 5,
+            "price": 125324
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 125,324원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 125,324원",
             "percent": 5,
             "price": 125324
           }
@@ -876,7 +871,7 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 121920,
         "paybacks": {
-          "하나카드": {
+          "삼성카드": {
             "immediate_price": 125324,
             "payback_pct": 1.0,
             "after_payback": 124071,
@@ -1030,14 +1025,14 @@
         "member_price": 262400,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 230,082원",
-            "percent": 7,
-            "price": 230082
+            "alt": "cardCd02",
+            "text": "삼성 5% 즉시할인 235,030원",
+            "percent": 5,
+            "price": 235030
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 235,030원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 235,030원",
             "percent": 5,
             "price": 235030
           }
@@ -1046,7 +1041,7 @@
         "kakao_reward_pt": 20000,
         "kakao_final_cost": 242400,
         "paybacks": {
-          "하나카드": {
+          "삼성카드": {
             "immediate_price": 235030,
             "payback_pct": 1.0,
             "after_payback": 232680,
@@ -1341,14 +1336,14 @@
         "member_price": 95840,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 80,219원",
-            "percent": 7,
-            "price": 80219
+            "alt": "cardCd02",
+            "text": "삼성 5% 즉시할인 81,944원",
+            "percent": 5,
+            "price": 81944
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 81,944원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 81,944원",
             "percent": 5,
             "price": 81944
           }
@@ -1357,7 +1352,7 @@
         "kakao_reward_pt": 0,
         "kakao_final_cost": 95840,
         "paybacks": {
-          "하나카드": {
+          "삼성카드": {
             "immediate_price": 81944,
             "payback_pct": 1.0,
             "after_payback": 81125,
@@ -1480,14 +1475,14 @@
         "member_price": 132680,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 123,391원",
-            "percent": 7,
-            "price": 123391
+            "alt": "cardCd02",
+            "text": "삼성 5% 즉시할인 126,045원",
+            "percent": 5,
+            "price": 126045
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 126,045원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 126,045원",
             "percent": 5,
             "price": 126045
           }
@@ -1496,7 +1491,7 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 122680,
         "paybacks": {
-          "하나카드": {
+          "삼성카드": {
             "immediate_price": 126045,
             "payback_pct": 1.0,
             "after_payback": 124785,
@@ -1630,14 +1625,14 @@
         "member_price": 103360,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 86,504원",
-            "percent": 7,
-            "price": 86504
+            "alt": "cardCd02",
+            "text": "삼성 5% 즉시할인 88,365원",
+            "percent": 5,
+            "price": 88365
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 88,365원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 88,365원",
             "percent": 5,
             "price": 88365
           }
@@ -1646,7 +1641,7 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 93360,
         "paybacks": {
-          "하나카드": {
+          "삼성카드": {
             "immediate_price": 88365,
             "payback_pct": 1.0,
             "after_payback": 87481,
@@ -1782,14 +1777,14 @@
         "member_price": 118840,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 110,512원",
-            "percent": 7,
-            "price": 110512
+            "alt": "cardCd02",
+            "text": "삼성 5% 즉시할인 112,889원",
+            "percent": 5,
+            "price": 112889
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 112,889원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 112,889원",
             "percent": 5,
             "price": 112889
           }
@@ -1798,7 +1793,7 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 108840,
         "paybacks": {
-          "하나카드": {
+          "삼성카드": {
             "immediate_price": 112889,
             "payback_pct": 1.0,
             "after_payback": 111760,
@@ -2050,14 +2045,14 @@
         "member_price": 165600,
         "card_slides": [
           {
-            "alt": "cardCd04",
-            "text": "현대 7% 즉시할인 140,058원",
-            "percent": 7,
-            "price": 140058
+            "alt": "cardCd02",
+            "text": "삼성 5% 즉시할인 143,070원",
+            "percent": 5,
+            "price": 143070
           },
           {
-            "alt": "cardCd10",
-            "text": "하나 5% 즉시할인 143,070원",
+            "alt": "cardCd40",
+            "text": "NH 5% 즉시할인 143,070원",
             "percent": 5,
             "price": 143070
           }
@@ -2066,7 +2061,7 @@
         "kakao_reward_pt": 10000,
         "kakao_final_cost": 155600,
         "paybacks": {
-          "하나카드": {
+          "삼성카드": {
             "immediate_price": 143070,
             "payback_pct": 1.0,
             "after_payback": 141639,

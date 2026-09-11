@@ -57,6 +57,7 @@ from phone_auto.hmall_hyundai_buy import (
     preflight_card_app,                 # ★KB Pay 는 USB 디버깅이면 안 뜬다 (3사 공용)
     _dump_texts,                        # ★윈도우 OCR 이 놓치는 텍스트 보강 (OCR 과 겹쳐 읽기)
     ocr_or_dump_tap,                    # ★OCR 탭 실패 시 dump 탭으로 재시도 (3사 공용 정본)
+    SAMSUNG_MAX_PAY,                    # ★삼성 1건 30만원 상한 (3사 공용, 정본은 hmall 쪽 1군데)
 )
 from phone_auto.flow_runner import _ocr_texts, FlowRunner
 # PATH(bare adb)는 hmall_hyundai_buy import 시 이미 설정됨.
@@ -2155,6 +2156,19 @@ def _order_sheet_tail(res: dict, idx: int, card, goods_no, combo_idx) -> dict:
     _actual = int(_n) if _n else None
     res["pay_amount"] = _actual
     print(f"[#{idx}] 결제 예정 금액: {_amt or '(판독실패)'}", flush=True)
+    # ★삼성카드 30만원 상한 — 현대몰과 **같은 가드**(정본 상수 = hmall_hyundai_buy.SAMSUNG_MAX_PAY).
+    #   MAX_PAY 와 달리 환경변수 없이 항상 걸고, 판독 실패도 막는다. 넘으면 상품을 나눠 2건으로 결제한다.
+    #   (READ_FIRST 「버그 하나를 고치면 같은 모양을 폴더 전체에서 찾는다」 — 한쪽에만 있으면 곧 구멍이 된다.)
+    if use_card == "삼성":
+        if _actual is None:
+            res["status"] = "AMOUNT_UNREADABLE(삼성 30만원 상한 — 금액을 못 읽으면 결제 안 함)"
+            print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+            return res
+        if _actual >= SAMSUNG_MAX_PAY:
+            res["status"] = (f"SAMSUNG_OVER_LIMIT({_actual:,}원 ≥ {SAMSUNG_MAX_PAY:,}원) — "
+                             f"인증서 단계에 막힌다. 상품을 나눠 30만원 미만 2건으로 결제할 것")
+            print(f"[#{idx}] ⛔ {res['status']}", flush=True)
+            return res
     _max = os.environ.get("MAX_PAY")
     # ★금액을 못 읽으면 **가드가 통째로 사라진다** (2026-08-31 실측: '결제 예정 금액: (판독실패)'
     #   인데도 그대로 결제 실행됨). 종전 조건 `if _max and _amt:` 은 _amt=None 이면 검사를 건너뛰어

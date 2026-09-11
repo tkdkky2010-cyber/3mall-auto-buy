@@ -439,3 +439,13 @@ try:
     print(f"조건부 서식 추가 — K2:M{1+len(COMBOS)} 행별 최저 공급률 셀 연두색")
 except Exception as e:
     print(f"⚠️ 조건부 서식 실패: {e}")
+
+# ── 주로 사는 조합번호 색칠 (사용자 지시 2026-09-11: Step 3 → Step 1 로 이동) ──
+#   여기가 Step 1 의 마지막이다. 갤러리아·Hmall·롯데 세 섹션 A열 + 차트 J열을 다 칠하므로
+#   세 섹션이 모두 시트에 올라온 뒤여야 한다 → lotte.py 끝이 유일하게 맞는 자리.
+#   ★고정 세트다. 그날 플랜으로 자동 계산하지 말 것 (경위: READ_FIRST.md 상단 조합번호 색칠 사고).
+try:
+    from cart_plan import highlight_combo_numbers, HIGHLIGHT_COMBOS   # type: ignore
+    highlight_combo_numbers(ws, HIGHLIGHT_COMBOS)
+except Exception as _e:
+    print(f"⚠️ 조합번호 색칠 실패: {_e}")

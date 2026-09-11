@@ -392,8 +392,9 @@ def main(argv=None) -> int:
     )
     print(f"\n→ 시트 입력: {rng}")
 
-    # 주로 사는 조합번호 색칠 (고정 세트 — 플랜과 무관, 위 HIGHLIGHT_COMBOS 주석 참조)
-    highlight_combo_numbers(ws, HIGHLIGHT_COMBOS)
+    # 조합번호 색칠은 **Step 1(rate-check/lotte.py 끝)** 로 옮겼다 (사용자 지시 2026-09-11:
+    # "스텝1,2 에 주로사는조합번호 색칠하는거 끼워넣어 스텝3에 색칠하는 내용은 없어도돼").
+    # 함수와 HIGHLIGHT_COMBOS 는 여기 그대로 두고 lotte.py 가 import 해서 쓴다 — 정본은 한 군데다.
     return 0
 
 
