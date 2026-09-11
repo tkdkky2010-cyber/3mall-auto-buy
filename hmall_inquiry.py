@@ -71,7 +71,7 @@ def _select_by_first_option(page, first_text: str):
     return None
 
 
-def fill_form(page, name: str, point_no: str) -> dict:
+def fill_form(page, body: str) -> dict:
     """폼을 채우고 **채워진 값을 되읽어** 반환. 확인 클릭은 하지 않는다."""
     page.goto(INQUIRY_URL, wait_until="domcontentloaded")
     page.wait_for_timeout(2500)
@@ -93,7 +93,7 @@ def fill_form(page, name: str, point_no: str) -> dict:
         return {"ok": False, "error": f"상담사유 자동선택 실패 (value={reason})"}
 
     page.wait_for_selector("textarea#cnslCntn", timeout=10000)
-    page.fill("textarea#cnslCntn", body_text(name, point_no))
+    page.fill("textarea#cnslCntn", body)
     page.wait_for_timeout(400)
 
     page.locator("input[name=answReqnGbcd][value='1']").check()   # SMS
@@ -121,7 +121,7 @@ def fill_form(page, name: str, point_no: str) -> dict:
         hp:   document.querySelector('input[name=hpNum]')?.value || '',
         agree: !!document.querySelector('input#deliverCheck')?.checked,
     })""")
-    got["ok"] = (got["cntn"] == body_text(name, point_no) and got["sms"] and not got["tel"]
+    got["ok"] = (got["cntn"] == body and got["sms"] and not got["tel"]
                  and got["hp"] == HP_NUM and got["agree"])
     if not got["ok"]:
         got["error"] = "폼 값 검증 실패"
@@ -225,7 +225,7 @@ def main() -> int:
                 print(f"[{idx}] 로그인 실패 — skip")
                 results.append({"idx": idx, "id": exp_id, "ok": False, "step": "login"})
                 continue
-            f = fill_form(page, name, point_no)
+            f = fill_form(page, body_text(name, point_no))
             print(f"[{idx}] fill: {json.dumps(f, ensure_ascii=False)}")
             if not f.get("ok"):
                 results.append({"idx": idx, "id": exp_id, "ok": False, "step": "fill", **f})
